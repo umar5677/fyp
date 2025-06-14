@@ -61,54 +61,83 @@ app.post('/api/ocr/aws-parse-image', async (req, res) => {
             return res.status(404).json({ message: "No text was detected." });
         }
 
-        const numericWords = TextDetections.filter(d => d.Type === 'WORD' && /^\d+$/.test(d.DetectedText));
-
-        if (numericWords.length === 0) {
-            return res.status(404).json({ message: "No numbers found in the image." });
-        }
-
-        // Sort by physical size (area) to find the most dominant number first
-        numericWords.sort((a, b) => {
-            const areaA = a.Geometry.BoundingBox.Width * a.Geometry.BoundingBox.Height;
-            const areaB = b.Geometry.BoundingBox.Width * b.Geometry.BoundingBox.Height;
-            return areaB - areaA;
+        const words = TextDetections
+        .filter(d => d.Type === 'WORD')
+        .sort((a, b) => {
+          const dy = a.Geometry.BoundingBox.Top - b.Geometry.BoundingBox.Top;
+          if (Math.abs(dy) < 0.02) {
+            return a.Geometry.BoundingBox.Left - b.Geometry.BoundingBox.Left;
+          }
+          return dy;
         });
-
-        // Iterate through our size-sorted numbers to find a plausible reading
-        for (const anchor of numericWords) {
-            let potentialParts = [anchor];
-
-            // Find other numbers that are physically close to our current anchor
-            for (const other of numericWords) {
-                if (other.Id === anchor.Id) continue;
-
-                const boxA = anchor.Geometry.BoundingBox;
-                const boxB = other.Geometry.BoundingBox;
-
-                // Check for horizontal or vertical proximity
-                const horizontalDist = Math.abs(boxA.Left - boxB.Left);
-                const verticalDist = Math.abs(boxA.Top - boxB.Top);
-                
-                // If they are close, consider them part of the same number
-                if (horizontalDist < boxA.Width * 2 && verticalDist < boxA.Height) {
-                    potentialParts.push(other);
-                }
-            }
-            
-            // Sort the parts of our potential number from left to right
-            potentialParts.sort((a, b) => a.Geometry.BoundingBox.Left - b.Geometry.BoundingBox.Left);
-
-            const combinedText = potentialParts.map(p => p.DetectedText).join('');
-            const finalNumber = parseInt(combinedText);
-
-            // If we have a valid number in the correct range, we're done
-            if (!isNaN(finalNumber) && finalNumber >= 20 && finalNumber <= 600) {
-                return res.status(200).json({ success: true, number: String(finalNumber) });
-            }
-        }
+      
+        let calories = null;
+        let sugar = null;
+        let bloodsugar = null;
         
-        // If no combination worked, return a failure message
-        res.status(404).json({ message: "Could not identify a clear blood sugar reading." });
+        // Helper: extract decimal numbers from nearby words
+        function extractNumericNear(index, wordList) {
+            for (let j = index + 1; j <= index + 4 && j < wordList.length; j++) {
+            const clean = wordList[j].DetectedText.replace(/[^\d.]/g, '');
+            if (/^\d+(\.\d+)?$/.test(clean)) {
+                return parseFloat(clean);
+            }
+            }
+            return null;
+        }
+      
+      // Define keyword sets
+      const calorieKeywords = ['calorie', 'calories', 'energy'];
+      const sugarKeywords = ['sugar', 'sugars', 'total sugar', 'total sugars', 'added sugar', 'added sugars'];
+      const bloodSugarKeywords = ['blood sugar', 'glucose'];
+      
+      for (let i = 0; i < words.length; i++) {
+        const text = words[i].DetectedText.toLowerCase();
+        const phrase = words.slice(i, i + 2).map(w => w.DetectedText.toLowerCase()).join(' ');
+      
+        // --- CALORIES ---
+        if (
+          calorieKeywords.some(kw => text.includes(kw) || phrase.includes(kw)) &&
+          calories === null
+        ) {
+          const numeric = extractNumericNear(i, words);
+          if (numeric !== null) calories = numeric;
+        }
+      
+        // --- SUGAR ---
+        const slidingPhrase = words.slice(i, i + 3).map(w => w.DetectedText.toLowerCase()).join(' ');
+
+        if (
+        sugarKeywords.some(kw =>
+            text.includes(kw) ||
+            phrase.includes(kw) ||
+            slidingPhrase.includes(kw)
+        ) && sugar === null
+        ) {
+        const numeric = extractNumericNear(i, words);
+        if (numeric !== null) sugar = numeric;
+        }
+      
+        // --- BLOOD SUGAR ---
+        if (
+          bloodSugarKeywords.some(kw => text.includes(kw) || phrase.includes(kw)) &&
+          bloodsugar === null
+        ) {
+          const numeric = extractNumericNear(i, words);
+          if (numeric !== null) bloodsugar = numeric;
+        }
+      }
+
+if (!calories && !sugar && !bloodsugar) {
+  return res.status(404).json({ message: "Could not detect any values." });
+}
+
+return res.status(200).json({
+  success: true,
+  calories: calories ?? null,
+  sugar: sugar ?? null,
+  bloodsugar: bloodsugar ?? null
+});
 
     } catch (error) {
         console.error("AWS Rekognition error:", error);
@@ -178,6 +207,89 @@ app.put('/api/logs/bloodsugar/:logId', async (req, res) => {
 app.delete('/api/logs/bloodsugar/:logId', async (req, res) => {
     const { logId } = req.params;
     if (!logId) return res.status(400).json({ message: "Log ID is required." });
+    try {
+        const [result] = await dbPool.query(`DELETE FROM dataLogs WHERE logID = ?`, [logId]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Log not found to delete.' });
+        }
+        res.status(200).json({ message: 'Log deleted successfully.' });
+    } catch (error) {
+        console.error('Error deleting log:', error);
+        res.status(500).json({ message: 'Error deleting log.' });
+    }
+});
+
+// --- Calorie and Sugar Log Routes ---
+app.get('/api/logs/caloriesugar/history/:userId', async (req, res) => {
+    const { userId } = req.params;
+    if (!userId) return res.status(400).json({ message: "User ID is required." });
+
+    try {
+        const [logs] = await dbPool.query(
+            `SELECT logID, userID, type, amount, date FROM dataLogs WHERE userID = ? AND type IN (1, 2) ORDER BY date DESC`,
+            [userId]
+        );
+        res.status(200).json(logs);
+    } catch (error) {
+        console.error('Error fetching calorie/sugar history:', error);
+        res.status(500).json({ message: 'Error fetching history.' });
+    }
+});
+
+app.post('/api/logs/caloriesugar', async (req, res) => {
+    const { userId, amount, type, date } = req.body;
+    const dateToInsert = date ? new Date(date) : new Date();
+
+    if (!userId || amount == null || type == null) {
+        return res.status(400).json({ message: 'User ID, amount, and type are required.' });
+    }
+
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount) || numericAmount < 0 || ![1, 2].includes(type)) {
+        return res.status(400).json({ message: 'Invalid input: amount must be non-negative, and type must be 1 or 2.' });
+    }
+
+    try {
+        const [result] = await dbPool.query(
+            'INSERT INTO dataLogs (userID, type, amount, date) VALUES (?, ?, ?, ?)',
+            [userId, type, numericAmount, dateToInsert]
+        );
+        res.status(201).json({ success: true, message: 'Log created successfully!', logId: result.insertId });
+    } catch (error) {
+        console.error('Error creating log:', error);
+        res.status(500).json({ success: false, message: 'Error creating log.' });
+    }
+});
+
+app.put('/api/logs/caloriesugar/:logId', async (req, res) => {
+    const { logId } = req.params;
+    const { amount } = req.body;
+
+    if (amount == null) {
+        return res.status(400).json({ message: 'Amount is required.' });
+    }
+
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount) || numericAmount < 0) {
+        return res.status(400).json({ message: 'A valid, non-negative amount is required.' });
+    }
+
+    try {
+        const [result] = await dbPool.query(`UPDATE dataLogs SET amount = ? WHERE logID = ?`, [numericAmount, logId]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Log not found.' });
+        }
+        res.status(200).json({ message: 'Log updated successfully.' });
+    } catch (error) {
+        console.error('Error updating log:', error);
+        res.status(500).json({ message: 'Error updating log.' });
+    }
+});
+
+app.delete('/api/logs/caloriesugar/:logId', async (req, res) => {
+    const { logId } = req.params;
+    if (!logId) return res.status(400).json({ message: "Log ID is required." });
+
     try {
         const [result] = await dbPool.query(`DELETE FROM dataLogs WHERE logID = ?`, [logId]);
         if (result.affectedRows === 0) {

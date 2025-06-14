@@ -7,7 +7,7 @@ import LoginScreen from './screens/Login';
 import AppTabs from './components/AppTabs'; // Assuming AppTabs is in components
 import LogBloodSugarScreen from './screens/LogBloodSugarScreen'; // Import the new screen
 // Import other modal screens if you have them, e.g., for calorie/sugar
-// import LogCalorieSugarScreen from './screens/LogCalorieSugarScreen';
+import LogCalorieSugarScreen from './screens/LogCalorieSugarScreen';
 
 const Stack = createStackNavigator();
 
@@ -37,13 +37,16 @@ export default function App() {
             // title: 'Log Blood Sugar', // Or set title in the screen itself
           }}
         />
-        {/*
+        
         <Stack.Screen
           name="LogCalorieSugarModal"
           component={LogCalorieSugarScreen}
-          options={{ presentation: 'modal', title: 'Log Food Intake' }}
+          options={{ 
+            presentation: 'modal',
+            headerShown: false,
+          }}
         />
-        */}
+       
       </Stack.Navigator>
     </NavigationContainer>
   );

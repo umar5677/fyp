@@ -10,7 +10,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
 // API URLs
-const BASE_URL = 'http://192.168.10.121:3000/api';
+const BASE_URL = 'http://192.168.0.120:3000/api';
 const LOGS_URL = `${BASE_URL}/logs/bloodsugar`;
 const HISTORY_URL = `${LOGS_URL}/history`;
 const OCR_URL = `${BASE_URL}/ocr/aws-parse-image`;

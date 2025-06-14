@@ -25,7 +25,7 @@ const SpeedDialButton = ({ navigation, userId }) => {
     toggleMenu(); // Close menu after action
     switch (action) {
       case 'calorieSugar':
-        Alert.alert('Action', 'Add Calorie and Sugar Intake');
+        navigation.navigate('LogCalorieSugarModal', { userId });
         break;
       case 'bloodSugar':
         // --- The Fix Starts Here ---

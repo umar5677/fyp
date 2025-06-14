@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 
 // THIS IS YOUR BACKEND API URL that connects to your AWS DB for login
-const YOUR_AWS_LOGIN_API_URL = 'http://192.168.10.121:3000/api/login';
+const YOUR_AWS_LOGIN_API_URL = 'http://192.168.0.120:3000/api/login';
 
 const Login = ({ navigation }) => {
   const [email, setEmail] = useState('');
