@@ -1,40 +1,36 @@
 // components/AppTabs.js
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Platform, StyleSheet, Alert } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-// Adjust import paths for screens (go up one level, then into screens)
 import Home from '../screens/Home';
 import Calendar from '../screens/Calendar';
 import Stats from '../screens/Stats';
 import Profile from '../screens/Profile';
-
-// Import SpeedDialButton from the SAME 'components' folder
 import SpeedDialButton from './SpeedDialButton';
 
 const Tab = createBottomTabNavigator();
+const DummyAddScreen = () => null;
 
 const ACTIVE_COLOR = '#007AFF';
 const INACTIVE_COLOR = '#8e8e93';
-const TAB_BAR_BACKGROUND = Platform.OS === 'ios' ? '#F7F7F7' : '#FFFFFF';
-const BORDER_COLOR = '#D1D1D6';
 
-const DummyAddScreen = () => null;
-
-const AppTabs = ({ navigation }) => {
-  // The 'navigation' prop is passed from App.js (the root StackNavigator)
-  // and will be passed to SpeedDialButton
+const AppTabs = ({ navigation, route }) => {
+  // --- The Fix Starts Here ---
+  // 1. Get the userId from the route params passed from the Login screen.
+  const { userId } = route.params;
+  // --- The Fix Ends Here ---
 
   return (
     <Tab.Navigator
       screenOptions={{
         tabBarStyle: {
-          backgroundColor: TAB_BAR_BACKGROUND,
+          backgroundColor: Platform.OS === 'ios' ? '#F7F7F7' : '#FFFFFF',
           height: Platform.OS === 'ios' ? 85 : 65,
           paddingBottom: Platform.OS === 'ios' ? 30 : 5,
           borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: BORDER_COLOR,
+          borderTopColor: '#D1D1D6',
         },
         tabBarActiveTintColor: ACTIVE_COLOR,
         tabBarInactiveTintColor: INACTIVE_COLOR,
@@ -46,10 +42,7 @@ const AppTabs = ({ navigation }) => {
         component={Home}
         options={{
           title: 'Home',
-          tabBarLabel: 'Home',
-          tabBarIcon: ({ focused, color, size }) => (
-            <Ionicons name={focused ? "home" : "home-outline"} size={size} color={color} />
-          ),
+          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? "home" : "home-outline"} size={size} color={color} />,
         }}
       />
       <Tab.Screen
@@ -57,10 +50,7 @@ const AppTabs = ({ navigation }) => {
         component={Calendar}
         options={{
           title: 'Calendar',
-          tabBarLabel: 'Calendar',
-          tabBarIcon: ({ focused, color, size }) => (
-            <Ionicons name={focused ? "calendar" : "calendar-outline"} size={size} color={color} />
-          ),
+          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? "calendar" : "calendar-outline"} size={size} color={color} />,
         }}
       />
       <Tab.Screen
@@ -68,9 +58,9 @@ const AppTabs = ({ navigation }) => {
         component={DummyAddScreen}
         options={{
           tabBarLabel: '',
-          // Pass the parent stack's navigation to SpeedDialButton
-          tabBarButton: () => (<SpeedDialButton navigation={navigation} />),
           headerShown: false,
+          // 2. Pass the 'navigation' prop and the extracted 'userId' directly
+          tabBarButton: () => <SpeedDialButton navigation={navigation} userId={userId} />,
         }}
       />
       <Tab.Screen
@@ -78,10 +68,7 @@ const AppTabs = ({ navigation }) => {
         component={Stats}
         options={{
           title: 'Stats',
-          tabBarLabel: 'Stats',
-          tabBarIcon: ({ focused, color, size }) => (
-            <Ionicons name={focused ? "bar-chart" : "bar-chart-outline"} size={size} color={color} />
-          ),
+          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? "bar-chart" : "bar-chart-outline"} size={size} color={color} />,
         }}
       />
       <Tab.Screen
@@ -89,10 +76,7 @@ const AppTabs = ({ navigation }) => {
         component={Profile}
         options={{
           title: 'Profile',
-          tabBarLabel: 'Profile',
-          tabBarIcon: ({ focused, color, size }) => (
-            <Ionicons name={focused ? "person" : "person-outline"} size={size} color={color} />
-          ),
+          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? "person" : "person-outline"} size={size} color={color} />,
         }}
       />
     </Tab.Navigator>

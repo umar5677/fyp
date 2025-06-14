@@ -1,201 +1,352 @@
 // screens/LogBloodSugarScreen.js
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons'; // For the edit icon
+import { 
+    View, Text, TextInput, Button, StyleSheet, Alert, 
+    TouchableOpacity, ActivityIndicator, Modal, FlatList, 
+    KeyboardAvoidingView, Platform 
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
-// --- Simulate fetching and saving data ---
-// In a real app, these would be API calls
-const fetchCurrentBloodSugar = async () => {
-  return new Promise(resolve => setTimeout(() => resolve(110), 500)); // Simulate API delay, returns 110 mg/dL
+// API URLs
+const BASE_URL = 'http://192.168.10.121:3000/api';
+const LOGS_URL = `${BASE_URL}/logs/bloodsugar`;
+const HISTORY_URL = `${LOGS_URL}/history`;
+const OCR_URL = `${BASE_URL}/ocr/aws-parse-image`;
+
+//API Helper Object
+const api = {
+    getHistory: async (userId) => {
+        const response = await fetch(`${HISTORY_URL}/${userId}`);
+        if (!response.ok) throw new Error('Failed to fetch history');
+        return response.json();
+    },
+    addLog: async (userId, amount) => {
+        const response = await fetch(LOGS_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, amount, date: new Date().toISOString() }),
+        });
+        return response.json();
+    },
+    updateLog: async (logId, amount) => {
+        const response = await fetch(`${LOGS_URL}/${logId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount }),
+        });
+        return response.json();
+    },
+    deleteLog: async (logId) => {
+        const response = await fetch(`${LOGS_URL}/${logId}`, { method: 'DELETE' });
+        return response.json();
+    },
+    scanImage: async (base64) => {
+        const response = await fetch(OCR_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: base64 }),
+        });
+        return response.json();
+    },
 };
 
-const saveBloodSugarLog = async (value) => {
-  console.log('Saving blood sugar:', value);
-  return new Promise(resolve => setTimeout(() => resolve({ success: true, message: 'Blood sugar logged!' }), 1000));
-};
-// --- End Simulation ---
+//  EditModal Component
+const EditLogModal = ({ modalVisible, setModalVisible, log, onSave, onDelete, onScan }) => {
+    const [inputValue, setInputValue] = useState(String(log?.amount || ''));
+    const [isSaving, setIsSaving] = useState(false);
+    const [isScanning, setIsScanning] = useState(false);
 
-const LogBloodSugarScreen = ({ navigation }) => {
-  const [currentReading, setCurrentReading] = useState(null);
-  const [inputValue, setInputValue] = useState('');
-  const [isEditing, setIsEditing] = useState(false); // Start in non-editing mode if displaying current
-  const [isLoading, setIsLoading] = useState(false);
-  const [isFetchingCurrent, setIsFetchingCurrent] = useState(true);
+    useEffect(() => {
+        if (modalVisible) {
+            setInputValue(String(log?.amount || ''));
+        }
+    }, [log, modalVisible]);
 
-  useEffect(() => {
-    const loadData = async () => {
-      setIsFetchingCurrent(true);
-      const fetchedReading = await fetchCurrentBloodSugar();
-      setCurrentReading(fetchedReading);
-      setInputValue(String(fetchedReading)); // Pre-fill input with current reading
-      setIsFetchingCurrent(false);
-      // setIsEditing(false); // Initially, just display, don't allow edit until "Edit" is pressed
+    if (!log) {
+        return null;
+    }
+
+    const handleSave = async () => {
+        if (isSaving) return;
+        setIsSaving(true);
+        await onSave(log.logID, inputValue);
+        setIsSaving(false);
+        setModalVisible(false);
     };
-    loadData();
-  }, []);
 
-  const handleEditPress = () => {
-    setIsEditing(true);
-  };
+    const handleDelete = () => {
+        Alert.alert("Delete Log", "Are you sure you want to delete this log?", [
+            { text: "Cancel", style: "cancel" },
+            { text: "Delete", style: "destructive", onPress: () => {
+                onDelete(log.logID);
+                setModalVisible(false);
+            }},
+        ]);
+    };
 
-  const handleSave = async () => {
-    const numericValue = parseFloat(inputValue);
-    if (isNaN(numericValue) || numericValue <= 0) {
-      Alert.alert('Invalid Input', 'Please enter a valid blood sugar value.');
-      return;
-    }
-    setIsLoading(true);
-    const result = await saveBloodSugarLog(numericValue);
-    setIsLoading(false);
-    if (result.success) {
-      Alert.alert('Success', result.message);
-      setCurrentReading(numericValue); // Update displayed current reading
-      setIsEditing(false); // Exit editing mode
-      // Optionally navigate back or refresh data elsewhere
-      // navigation.goBack();
-    } else {
-      Alert.alert('Error', result.message || 'Failed to save data.');
-    }
-  };
+    const handlePickImage = async (type) => {
+        const permissions = type === 'camera' ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permissions.granted) {
+            Alert.alert('Permission Denied', `Access to the ${type} is required.`);
+            return;
+        }
+        const pickerResult = type === 'camera' ? await ImagePicker.launchCameraAsync() : await ImagePicker.launchImageLibraryAsync();
+        if (pickerResult.canceled || !pickerResult.assets?.length) return;
+        
+        setIsScanning(true);
+        const scanResult = await onScan(pickerResult.assets[0].uri);
+        setIsScanning(false);
+        if (scanResult) {
+            setInputValue(scanResult);
+        }
+    };
 
-  if (isFetchingCurrent) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <Text>Loading current blood sugar...</Text>
-      </View>
+        <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
+            <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.modalOverlay}>
+                <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setModalVisible(false)} />
+                <View style={styles.modalContent}>
+                    <Text style={styles.modalTitle}>{log.logID ? 'Edit' : 'Add New'} Reading</Text>
+                    <TextInput
+                        style={styles.modalInput}
+                        value={inputValue}
+                        onChangeText={setInputValue}
+                        keyboardType="decimal-pad"
+                        placeholder="0"
+                        placeholderTextColor="#999"
+                        autoFocus={true}
+                    />
+                    
+                    {isScanning ? <ActivityIndicator style={styles.spinner} /> : (
+                        <View style={styles.scanButtonsContainer}>
+                            <TouchableOpacity style={styles.scanButton} onPress={() => handlePickImage('camera')}>
+                                <Ionicons name="camera-outline" size={20} color="#fff" />
+                                <Text style={styles.scanButtonText}>Scan</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.scanButton} onPress={() => handlePickImage('gallery')}>
+                                <Ionicons name="image-outline" size={20} color="#fff" />
+                                <Text style={styles.scanButtonText}>Upload</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                    
+                    <View style={styles.modalActions}>
+                        <TouchableOpacity onPress={() => setModalVisible(false)}>
+                            <Text style={styles.modalButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                        {log.logID && 
+                            <TouchableOpacity onPress={handleDelete}>
+                                <Text style={[styles.modalButtonText, { color: '#FF3B30' }]}>Delete</Text>
+                            </TouchableOpacity>
+                        }
+                        <TouchableOpacity onPress={handleSave} disabled={isSaving}>
+                             <Text style={[styles.modalButtonText, { fontWeight: 'bold' }]}>Save</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </KeyboardAvoidingView>
+        </Modal>
     );
-  }
-
-  return (
-    <View style={styles.container}>
-      <Text style={styles.headerTitle}>Log Blood Sugar</Text>
-
-      <View style={styles.currentReadingContainer}>
-        <Text style={styles.currentReadingLabel}>Last Reading:</Text>
-        <Text style={styles.currentReadingValue}>
-          {currentReading !== null ? `${currentReading} mg/dL` : 'N/A'}
-        </Text>
-        {!isEditing && currentReading !== null && (
-          <TouchableOpacity onPress={handleEditPress} style={styles.editButtonIcon}>
-            <Ionicons name="pencil" size={24} color="#007AFF" />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {isEditing || currentReading === null ? ( // Show input if editing or no current reading
-        <>
-          <Text style={styles.label}>Enter New Blood Sugar (mg/dL):</Text>
-          <TextInput
-            style={styles.input}
-            value={inputValue}
-            onChangeText={setInputValue}
-            placeholder="e.g., 120"
-            keyboardType="numeric"
-            returnKeyType="done"
-            editable={isEditing || currentReading === null} // Make editable based on state
-          />
-          <View style={styles.buttonContainer}>
-            <Button
-              title={isLoading ? 'Saving...' : 'Save Log'}
-              onPress={handleSave}
-              disabled={isLoading || !inputValue}
-              color="#007AFF"
-            />
-            {isEditing && currentReading !== null && ( // Show cancel if was editing an existing value
-                 <Button
-                    title="Cancel Edit"
-                    onPress={() => {
-                        setIsEditing(false);
-                        setInputValue(String(currentReading)); // Reset input
-                    }}
-                    color="#FF3B30"
-                 />
-            )}
-          </View>
-        </>
-      ) : (
-        <View style={styles.buttonContainer}>
-          <Button title="Log New Reading" onPress={handleEditPress} color="#007AFF" />
-        </View>
-      )}
-
-      {/* Close button if presented as modal */}
-      <View style={styles.closeButtonContainer}>
-        <Button title="Close" onPress={() => navigation.goBack()} color="#8E8E93"/>
-      </View>
-    </View>
-  );
 };
 
+// Main Screen Component 
+const LogBloodSugarScreen = ({ navigation, route }) => {
+    const { userId } = route.params;
+
+    const [history, setHistory] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [selectedLog, setSelectedLog] = useState(null);
+    const [modalVisible, setModalVisible] = useState(false);
+
+    const loadData = async () => {
+        setIsLoading(true);
+        try {
+            const historyData = await api.getHistory(userId);
+            setHistory(historyData);
+        } catch (error) {
+            Alert.alert("Error", "Could not load reading history.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (userId) loadData();
+    }, [userId]);
+
+    const handleSave = async (logId, amount) => {
+        try {
+            const apiCall = logId ? api.updateLog : api.addLog;
+            const params = logId ? [logId, amount] : [userId, amount];
+            const result = await apiCall(...params);
+            
+            if (result.success !== false) {
+                 Alert.alert('Success', result.message || 'Operation successful.');
+            } else {
+                 Alert.alert('Error', result.message || 'Operation failed.');
+            }
+        } catch(e) {
+            Alert.alert('Error', 'An unexpected error occurred.');
+        }
+        loadData();
+    };
+
+    const handleDelete = async (logId) => {
+        try {
+            const result = await api.deleteLog(logId);
+            Alert.alert(result.message || 'Operation failed.');
+        } catch(e) {
+            Alert.alert('Error', 'An unexpected error occurred.');
+        }
+        loadData();
+    };
+    
+    const handleScan = async (imageUri) => {
+        try {
+            const manipulated = await manipulateAsync(imageUri, [{ resize: { width: 1080 } }], { compress: 0.9, format: SaveFormat.JPEG, base64: true });
+            const result = await api.scanImage(manipulated.base64);
+            if (result.number) {
+                Alert.alert('Scan Successful', `Detected: ${result.number}`);
+                return result.number;
+            } else {
+                Alert.alert('Scan Failed', result.message || 'Could not find a number.');
+                return null;
+            }
+        } catch (error) {
+            Alert.alert('Scan Error', 'An error occurred while scanning the image.');
+            return null;
+        }
+    };
+
+    const handleHistoryPress = (item) => {
+        setSelectedLog(item);
+        setModalVisible(true);
+    };
+
+    const handleAddNew = () => {
+        setSelectedLog({ amount: '' });
+        setModalVisible(true);
+    };
+
+    const lastReading = history.length > 0 ? history[0] : null;
+
+    const renderHistoryItem = ({ item }) => {
+        const date = new Date(item.date);
+        const formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const formattedTime = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        return (
+            <TouchableOpacity style={styles.historyRow} onPress={() => handleHistoryPress(item)}>
+                <Text style={styles.historyText}>{formattedDate}</Text>
+                <Text style={styles.historyText}>{formattedTime}</Text>
+                <Text style={styles.historyValue}>{item.amount} <Text style={styles.historyUnit}>mg/dL</Text></Text>
+            </TouchableOpacity>
+        );
+    };
+
+    const renderLastReadingContent = () => {
+        if (isLoading) {
+            return <ActivityIndicator style={styles.spinner} />;
+        }
+        if (lastReading) {
+            return (
+                <>
+                    <Text style={styles.lastReadingValue}>
+                        {lastReading.amount} <Text style={styles.lastReadingUnit}>mg/dL</Text>
+                    </Text>
+                    <Text style={styles.cardDate}>
+                        <Ionicons name="calendar-outline" size={14} color="#555" /> {new Date(lastReading.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                        <Text>   </Text>
+                        <Ionicons name="time-outline" size={14} color="#555" /> {new Date(lastReading.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                </>
+            );
+        }
+        return <Text style={styles.noDataText}>No readings yet. Press '+' to add one!</Text>;
+    };
+
+    return (
+        <View style={styles.container}>
+            <EditLogModal 
+                modalVisible={modalVisible}
+                setModalVisible={setModalVisible}
+                log={selectedLog}
+                onSave={handleSave}
+                onDelete={handleDelete}
+                onScan={handleScan}
+            />
+            
+            <View style={styles.header}>
+                <Text style={styles.headerTitle}>Blood Sugar</Text>
+                <TouchableOpacity onPress={() => navigation.goBack()}>
+                    <Text style={styles.doneButton}>Done</Text>
+                </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity 
+                style={styles.lastReadingCard}
+                onPress={() => lastReading ? handleHistoryPress(lastReading) : handleAddNew()}
+                disabled={isLoading}
+            >
+                <Text style={styles.cardTitle}><Ionicons name="water" size={16} color="#007AFF" /> Last Reading</Text>
+                {renderLastReadingContent()}
+            </TouchableOpacity>
+
+            <View style={styles.historyContainer}>
+                <Text style={styles.cardTitle}><Ionicons name="analytics" size={16} color="#007AFF" /> Reading History</Text>
+                <View style={styles.historyHeader}>
+                    <Text style={[styles.historyHeaderText, {flex: 2}]}>Date</Text>
+                    <Text style={[styles.historyHeaderText, {flex: 1.5}]}>Time</Text>
+                    <Text style={[styles.historyHeaderText, {flex: 1, textAlign: 'right'}]}>Value</Text>
+                </View>
+                <FlatList
+                    data={history.slice(1)}
+                    renderItem={renderHistoryItem}
+                    keyExtractor={item => item.logID.toString()}
+                    ListEmptyComponent={<Text style={styles.noDataText}>No previous history.</Text>}
+                />
+            </View>
+             
+            <TouchableOpacity style={styles.fab} onPress={handleAddNew}>
+                <Ionicons name="add" size={30} color="white" />
+            </TouchableOpacity>
+        </View>
+    );
+};
+
+//STYLES 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#F8F8F8',
-  },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-    color: '#333',
-  },
-  currentReadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 25,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  currentReadingLabel: {
-    fontSize: 18,
-    color: '#555',
-    marginRight: 10,
-  },
-  currentReadingValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000',
-    flex: 1, // Take remaining space
-  },
-  editButtonIcon: {
-    padding: 5,
-  },
-  label: {
-    fontSize: 16,
-    color: '#444',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#B0C4DE',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    fontSize: 18,
-    marginBottom: 20,
-    color: '#333',
-  },
-  buttonContainer: {
-    marginTop: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-around', // For Save and Cancel
-  },
-  closeButtonContainer: {
-    marginTop: 'auto', // Push to bottom
-    marginBottom: 20,
-  }
+    container: { flex: 1, backgroundColor: '#F0F2F5', paddingTop: 15, paddingHorizontal: 15 },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10, marginBottom: 5, },
+    headerTitle: { fontSize: 28, fontWeight: 'bold' },
+    doneButton: { fontSize: 17, color: '#007AFF', fontWeight: '600' },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    spinner: { marginVertical: 20 },
+    lastReadingCard: { backgroundColor: 'white', padding: 20, borderRadius: 12, marginBottom: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.20, shadowRadius: 1.41, elevation: 2 },
+    historyContainer: { flex: 1, backgroundColor: 'white', borderRadius: 12, paddingHorizontal: 20, paddingTop: 20 },
+    cardTitle: { fontSize: 16, fontWeight: '600', color: '#555', marginBottom: 10 },
+    lastReadingValue: { fontSize: 48, fontWeight: 'bold', color: '#111' },
+    lastReadingUnit: { fontSize: 24, fontWeight: 'normal', color: '#777' },
+    cardDate: { marginTop: 10, color: '#555', alignItems: 'center' },
+    noDataText: { textAlign: 'center', padding: 20, color: '#888' },
+    historyHeader: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#EEE', paddingBottom: 10 },
+    historyHeaderText: { fontWeight: 'bold', color: '#555' },
+    historyRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#EEE' },
+    historyText: { fontSize: 14 },
+    historyValue: { fontSize: 14, fontWeight: 'bold' },
+    historyUnit: { fontWeight: 'normal', color: '#555' },
+    fab: { position: 'absolute', margin: 16, right: 10, bottom: 10, backgroundColor: '#007AFF', width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#000', shadowRadius: 5, shadowOpacity: 0.3, shadowOffset: { height: 2, width: 0 } },
+    modalOverlay: { flex: 1, justifyContent: 'flex-end' },
+    modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+    modalContent: { backgroundColor: '#F0F2F5', paddingHorizontal: 20, paddingTop: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+    modalTitle: { fontSize: 16, fontWeight: '600', color: '#888', textAlign: 'center', marginBottom: 15 },
+    modalInput: { backgroundColor: '#FFFFFF', borderColor: '#E0E0E0', borderWidth: 1, borderRadius: 10, padding: 15, fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
+    scanButtonsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 30 },
+    scanButton: { flex: 1, flexDirection: 'row', backgroundColor: '#007AFF', paddingVertical: 14, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginHorizontal: 5 },
+    scanButtonText: { color: '#fff', marginLeft: 8, fontWeight: '600', fontSize: 16 },
+    modalActions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
+    modalButtonText: { color: '#007AFF', fontSize: 17, padding: 10 },
 });
 
 export default LogBloodSugarScreen;
