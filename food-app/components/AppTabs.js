@@ -18,7 +18,7 @@ const ACTIVE_COLOR = '#007AFF';
 const INACTIVE_COLOR = '#8e8e93';
 
 const AppTabs = ({ navigation, route }) => {
-  const { userId } = route.params;
+  const userId = route.params?.userId;
   const insets = useSafeAreaInsets();
 
   return (

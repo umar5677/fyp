@@ -88,7 +88,7 @@ const EditCalorieSugarModal = ({ modalVisible, setModalVisible, logs, onSave, on
 
 
 // --- Main Screen Component ---
-export default function LogCalorieSugarScreen({ navigation, route }) {
+export default function LogCalorieSugarScreen({ navigation}) {
     const [history, setHistory] = useState([]);
     const [groupedHistory, setGroupedHistory] = useState([]);
     const [modalVisible, setModalVisible] = useState(false);

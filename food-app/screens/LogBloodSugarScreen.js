@@ -119,7 +119,7 @@ const EditLogModal = ({
 
 
 // --- Main Screen Component ---
-const LogBloodSugarScreen = ({ navigation, route }) => {
+const LogBloodSugarScreen = ({ navigation}) => {
     const [history, setHistory] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedLog, setSelectedLog] = useState(null);
