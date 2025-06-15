@@ -1,8 +1,8 @@
-// screens/Login.js (YOUR ACTUAL LOGIN LOGIC - ADAPT THIS)
+// screens/Login.js
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 
-// THIS IS YOUR BACKEND API URL that connects to your AWS DB for login
+//BACKEND API URL that connects to your AWS DB for login
 const YOUR_AWS_LOGIN_API_URL = 'http://192.168.0.120:3000/api/login';
 
 const Login = ({ navigation }) => {
@@ -19,7 +19,7 @@ const Login = ({ navigation }) => {
     setIsLoading(true);
 
     try {
-      // THIS IS WHERE YOU MAKE YOUR ACTUAL FETCH CALL TO YOUR AWS BACKEND
+      //ACTUAL FETCH CALL TO YOUR AWS BACKEND
       const response = await fetch(YOUR_AWS_LOGIN_API_URL, {
         method: 'POST',
         headers: {
@@ -30,17 +30,16 @@ const Login = ({ navigation }) => {
 
       const responseData = await response.json(); // Always try to parse JSON
 
-      if (response.ok) { // Check for 2xx status codes
+      if (response.ok) {
         // Login successful
         Alert.alert('Login Success', responseData.message || 'Successfully logged in!');
 
-        // CRUCIAL NAVIGATION STEP:
-        // Navigate to 'MainApp' which will render your AppTabs
-        // You might want to pass user data received from your backend
+        // Navigate to 'MainApp'
+        // Pass user data received from your backend
         navigation.replace('MainApp', {
-          userId: responseData.userId, // Example: if your API returns userId
-          userEmail: responseData.email, // Example: if your API returns email
-          // token: responseData.token, // If your API returns a token for session management
+          userId: responseData.userId, // API returns userId
+          userEmail: responseData.email, // API returns email
+          // token: responseData.token, // API returns a token for session management
         });
       } else {
         // Login failed - Handle specific error messages from your backend

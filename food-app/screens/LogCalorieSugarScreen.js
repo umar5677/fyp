@@ -37,9 +37,6 @@ export default function LogCalorieSugarScreen({ navigation, route }) {
   
         const tempGroups = {};
         data.forEach(log => {
-            // Find a timestamp to group by. This is tricky.
-            // A better approach would be for the server to return a groupId.
-            // For now, let's find the closest timestamp within the threshold.
             const logTime = new Date(log.date).getTime();
             let foundGroup = false;
             for (const key in tempGroups) {
@@ -70,7 +67,6 @@ export default function LogCalorieSugarScreen({ navigation, route }) {
   };
 
   const handleScan = async (launchFn) => {
-    // This function needs to be adapted for Calorie/Sugar OCR
     // The current server endpoint is for blood sugar.
     Alert.alert("Not Implemented", "OCR for nutrition labels is not yet connected.");
   };

@@ -1,20 +1,19 @@
 // api/login.js
 const express = require('express');
-const bcrypt = require('bcryptjs'); // bcryptjs is now required here
+const bcrypt = require('bcryptjs'); 
 
-// --- Helper Function for Hashing Passwords (to be exported) ---
+// Helper Function for Hashing Passwords (to be exported)
 async function hashPassword(password) {
     const saltRounds = 10;
     return await bcrypt.hash(password, saltRounds);
 }
 
-// --- Helper Function for Comparing Passwords (used internally) ---
+// Helper Function for Comparing Passwords (used internally)
 async function comparePassword(plainPassword, hashedPassword) {
     return await bcrypt.compare(plainPassword, hashedPassword);
 }
 
-// --- "Internal" Authentication Logic Function ---
-// It now directly uses comparePassword from this module and accepts dbPool
+// "Internal" Authentication Logic Function
 async function authenticateUser(email, password, dbPool) {
     try {
         const [users] = await dbPool.query('SELECT userID, email, password FROM users WHERE email = ?', [email]);
@@ -35,8 +34,7 @@ async function authenticateUser(email, password, dbPool) {
     }
 }
 
-// --- Router Factory Function (to be exported) ---
-// This function takes dbPool and returns the configured router.
+// Router Factory Function (to be exported)
 function createLoginRouter(dbPool) {
     const router = express.Router();
 
