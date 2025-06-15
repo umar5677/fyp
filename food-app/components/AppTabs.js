@@ -3,6 +3,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Platform, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Home from '../screens/Home';
 import Calendar from '../screens/Calendar';
@@ -17,31 +18,29 @@ const ACTIVE_COLOR = '#007AFF';
 const INACTIVE_COLOR = '#8e8e93';
 
 const AppTabs = ({ navigation, route }) => {
-  // --- The Fix Starts Here ---
-  // 1. Get the userId from the route params passed from the Login screen.
   const { userId } = route.params;
-  // --- The Fix Ends Here ---
+  const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
       screenOptions={{
         tabBarStyle: {
           backgroundColor: Platform.OS === 'ios' ? '#F7F7F7' : '#FFFFFF',
-          height: Platform.OS === 'ios' ? 85 : 65,
-          paddingBottom: Platform.OS === 'ios' ? 30 : 5,
+          height: 45 + insets.bottom, 
+          paddingBottom: insets.bottom,
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: '#D1D1D6',
         },
         tabBarActiveTintColor: ACTIVE_COLOR,
         tabBarInactiveTintColor: INACTIVE_COLOR,
-        headerShown: true,
+        headerShown: false,
       }}
     >
       <Tab.Screen
         name="HomeTab"
         component={Home}
         options={{
-          title: 'Home',
+          tabBarLabel: 'Home',
           tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? "home" : "home-outline"} size={size} color={color} />,
         }}
       />
@@ -49,7 +48,7 @@ const AppTabs = ({ navigation, route }) => {
         name="CalendarTab"
         component={Calendar}
         options={{
-          title: 'Calendar',
+          tabBarLabel: 'Calendar',
           tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? "calendar" : "calendar-outline"} size={size} color={color} />,
         }}
       />
@@ -58,8 +57,6 @@ const AppTabs = ({ navigation, route }) => {
         component={DummyAddScreen}
         options={{
           tabBarLabel: '',
-          headerShown: false,
-          // 2. Pass the 'navigation' prop and the extracted 'userId' directly
           tabBarButton: () => <SpeedDialButton navigation={navigation} userId={userId} />,
         }}
       />
@@ -67,7 +64,7 @@ const AppTabs = ({ navigation, route }) => {
         name="StatsTab"
         component={Stats}
         options={{
-          title: 'Stats',
+          tabBarLabel: 'Stats',
           tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? "bar-chart" : "bar-chart-outline"} size={size} color={color} />,
         }}
       />
@@ -75,7 +72,7 @@ const AppTabs = ({ navigation, route }) => {
         name="ProfileTab"
         component={Profile}
         options={{
-          title: 'Profile',
+          tabBarLabel: 'Profile',
           tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? "person" : "person-outline"} size={size} color={color} />,
         }}
       />

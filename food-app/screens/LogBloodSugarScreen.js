@@ -3,19 +3,18 @@ import React, { useState, useEffect } from 'react';
 import { 
     View, Text, TextInput, Button, StyleSheet, Alert, 
     TouchableOpacity, ActivityIndicator, Modal, FlatList, 
-    KeyboardAvoidingView, Platform 
+    KeyboardAvoidingView, Platform, SafeAreaView 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
-// API URLs
+//API URLs and Helper Object 
 const BASE_URL = 'http://192.168.0.120:3000/api';
 const LOGS_URL = `${BASE_URL}/logs/bloodsugar`;
 const HISTORY_URL = `${LOGS_URL}/history`;
 const OCR_URL = `${BASE_URL}/ocr/aws-parse-image`;
 
-//API Helper Object
 const api = {
     getHistory: async (userId) => {
         const response = await fetch(`${HISTORY_URL}/${userId}`);
@@ -52,8 +51,9 @@ const api = {
     },
 };
 
-//  EditModal Component
+//EditModal Component 
 const EditLogModal = ({ modalVisible, setModalVisible, log, onSave, onDelete, onScan }) => {
+    if (!log) return null;
     const [inputValue, setInputValue] = useState(String(log?.amount || ''));
     const [isSaving, setIsSaving] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
@@ -63,10 +63,6 @@ const EditLogModal = ({ modalVisible, setModalVisible, log, onSave, onDelete, on
             setInputValue(String(log?.amount || ''));
         }
     }, [log, modalVisible]);
-
-    if (!log) {
-        return null;
-    }
 
     const handleSave = async () => {
         if (isSaving) return;
@@ -118,7 +114,6 @@ const EditLogModal = ({ modalVisible, setModalVisible, log, onSave, onDelete, on
                         placeholderTextColor="#999"
                         autoFocus={true}
                     />
-                    
                     {isScanning ? <ActivityIndicator style={styles.spinner} /> : (
                         <View style={styles.scanButtonsContainer}>
                             <TouchableOpacity style={styles.scanButton} onPress={() => handlePickImage('camera')}>
@@ -131,16 +126,11 @@ const EditLogModal = ({ modalVisible, setModalVisible, log, onSave, onDelete, on
                             </TouchableOpacity>
                         </View>
                     )}
-                    
                     <View style={styles.modalActions}>
                         <TouchableOpacity onPress={() => setModalVisible(false)}>
                             <Text style={styles.modalButtonText}>Cancel</Text>
                         </TouchableOpacity>
-                        {log.logID && 
-                            <TouchableOpacity onPress={handleDelete}>
-                                <Text style={[styles.modalButtonText, { color: '#FF3B30' }]}>Delete</Text>
-                            </TouchableOpacity>
-                        }
+                        {log.logID && <TouchableOpacity onPress={handleDelete}><Text style={[styles.modalButtonText, { color: '#FF3B30' }]}>Delete</Text></TouchableOpacity>}
                         <TouchableOpacity onPress={handleSave} disabled={isSaving}>
                              <Text style={[styles.modalButtonText, { fontWeight: 'bold' }]}>Save</Text>
                         </TouchableOpacity>
@@ -151,7 +141,7 @@ const EditLogModal = ({ modalVisible, setModalVisible, log, onSave, onDelete, on
     );
 };
 
-// Main Screen Component 
+// Main Screen Component
 const LogBloodSugarScreen = ({ navigation, route }) => {
     const { userId } = route.params;
 
@@ -267,7 +257,7 @@ const LogBloodSugarScreen = ({ navigation, route }) => {
     };
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
             <EditLogModal 
                 modalVisible={modalVisible}
                 setModalVisible={setModalVisible}
@@ -311,20 +301,66 @@ const LogBloodSugarScreen = ({ navigation, route }) => {
             <TouchableOpacity style={styles.fab} onPress={handleAddNew}>
                 <Ionicons name="add" size={30} color="white" />
             </TouchableOpacity>
-        </View>
+        </SafeAreaView>
     );
 };
 
-//STYLES 
+// STYLEs
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F0F2F5', paddingTop: 15, paddingHorizontal: 15 },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10, marginBottom: 5, },
-    headerTitle: { fontSize: 28, fontWeight: 'bold' },
-    doneButton: { fontSize: 17, color: '#007AFF', fontWeight: '600' },
+    container: { 
+        flex: 1, 
+        backgroundColor: '#F0F2F5',
+    },
+    header: { 
+        flexDirection: 'row', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        paddingBottom: 10, 
+        marginBottom: 5,
+        paddingHorizontal: 15,
+        paddingTop: Platform.OS === 'android' ? 15 : 0,
+    },
+    headerTitle: { 
+        fontSize: 28, 
+        fontWeight: 'bold' 
+    },
+    doneButton: { 
+        fontSize: 17, 
+        color: '#007AFF', 
+        fontWeight: '600' 
+    },
+    lastReadingCard: { 
+        backgroundColor: 'white', 
+        padding: 20, 
+        borderRadius: 12, 
+        marginBottom: 20, 
+        marginHorizontal: 15,
+        shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.20, shadowRadius: 1.41, elevation: 2, 
+    },
+    historyContainer: { 
+        flex: 1, 
+        backgroundColor: 'white', 
+        borderRadius: 12, 
+        paddingHorizontal: 20, 
+        paddingTop: 20,
+        marginHorizontal: 15,
+        marginBottom: 15,
+    },
+    fab: { 
+        position: 'absolute', 
+        margin: 16, 
+        right: 20, 
+        bottom: 20, 
+        backgroundColor: '#007AFF', 
+        width: 60, height: 60, 
+        borderRadius: 30, 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        elevation: 8, 
+        shadowColor: '#000', shadowRadius: 5, shadowOpacity: 0.3, shadowOffset: { height: 2, width: 0 } 
+    },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     spinner: { marginVertical: 20 },
-    lastReadingCard: { backgroundColor: 'white', padding: 20, borderRadius: 12, marginBottom: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.20, shadowRadius: 1.41, elevation: 2 },
-    historyContainer: { flex: 1, backgroundColor: 'white', borderRadius: 12, paddingHorizontal: 20, paddingTop: 20 },
     cardTitle: { fontSize: 16, fontWeight: '600', color: '#555', marginBottom: 10 },
     lastReadingValue: { fontSize: 48, fontWeight: 'bold', color: '#111' },
     lastReadingUnit: { fontSize: 24, fontWeight: 'normal', color: '#777' },
@@ -336,7 +372,6 @@ const styles = StyleSheet.create({
     historyText: { fontSize: 14 },
     historyValue: { fontSize: 14, fontWeight: 'bold' },
     historyUnit: { fontWeight: 'normal', color: '#555' },
-    fab: { position: 'absolute', margin: 16, right: 10, bottom: 10, backgroundColor: '#007AFF', width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#000', shadowRadius: 5, shadowOpacity: 0.3, shadowOffset: { height: 2, width: 0 } },
     modalOverlay: { flex: 1, justifyContent: 'flex-end' },
     modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
     modalContent: { backgroundColor: '#F0F2F5', paddingHorizontal: 20, paddingTop: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 },

@@ -3,10 +3,8 @@ import React, { useState, useRef } from 'react';
 import { View, TouchableOpacity, StyleSheet, Animated, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-// --- The Fix Starts Here ---
 // 1. Accept 'userId' as a prop instead of 'route'
 const SpeedDialButton = ({ navigation, userId }) => {
-// --- The Fix Ends Here ---
 
   const [isOpen, setIsOpen] = useState(false);
   const animation = useRef(new Animated.Value(0)).current;
@@ -28,10 +26,7 @@ const SpeedDialButton = ({ navigation, userId }) => {
         navigation.navigate('LogCalorieSugarModal', { userId });
         break;
       case 'bloodSugar':
-        // --- The Fix Starts Here ---
-        // 2. Use the 'userId' prop directly when navigating
         navigation.navigate('LogBloodSugarModal', { userId: userId });
-        // --- The Fix Ends Here ---
         break;
       default:
         break;
