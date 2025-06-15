@@ -9,64 +9,39 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
-//API URLs and Helper Object 
-const BASE_URL = 'http://192.168.0.120:3000/api';
-const LOGS_URL = `${BASE_URL}/logs/bloodsugar`;
-const HISTORY_URL = `${LOGS_URL}/history`;
-const OCR_URL = `${BASE_URL}/ocr/aws-parse-image`;
+import { api } from '../utils/api'; 
 
-const api = {
-    getHistory: async (userId) => {
-        const response = await fetch(`${HISTORY_URL}/${userId}`);
-        if (!response.ok) throw new Error('Failed to fetch history');
-        return response.json();
-    },
-    addLog: async (userId, amount) => {
-        const response = await fetch(LOGS_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, amount, date: new Date().toISOString() }),
-        });
-        return response.json();
-    },
-    updateLog: async (logId, amount) => {
-        const response = await fetch(`${LOGS_URL}/${logId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amount }),
-        });
-        return response.json();
-    },
-    deleteLog: async (logId) => {
-        const response = await fetch(`${LOGS_URL}/${logId}`, { method: 'DELETE' });
-        return response.json();
-    },
-    scanImage: async (base64) => {
-        const response = await fetch(OCR_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image: base64 }),
-        });
-        return response.json();
-    },
-};
-
-//EditModal Component 
-const EditLogModal = ({ modalVisible, setModalVisible, log, onSave, onDelete, onScan }) => {
-    if (!log) return null;
-    const [inputValue, setInputValue] = useState(String(log?.amount || ''));
+// --- EditLogModal Component (with state lifted up) ---
+const EditLogModal = ({ 
+    modalVisible, 
+    setModalVisible, 
+    log, 
+    onSave, 
+    onDelete, 
+    onScan,
+    // --- NEW PROPS FOR LIFTED STATE ---
+    inputValue,
+    setInputValue 
+}) => {
+    // Hooks for modal-specific state
     const [isSaving, setIsSaving] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
 
+    // This effect now correctly syncs the input value when the modal opens
     useEffect(() => {
         if (modalVisible) {
             setInputValue(String(log?.amount || ''));
         }
     }, [log, modalVisible]);
 
+    if (!log) {
+        return null;
+    }
+
     const handleSave = async () => {
         if (isSaving) return;
         setIsSaving(true);
+        // The onSave function already has access to the updated inputValue from the parent
         await onSave(log.logID, inputValue);
         setIsSaving(false);
         setModalVisible(false);
@@ -95,6 +70,7 @@ const EditLogModal = ({ modalVisible, setModalVisible, log, onSave, onDelete, on
         const scanResult = await onScan(pickerResult.assets[0].uri);
         setIsScanning(false);
         if (scanResult) {
+            // This now updates the parent component's state directly via the prop
             setInputValue(scanResult);
         }
     };
@@ -108,7 +84,7 @@ const EditLogModal = ({ modalVisible, setModalVisible, log, onSave, onDelete, on
                     <TextInput
                         style={styles.modalInput}
                         value={inputValue}
-                        onChangeText={setInputValue}
+                        onChangeText={setInputValue} // Use the prop directly
                         keyboardType="decimal-pad"
                         placeholder="0"
                         placeholderTextColor="#999"
@@ -141,48 +117,51 @@ const EditLogModal = ({ modalVisible, setModalVisible, log, onSave, onDelete, on
     );
 };
 
-// Main Screen Component
-const LogBloodSugarScreen = ({ navigation, route }) => {
-    const { userId } = route.params;
 
+// --- Main Screen Component ---
+const LogBloodSugarScreen = ({ navigation, route }) => {
     const [history, setHistory] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedLog, setSelectedLog] = useState(null);
     const [modalVisible, setModalVisible] = useState(false);
+    
+    // --- STATE IS LIFTED UP HERE ---
+    // This is now the single source of truth for the input field value in the modal
+    const [modalInputValue, setModalInputValue] = useState('');
 
     const loadData = async () => {
         setIsLoading(true);
         try {
-            const historyData = await api.getHistory(userId);
+            const historyData = await api.getHistory([3]);
             setHistory(historyData);
         } catch (error) {
-            Alert.alert("Error", "Could not load reading history.");
+            console.error("Failed to load history:", error);
+            Alert.alert("Error", "Could not load reading history. You may need to log in again.");
         } finally {
             setIsLoading(false);
         }
     };
 
     useEffect(() => {
-        if (userId) loadData();
-    }, [userId]);
+        loadData();
+    }, []);
 
     const handleSave = async (logId, amount) => {
         try {
-            const apiCall = logId ? api.updateLog : api.addLog;
-            const params = logId ? [logId, amount] : [userId, amount];
-            const result = await apiCall(...params);
-            
-            if (result.success !== false) {
-                 Alert.alert('Success', result.message || 'Operation successful.');
+            let result;
+            if (logId) {
+                result = await api.updateLog(logId, amount);
             } else {
-                 Alert.alert('Error', result.message || 'Operation failed.');
+                result = await api.addLog({ amount: amount, type: 3 });
             }
+            if (result.success !== false) Alert.alert('Success', result.message || 'Operation successful.');
+            else Alert.alert('Error', result.message || 'Operation failed.');
         } catch(e) {
             Alert.alert('Error', 'An unexpected error occurred.');
         }
         loadData();
     };
-
+    
     const handleDelete = async (logId) => {
         try {
             const result = await api.deleteLog(logId);
@@ -192,14 +171,15 @@ const LogBloodSugarScreen = ({ navigation, route }) => {
         }
         loadData();
     };
-    
+
     const handleScan = async (imageUri) => {
         try {
             const manipulated = await manipulateAsync(imageUri, [{ resize: { width: 1080 } }], { compress: 0.9, format: SaveFormat.JPEG, base64: true });
             const result = await api.scanImage(manipulated.base64);
-            if (result.number) {
-                Alert.alert('Scan Successful', `Detected: ${result.number}`);
-                return result.number;
+            const number = result.bloodsugar || result.number;
+            if (number) {
+                Alert.alert('Scan Successful', `Detected: ${number}`);
+                return String(number); // Return the number as a string
             } else {
                 Alert.alert('Scan Failed', result.message || 'Could not find a number.');
                 return null;
@@ -212,11 +192,13 @@ const LogBloodSugarScreen = ({ navigation, route }) => {
 
     const handleHistoryPress = (item) => {
         setSelectedLog(item);
+        setModalInputValue(String(item.amount)); // Pre-fill the input state
         setModalVisible(true);
     };
 
     const handleAddNew = () => {
         setSelectedLog({ amount: '' });
+        setModalInputValue(''); // Clear the input state for a new entry
         setModalVisible(true);
     };
 
@@ -265,6 +247,9 @@ const LogBloodSugarScreen = ({ navigation, route }) => {
                 onSave={handleSave}
                 onDelete={handleDelete}
                 onScan={handleScan}
+                // --- Pass the state and setter down to the modal ---
+                inputValue={modalInputValue}
+                setInputValue={setModalInputValue}
             />
             
             <View style={styles.header}>
@@ -305,60 +290,15 @@ const LogBloodSugarScreen = ({ navigation, route }) => {
     );
 };
 
-// STYLEs
+// --- Styles ---
 const styles = StyleSheet.create({
-    container: { 
-        flex: 1, 
-        backgroundColor: '#F0F2F5',
-    },
-    header: { 
-        flexDirection: 'row', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        paddingBottom: 10, 
-        marginBottom: 5,
-        paddingHorizontal: 15,
-        paddingTop: Platform.OS === 'android' ? 15 : 0,
-    },
-    headerTitle: { 
-        fontSize: 28, 
-        fontWeight: 'bold' 
-    },
-    doneButton: { 
-        fontSize: 17, 
-        color: '#007AFF', 
-        fontWeight: '600' 
-    },
-    lastReadingCard: { 
-        backgroundColor: 'white', 
-        padding: 20, 
-        borderRadius: 12, 
-        marginBottom: 20, 
-        marginHorizontal: 15,
-        shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.20, shadowRadius: 1.41, elevation: 2, 
-    },
-    historyContainer: { 
-        flex: 1, 
-        backgroundColor: 'white', 
-        borderRadius: 12, 
-        paddingHorizontal: 20, 
-        paddingTop: 20,
-        marginHorizontal: 15,
-        marginBottom: 15,
-    },
-    fab: { 
-        position: 'absolute', 
-        margin: 16, 
-        right: 20, 
-        bottom: 20, 
-        backgroundColor: '#007AFF', 
-        width: 60, height: 60, 
-        borderRadius: 30, 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        elevation: 8, 
-        shadowColor: '#000', shadowRadius: 5, shadowOpacity: 0.3, shadowOffset: { height: 2, width: 0 } 
-    },
+    container: { flex: 1, backgroundColor: '#F0F2F5' },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10, marginBottom: 5, paddingHorizontal: 15, paddingTop: Platform.OS === 'android' ? 25 : 15 },
+    headerTitle: { fontSize: 28, fontWeight: 'bold' },
+    doneButton: { fontSize: 17, color: '#007AFF', fontWeight: '600' },
+    lastReadingCard: { backgroundColor: 'white', padding: 20, borderRadius: 12, marginBottom: 20, marginHorizontal: 15, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.20, shadowRadius: 1.41, elevation: 2 },
+    historyContainer: { flex: 1, backgroundColor: 'white', borderRadius: 12, paddingHorizontal: 20, paddingTop: 20, marginHorizontal: 15, marginBottom: 15 },
+    fab: { position: 'absolute', margin: 16, right: 20, bottom: 20, backgroundColor: '#007AFF', width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#000', shadowRadius: 5, shadowOpacity: 0.3, shadowOffset: { height: 2, width: 0 } },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     spinner: { marginVertical: 20 },
     cardTitle: { fontSize: 16, fontWeight: '600', color: '#555', marginBottom: 10 },

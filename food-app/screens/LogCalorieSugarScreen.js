@@ -8,265 +8,260 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
-const BASE_URL = 'http://192.168.0.120:3000/api';
-const LOGS_URL = `${BASE_URL}/logs/caloriesugar`;
-const HISTORY_URL = `${LOGS_URL}/history`;
-const OCR_URL = `${BASE_URL}/ocr/aws-parse-image`; // Assuming it's the same OCR endpoint
+// Import the centralized, JWT-aware api object
+import { api } from '../utils/api';
 
-export default function LogCalorieSugarScreen({ navigation, route }) {
-  const { userId } = route.params;
-  const [history, setHistory] = useState([]);
-  const [groupedHistory, setGroupedHistory] = useState([]);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [scannedValues, setScannedValues] = useState({ calories: '', sugar: '' });
-  const [editingLogs, setEditingLogs] = useState(null);
-  const [isScanning, setIsScanning] = useState(false);
+// --- EditModal Component (Defined once at the top level for stability) ---
+const EditCalorieSugarModal = ({ modalVisible, setModalVisible, logs, onSave, onScan }) => {
+    // 1. All hooks are called unconditionally at the top.
+    const [calories, setCalories] = useState('');
+    const [sugar, setSugar] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+    const [isScanning, setIsScanning] = useState(false);
+    
+    // 2. The useEffect hook is also at the top, before any returns.
+    useEffect(() => {
+        if (modalVisible && logs) {
+            const calorieLog = logs.find(l => l.type === 1);
+            const sugarLog = logs.find(l => l.type === 2);
+            setCalories(calorieLog?.amount?.toString() || '');
+            setSugar(sugarLog?.amount?.toString() || '');
+        }
+    }, [logs, modalVisible]);
 
-  const loadHistory = async () => {
-    try {
-      const res = await fetch(`${HISTORY_URL}/${userId}`);
-      const data = await res.json();
-      if (res.ok) {
-        setHistory(data);
-  
-        const grouped = [];
-        // Grouping by a tight time threshold to combine calorie and sugar entries
-        const timeThreshold = 5000; // 5 seconds
-  
-        data.sort((a, b) => new Date(b.date) - new Date(a.date));
-  
-        const tempGroups = {};
-        data.forEach(log => {
-            const logTime = new Date(log.date).getTime();
-            let foundGroup = false;
-            for (const key in tempGroups) {
-                if (Math.abs(logTime - key) < timeThreshold) {
-                    tempGroups[key].push(log);
-                    foundGroup = true;
-                    break;
-                }
-            }
-            if (!foundGroup) {
-                tempGroups[logTime] = [log];
-            }
-        });
-  
-        const finalGrouped = Object.values(tempGroups).map(logs => ({
-            timestamp: logs[0].date,
-            logs: logs.sort((a, b) => a.type - b.type), // Ensure calories come first
-        }));
+    // 3. The conditional return happens AFTER all hooks have been called.
+    if (!logs) {
+        return null;
+    }
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        await onSave(logs, { calories, sugar });
+        setIsSaving(false);
+        setModalVisible(false);
+    };
+    
+    const handlePickImage = async (type) => {
+        const permissions = type === 'camera' ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permissions.granted) {
+            Alert.alert('Permission Denied', `Access to the ${type} is required.`);
+            return;
+        }
+        const pickerResult = type === 'camera' ? await ImagePicker.launchCameraAsync() : await ImagePicker.launchImageLibraryAsync();
+        if (pickerResult.canceled || !pickerResult.assets?.length) return;
+
+        setIsScanning(true);
+        const scanResult = await onScan(pickerResult.assets[0].uri);
+        setIsScanning(false);
         
-        setGroupedHistory(finalGrouped);
-
-      } else {
-        throw new Error(data.message || 'Failed to load history');
-      }
-    } catch(err) {
-      Alert.alert('Error', err.message);
-    }
-  };
-
-  const handleScan = async (launchFn) => {
-    // The current server endpoint is for blood sugar.
-    Alert.alert("Not Implemented", "OCR for nutrition labels is not yet connected.");
-  };
-
-  const handleSave = async () => {
-    try {
-      const entries = [];
-      if (scannedValues.calories) entries.push({ type: 1, amount: parseFloat(scannedValues.calories) });
-      if (scannedValues.sugar) entries.push({ type: 2, amount: parseFloat(scannedValues.sugar) });
-
-      if (editingLogs) {
-        // Update logic
-        const calLog = editingLogs.find(l => l.type === 1);
-        const sugLog = editingLogs.find(l => l.type === 2);
-        if (calLog) await fetch(`${LOGS_URL}/${calLog.logID}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: parseFloat(scannedValues.calories) }) });
-        if (sugLog) await fetch(`${LOGS_URL}/${sugLog.logID}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: parseFloat(scannedValues.sugar) }) });
-
-      } else {
-        // Add new logic
-        const date = new Date().toISOString();
-        for (const entry of entries) {
-          await fetch(LOGS_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, amount: entry.amount, type: entry.type, date })
-          });
+        if (scanResult) {
+            if (scanResult.calories !== null) setCalories(scanResult.calories.toString());
+            if (scanResult.sugar !== null) setSugar(scanResult.sugar.toString());
         }
-      }
-      setModalVisible(false);
-      setEditingLogs(null);
-      loadHistory();
-    } catch {
-      Alert.alert('Failed to save log');
-    }
-  };
+    };
 
-  const handleEditGroup = (logs) => {
-    const calorie = logs.find(l => l.type === 1);
-    const sugar = logs.find(l => l.type === 2);
-    setScannedValues({
-      calories: calorie?.amount?.toString() ?? '',
-      sugar: sugar?.amount?.toString() ?? ''
-    });
-    setEditingLogs(logs);
-    setModalVisible(true);
-  };
-
-  const handleDeleteGroup = (logs) => {
-    Alert.alert('Confirm Delete', 'Delete this log entry?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive', onPress: async () => {
-          try {
-            for (const log of logs) {
-              await fetch(`${LOGS_URL}/${log.logID}`, { method: 'DELETE' });
-            }
-            loadHistory();
-          } catch {
-            Alert.alert('Failed to delete log');
-          }
-        }
-      }
-    ]);
-  };
-
-  const handleAddNew = () => {
-    setScannedValues({ calories: '', sugar: '' });
-    setEditingLogs(null);
-    setModalVisible(true);
-  };
-
-  useEffect(() => { loadHistory(); }, []);
-
-  const today = new Date().toISOString().split('T')[0];
-  const todayLogs = history.filter(log => log.date.startsWith(today));
-  const totalCalories = todayLogs.filter(l => l.type === 1).reduce((sum, l) => sum + Number(l.amount || 0), 0);
-  const totalSugar = todayLogs.filter(l => l.type === 2).reduce((sum, l) => sum + Number(l.amount || 0), 0);
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <Modal visible={modalVisible} transparent animationType="slide">
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
-          <TouchableOpacity style={styles.modalBackdrop} onPress={() => setModalVisible(false)} />
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{editingLogs ? "Edit Log" : "Log Calories & Sugar"}</Text>
-            <TextInput
-              style={styles.modalInput}
-              keyboardType="decimal-pad"
-              value={scannedValues.calories}
-              onChangeText={(val) => setScannedValues({ ...scannedValues, calories: val })}
-              placeholder="Calories (kcal)"
-              placeholderTextColor="#999"
-            />
-            <TextInput
-              style={styles.modalInput}
-              keyboardType="decimal-pad"
-              value={scannedValues.sugar}
-              onChangeText={(val) => setScannedValues({ ...scannedValues, sugar: val })}
-              placeholder="Sugar (g)"
-              placeholderTextColor="#999"
-            />
-            {isScanning ? <ActivityIndicator /> : (
-              <View style={styles.scanButtonsContainer}>
-                <TouchableOpacity style={styles.scanButton} onPress={() => handleScan({ permission: ImagePicker.requestCameraPermissionsAsync, launch: ImagePicker.launchCameraAsync })}>
-                  <Ionicons name="camera-outline" size={20} color="#fff" />
-                  <Text style={styles.scanButtonText}>Scan</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.scanButton} onPress={() => handleScan({ permission: ImagePicker.requestMediaLibraryPermissionsAsync, launch: ImagePicker.launchImageLibraryAsync })}>
-                  <Ionicons name="image-outline" size={20} color="#fff" />
-                  <Text style={styles.scanButtonText}>Upload</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            <View style={styles.modalActions}>
-              <TouchableOpacity onPress={() => setModalVisible(false)}><Text style={styles.modalButtonText}>Cancel</Text></TouchableOpacity>
-              <TouchableOpacity onPress={handleSave}><Text style={[styles.modalButtonText, { fontWeight: 'bold' }]}>Save</Text></TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Calorie & Sugar</Text>
-        </View>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.doneButton}>Done</Text>
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.summaryBox}>
-        <Text style={styles.summaryText}>Today</Text>
-        <Text style={styles.summaryReading}>🔥 {totalCalories.toFixed(0)} kcal    🍬 {totalSugar.toFixed(1)} g</Text>
-      </View>
-
-      <FlatList
-        data={groupedHistory}
-        keyExtractor={(item) => item.timestamp}
-        renderItem={({ item }) => {
-            const calorieLog = item.logs.find(l => l.type === 1);
-            const sugarLog = item.logs.find(l => l.type === 2);
-            return (
-                <View style={styles.historyItem}>
-                    <Text style={styles.historyDate}>{new Date(item.timestamp).toLocaleString()}</Text>
-                    <View style={styles.logDataRow}>
-                        <View style={{flex: 1}}>
-                            <View style={styles.logRow}>
-                                <Text style={styles.historyLabel}>🔥 Calories:</Text>
-                                <Text style={styles.historyValue}>{parseFloat(calorieLog?.amount || 0).toFixed(0)} kcal</Text>
-                            </View>
-                            <View style={styles.logRow}>
-                                <Text style={styles.historyLabel}>🍬 Sugar:</Text>
-                                <Text style={[styles.historyValue, sugarLog && parseFloat(sugarLog.amount) > 15 ? { color: 'red' } : {}]}>{parseFloat(sugarLog?.amount || 0).toFixed(1)} g</Text>
-                            </View>
+    return (
+        <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+                <TouchableOpacity style={styles.modalBackdrop} onPress={() => setModalVisible(false)} />
+                <View style={styles.modalContent}>
+                    <Text style={styles.modalTitle}>{logs.length > 0 ? "Edit Log" : "Log Calories & Sugar"}</Text>
+                    <TextInput style={styles.modalInput} keyboardType="decimal-pad" value={calories} onChangeText={setCalories} placeholder="Calories (kcal)" placeholderTextColor="#999" />
+                    <TextInput style={styles.modalInput} keyboardType="decimal-pad" value={sugar} onChangeText={setSugar} placeholder="Sugar (g)" placeholderTextColor="#999" />
+                    
+                    {isScanning ? <ActivityIndicator style={styles.spinner} /> : (
+                        <View style={styles.scanButtonsContainer}>
+                            <TouchableOpacity style={styles.scanButton} onPress={() => handlePickImage('camera')}><Ionicons name="camera-outline" size={20} color="#fff" /><Text style={styles.scanButtonText}>Scan</Text></TouchableOpacity>
+                            <TouchableOpacity style={styles.scanButton} onPress={() => handlePickImage('gallery')}><Ionicons name="image-outline" size={20} color="#fff" /><Text style={styles.scanButtonText}>Upload</Text></TouchableOpacity>
                         </View>
-                        <View style={styles.actionsRow}>
-                            <TouchableOpacity onPress={() => handleEditGroup(item.logs)}>
-                                <Ionicons name="pencil-outline" size={24} color="#007AFF" />
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={() => handleDeleteGroup(item.logs)}>
-                                <Ionicons name="trash-outline" size={24} color="#FF3B30" />
-                            </TouchableOpacity>
-                        </View>
+                    )}
+
+                    <View style={styles.modalActions}>
+                        <TouchableOpacity onPress={() => setModalVisible(false)}><Text style={styles.modalButtonText}>Cancel</Text></TouchableOpacity>
+                        <TouchableOpacity onPress={handleSave} disabled={isSaving}><Text style={[styles.modalButtonText, { fontWeight: 'bold' }]}>Save</Text></TouchableOpacity>
                     </View>
                 </View>
-            );
-        }}
-        ListEmptyComponent={<Text style={styles.noData}>No logs available</Text>}
-      />
+            </KeyboardAvoidingView>
+        </Modal>
+    );
+};
 
-      <TouchableOpacity style={styles.fab} onPress={handleAddNew}>
-        <Ionicons name="add" size={30} color="white" />
-      </TouchableOpacity>
-    </SafeAreaView>
-  );
+
+// --- Main Screen Component ---
+export default function LogCalorieSugarScreen({ navigation, route }) {
+    const [history, setHistory] = useState([]);
+    const [groupedHistory, setGroupedHistory] = useState([]);
+    const [modalVisible, setModalVisible] = useState(false);
+    const [editingLogs, setEditingLogs] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const loadHistory = async () => {
+        setIsLoading(true);
+        try {
+            const data = await api.getHistory([1, 2]);
+            setHistory(data);
+
+            data.sort((a, b) => new Date(b.date) - new Date(a.date));
+            const tempGroups = {};
+            const timeThreshold = 5000;
+
+            data.forEach(log => {
+                const logTime = new Date(log.date).getTime();
+                let foundGroupKey = Object.keys(tempGroups).find(key => Math.abs(logTime - Number(key)) < timeThreshold);
+                if (foundGroupKey) {
+                    tempGroups[foundGroupKey].push(log);
+                } else {
+                    tempGroups[logTime] = [log];
+                }
+            });
+
+            const finalGrouped = Object.values(tempGroups).map(logs => ({
+                timestamp: logs[0].date,
+                logs: logs.sort((a, b) => a.type - b.type),
+            }));
+            setGroupedHistory(finalGrouped);
+        } catch (err) {
+            Alert.alert('Error', 'Failed to load history.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleScan = async (imageUri) => {
+        try {
+            const manipulated = await manipulateAsync(imageUri, [{ resize: { width: 1080 } }], { compress: 0.8, format: SaveFormat.JPEG, base64: true });
+            const result = await api.scanImage(manipulated.base64);
+
+            if (result.success && (result.calories !== null || result.sugar !== null)) {
+                Alert.alert('Scan Successful', `Found: ${result.calories || 'No'} calories, ${result.sugar || 'no'} sugar.`);
+                return { calories: result.calories, sugar: result.sugar };
+            } else {
+                Alert.alert('Scan Failed', result.message || 'Could not find calorie or sugar values.');
+                return null;
+            }
+        } catch (error) {
+            Alert.alert('Scan Error', 'An error occurred while scanning the image.');
+            return null;
+        }
+    };
+
+    const handleSave = async (logsToEdit, newValues) => {
+        try {
+            const hasCalories = newValues.calories && !isNaN(parseFloat(newValues.calories));
+            const hasSugar = newValues.sugar && !isNaN(parseFloat(newValues.sugar));
+
+            if (logsToEdit && logsToEdit.length > 0) {
+                const calLog = logsToEdit.find(l => l.type === 1);
+                const sugLog = logsToEdit.find(l => l.type === 2);
+                if (calLog && hasCalories) await api.updateLog(calLog.logID, parseFloat(newValues.calories));
+                if (sugLog && hasSugar) await api.updateLog(sugLog.logID, parseFloat(newValues.sugar));
+            } else {
+                if (hasCalories) await api.addLog({ amount: parseFloat(newValues.calories), type: 1 });
+                if (hasSugar) await api.addLog({ amount: parseFloat(newValues.sugar), type: 2 });
+            }
+            loadHistory();
+        } catch (error) {
+            Alert.alert('Error', 'Failed to save log.');
+        }
+    };
+
+    const handleDeleteGroup = (logs) => {
+        Alert.alert('Confirm Delete', 'Are you sure you want to delete this log entry?', [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Delete', style: 'destructive', onPress: async () => {
+                    try {
+                        for (const log of logs) {
+                            await api.deleteLog(log.logID);
+                        }
+                        loadHistory();
+                    } catch {
+                        Alert.alert('Error', 'Failed to delete log entry.');
+                    }
+                }
+            }
+        ]);
+    };
+
+    const handleEditGroup = (logs) => {
+        setEditingLogs(logs);
+        setModalVisible(true);
+    };
+
+    const handleAddNew = () => {
+        setEditingLogs([]);
+        setModalVisible(true);
+    };
+
+    useEffect(() => { loadHistory(); }, []);
+
+    const today = new Date().toISOString().split('T')[0];
+    const todayLogs = history.filter(log => log.date.startsWith(today));
+    const totalCalories = todayLogs.filter(l => l.type === 1).reduce((sum, l) => sum + Number(l.amount || 0), 0);
+    const totalSugar = todayLogs.filter(l => l.type === 2).reduce((sum, l) => sum + Number(l.amount || 0), 0);
+
+    return (
+        <SafeAreaView style={styles.container}>
+            <EditCalorieSugarModal
+                modalVisible={modalVisible}
+                setModalVisible={setModalVisible}
+                logs={editingLogs}
+                onSave={handleSave}
+                onScan={handleScan}
+            />
+            
+            <View style={styles.header}>
+                <Text style={styles.headerTitle}>Calorie & Sugar</Text>
+                <TouchableOpacity onPress={() => navigation.goBack()}>
+                    <Text style={styles.doneButton}>Done</Text>
+                </TouchableOpacity>
+            </View>
+            
+            <View style={styles.summaryBox}>
+                <Text style={styles.summaryText}>Today</Text>
+                <Text style={styles.summaryReading}>🔥 {totalCalories.toFixed(0)} kcal    🍬 {totalSugar.toFixed(1)} g</Text>
+            </View>
+
+            {isLoading ? <ActivityIndicator size="large" style={styles.spinner} /> :
+                <FlatList
+                    data={groupedHistory}
+                    keyExtractor={(item) => item.timestamp}
+                    renderItem={({ item }) => {
+                        const calorieLog = item.logs.find(l => l.type === 1);
+                        const sugarLog = item.logs.find(l => l.type === 2);
+                        return (
+                            <View style={styles.historyItem}>
+                                <Text style={styles.historyDate}>{new Date(item.timestamp).toLocaleString()}</Text>
+                                <View style={styles.logDataRow}>
+                                    <View style={{flex: 1}}>
+                                        {calorieLog && <View style={styles.logRow}><Text style={styles.historyLabel}>🔥 Calories:</Text><Text style={styles.historyValue}>{parseFloat(calorieLog.amount || 0).toFixed(0)} kcal</Text></View>}
+                                        {sugarLog && <View style={styles.logRow}><Text style={styles.historyLabel}>🍬 Sugar:</Text><Text style={[styles.historyValue, parseFloat(sugarLog.amount) > 15 ? { color: '#D9534F' } : {}]}>{parseFloat(sugarLog.amount || 0).toFixed(1)} g</Text></View>}
+                                    </View>
+                                    <View style={styles.actionsRow}>
+                                        <TouchableOpacity onPress={() => handleEditGroup(item.logs)}><Ionicons name="pencil-outline" size={24} color="#007AFF" /></TouchableOpacity>
+                                        <TouchableOpacity onPress={() => handleDeleteGroup(item.logs)}><Ionicons name="trash-outline" size={24} color="#FF3B30" style={{marginLeft: 12}} /></TouchableOpacity>
+                                    </View>
+                                </View>
+                            </View>
+                        );
+                    }}
+                    ListEmptyComponent={<Text style={styles.noData}>No logs available</Text>}
+                />
+            }
+
+            <TouchableOpacity style={styles.fab} onPress={handleAddNew}>
+                <Ionicons name="add" size={30} color="white" />
+            </TouchableOpacity>
+        </SafeAreaView>
+    );
 }
 
 const styles = StyleSheet.create({
-    container: { 
-        flex: 1, 
-        backgroundColor: '#F0F2F5',
-    },
-    header: { 
-        flexDirection: 'row', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        paddingHorizontal: 15,
-        paddingTop: Platform.OS === 'android' ? 25 : 15,
-        paddingBottom: 10,
-    },
+    container: { flex: 1, backgroundColor: '#F0F2F5' },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 15, paddingTop: Platform.OS === 'android' ? 25 : 15, paddingBottom: 10 },
     headerTitle: { fontSize: 28, fontWeight: 'bold', color: '#333' },
-    doneButton: { color: '#007AFF', fontSize: 17, fontWeight: '600' },
-    summaryBox: { 
-        padding: 16, 
-        backgroundColor: '#fff', 
-        borderRadius: 12, 
-        marginHorizontal: 15,
-        marginBottom: 15,
-        elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2,
-    },
+    doneButton: { color: '#007AFF', fontSize: 17, fontWeight: '600', paddingTop: 8 },
+    summaryBox: { padding: 16, backgroundColor: '#fff', borderRadius: 12, marginHorizontal: 15, marginBottom: 15, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
     summaryText: { fontSize: 16, fontWeight: '600', color: '#555', marginBottom: 4 },
     summaryReading: { fontSize: 20, fontWeight: 'bold' },
     historyItem: { backgroundColor: '#ffffff', padding: 16, marginBottom: 12, borderRadius: 16, marginHorizontal: 15, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
@@ -277,6 +272,7 @@ const styles = StyleSheet.create({
     historyValue: { fontSize: 16, fontWeight: 'bold', color: '#333' },
     actionsRow: { flexDirection: 'row', marginLeft: 16 },
     noData: { textAlign: 'center', marginTop: 50, color: '#888' },
+    spinner: {marginTop: 50},
     modalOverlay: { flex: 1, justifyContent: 'flex-end' },
     modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
     modalContent: { backgroundColor: '#F0F2F5', padding: 24, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
