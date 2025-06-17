@@ -1,17 +1,19 @@
 // screens/LogBloodSugarScreen.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
-    View, Text, TextInput, Button, StyleSheet, Alert, 
+    View, Text, TextInput, StyleSheet, Alert, 
     TouchableOpacity, ActivityIndicator, Modal, FlatList, 
     KeyboardAvoidingView, Platform, SafeAreaView 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import { useFocusEffect } from '@react-navigation/native';
+import { Calendar } from 'react-native-calendars';
 
 import { api } from '../utils/api'; 
 
-// --- EditLogModal Component (with state lifted up) ---
+// --- EditLogModal Component ---
 const EditLogModal = ({ 
     modalVisible, 
     setModalVisible, 
@@ -19,15 +21,12 @@ const EditLogModal = ({
     onSave, 
     onDelete, 
     onScan,
-    // --- NEW PROPS FOR LIFTED STATE ---
     inputValue,
     setInputValue 
 }) => {
-    // Hooks for modal-specific state
     const [isSaving, setIsSaving] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
 
-    // This effect now correctly syncs the input value when the modal opens
     useEffect(() => {
         if (modalVisible) {
             setInputValue(String(log?.amount || ''));
@@ -41,7 +40,6 @@ const EditLogModal = ({
     const handleSave = async () => {
         if (isSaving) return;
         setIsSaving(true);
-        // The onSave function already has access to the updated inputValue from the parent
         await onSave(log.logID, inputValue);
         setIsSaving(false);
         setModalVisible(false);
@@ -70,7 +68,6 @@ const EditLogModal = ({
         const scanResult = await onScan(pickerResult.assets[0].uri);
         setIsScanning(false);
         if (scanResult) {
-            // This now updates the parent component's state directly via the prop
             setInputValue(scanResult);
         }
     };
@@ -84,7 +81,7 @@ const EditLogModal = ({
                     <TextInput
                         style={styles.modalInput}
                         value={inputValue}
-                        onChangeText={setInputValue} // Use the prop directly
+                        onChangeText={setInputValue}
                         keyboardType="decimal-pad"
                         placeholder="0"
                         placeholderTextColor="#999"
@@ -118,58 +115,174 @@ const EditLogModal = ({
 };
 
 
+// --- SegmentedControl Component ---
+const SegmentedControl = ({ options, selectedOption, onSelect }) => {
+    return (
+        <View style={styles.segmentedControlContainer}>
+            {options.map(option => (
+                <TouchableOpacity
+                    key={option}
+                    style={[styles.segment, selectedOption === option && styles.segmentActive]}
+                    onPress={() => onSelect(option)}
+                >
+                    <Text style={[styles.segmentText, selectedOption === option && styles.segmentTextActive]}>
+                        {option.charAt(0).toUpperCase() + option.slice(1)}
+                    </Text>
+                </TouchableOpacity>
+            ))}
+        </View>
+    );
+};
+
+
+// --- DateNavigator Component ---
+const DateNavigator = ({ date, onDateChange, period, onOpenCalendar }) => {
+    const changeDate = (amount) => {
+        const newDate = new Date(date);
+        if (period === 'day') newDate.setDate(newDate.getDate() + amount);
+        else if (period === 'week') newDate.setDate(newDate.getDate() + (amount * 7));
+        else if (period === 'month') newDate.setMonth(newDate.getMonth() + amount);
+        onDateChange(newDate);
+    };
+
+    const formatDate = () => {
+        if (period === 'day') {
+            return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+        }
+        if (period === 'week') {
+            const start = new Date(date);
+            start.setDate(date.getDate() - date.getDay());
+            const end = new Date(start);
+            end.setDate(start.getDate() + 6);
+            return `${start.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})} - ${end.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})}`;
+        }
+        if (period === 'month') {
+            return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        }
+        return '';
+    };
+
+    return (
+        <View style={styles.dateNavigatorContainer}>
+            <TouchableOpacity onPress={() => changeDate(-1)} style={styles.arrowButton}>
+                <Ionicons name="chevron-back" size={24} color="#007AFF" />
+            </TouchableOpacity>
+            
+            {/* 3. Make the date text pressable */}
+            <TouchableOpacity onPress={onOpenCalendar}>
+                <Text style={styles.dateNavigatorText}>{formatDate()}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => changeDate(1)} style={styles.arrowButton}>
+                <Ionicons name="chevron-forward" size={24} color="#007AFF" />
+            </TouchableOpacity>
+        </View>
+    );
+};
+
+const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate }) => {
+    return (
+        <Modal visible={isVisible} transparent={true} animationType="fade">
+            <TouchableOpacity style={styles.calendarBackdrop} onPress={onClose} />
+            <View style={styles.calendarModalContainer}>
+                <Calendar
+                    current={initialDate.toISOString().split('T')[0]} // Set the initial month to show
+                    onDayPress={(day) => {
+                        onDayPress(new Date(day.timestamp));
+                        onClose();
+                    }}
+                    monthFormat={'MMMM yyyy'}
+                    theme={{
+                        backgroundColor: '#ffffff',
+                        calendarBackground: '#ffffff',
+                        textSectionTitleColor: '#b6c1cd',
+                        selectedDayBackgroundColor: '#007AFF',
+                        selectedDayTextColor: '#ffffff',
+                        todayTextColor: '#007AFF',
+                        dayTextColor: '#2d4150',
+                        arrowColor: '#007AFF',
+                    }}
+                />
+            </View>
+        </Modal>
+    );
+};
+
+
 // --- Main Screen Component ---
-const LogBloodSugarScreen = ({ navigation}) => {
+const LogBloodSugarScreen = ({ navigation }) => {
     const [history, setHistory] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [lastReading, setLastReading] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isLoadingLastReading, setIsLoadingLastReading] = useState(true);
     const [selectedLog, setSelectedLog] = useState(null);
     const [modalVisible, setModalVisible] = useState(false);
-    
-    // --- STATE IS LIFTED UP HERE ---
-    // This is now the single source of truth for the input field value in the modal
     const [modalInputValue, setModalInputValue] = useState('');
+    const [timePeriod, setTimePeriod] = useState('day');
+    const [displayDate, setDisplayDate] = useState(new Date());
+    const [isCalendarVisible, setIsCalendarVisible] = useState(false);
 
-    const loadData = async () => {
+    const loadData = async (period, date) => {
+        if (isLoading) return;
         setIsLoading(true);
         try {
-            const historyData = await api.getHistory([3]);
-            setHistory(historyData);
+            const data = await api.getHistory([3], period, date.toISOString());
+            setHistory(data);
         } catch (error) {
-            console.error("Failed to load history:", error);
-            Alert.alert("Error", "Could not load reading history. You may need to log in again.");
+            Alert.alert("Error", `Could not load history for the selected period.`);
         } finally {
             setIsLoading(false);
         }
     };
+    
+    const loadLastReading = async () => {
+        setIsLoadingLastReading(true);
+        try {
+            const data = await api.getHistory([3], 'all', null, 1);
+            if (data.length > 0) {
+                setLastReading(data[0]);
+            }
+        } catch (error) {
+             console.error("Could not load last reading:", error);
+        } finally {
+            setIsLoadingLastReading(false);
+        }
+    };
 
-    useEffect(() => {
-        loadData();
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            loadData(timePeriod, displayDate);
+            loadLastReading(); // Refresh last reading when screen is focused
+        }, [timePeriod, displayDate])
+    );
+
+    const refreshAllData = () => {
+        loadLastReading();
+        loadData(timePeriod, displayDate);
+    };
 
     const handleSave = async (logId, amount) => {
         try {
-            let result;
             if (logId) {
-                result = await api.updateLog(logId, amount);
+                await api.updateLog(logId, amount);
             } else {
-                result = await api.addLog({ amount: amount, type: 3 });
+                await api.addLog({ amount, type: 3 });
             }
-            if (result.success !== false) Alert.alert('Success', result.message || 'Operation successful.');
-            else Alert.alert('Error', result.message || 'Operation failed.');
+            Alert.alert('Success', 'Log saved successfully.');
         } catch(e) {
             Alert.alert('Error', 'An unexpected error occurred.');
         }
-        loadData();
+        refreshAllData();
     };
     
     const handleDelete = async (logId) => {
         try {
-            const result = await api.deleteLog(logId);
-            Alert.alert(result.message || 'Operation failed.');
+            await api.deleteLog(logId);
+            Alert.alert('Success', 'Log deleted successfully.');
         } catch(e) {
             Alert.alert('Error', 'An unexpected error occurred.');
         }
-        loadData();
+        refreshAllData();
     };
 
     const handleScan = async (imageUri) => {
@@ -179,7 +292,7 @@ const LogBloodSugarScreen = ({ navigation}) => {
             const number = result.bloodsugar || result.number;
             if (number) {
                 Alert.alert('Scan Successful', `Detected: ${number}`);
-                return String(number); // Return the number as a string
+                return String(number);
             } else {
                 Alert.alert('Scan Failed', result.message || 'Could not find a number.');
                 return null;
@@ -192,17 +305,15 @@ const LogBloodSugarScreen = ({ navigation}) => {
 
     const handleHistoryPress = (item) => {
         setSelectedLog(item);
-        setModalInputValue(String(item.amount)); // Pre-fill the input state
+        setModalInputValue(String(item.amount));
         setModalVisible(true);
     };
 
     const handleAddNew = () => {
         setSelectedLog({ amount: '' });
-        setModalInputValue(''); // Clear the input state for a new entry
+        setModalInputValue('');
         setModalVisible(true);
     };
-
-    const lastReading = history.length > 0 ? history[0] : null;
 
     const renderHistoryItem = ({ item }) => {
         const date = new Date(item.date);
@@ -218,7 +329,7 @@ const LogBloodSugarScreen = ({ navigation}) => {
     };
 
     const renderLastReadingContent = () => {
-        if (isLoading) {
+        if (isLoadingLastReading) {
             return <ActivityIndicator style={styles.spinner} />;
         }
         if (lastReading) {
@@ -235,7 +346,7 @@ const LogBloodSugarScreen = ({ navigation}) => {
                 </>
             );
         }
-        return <Text style={styles.noDataText}>No readings yet. Press '+' to add one!</Text>;
+        return <Text style={styles.noDataText}>No readings yet. Add one!</Text>;
     };
 
     return (
@@ -247,9 +358,15 @@ const LogBloodSugarScreen = ({ navigation}) => {
                 onSave={handleSave}
                 onDelete={handleDelete}
                 onScan={handleScan}
-                // --- Pass the state and setter down to the modal ---
                 inputValue={modalInputValue}
                 setInputValue={setModalInputValue}
+            />
+            
+            <CalendarModal
+                isVisible={isCalendarVisible}
+                onClose={() => setIsCalendarVisible(false)}
+                onDayPress={setDisplayDate}
+                initialDate={displayDate}
             />
             
             <View style={styles.header}>
@@ -262,25 +379,45 @@ const LogBloodSugarScreen = ({ navigation}) => {
             <TouchableOpacity 
                 style={styles.lastReadingCard}
                 onPress={() => lastReading ? handleHistoryPress(lastReading) : handleAddNew()}
-                disabled={isLoading}
+                disabled={isLoadingLastReading}
             >
                 <Text style={styles.cardTitle}><Ionicons name="water" size={16} color="#007AFF" /> Last Reading</Text>
                 {renderLastReadingContent()}
             </TouchableOpacity>
 
             <View style={styles.historyContainer}>
-                <Text style={styles.cardTitle}><Ionicons name="analytics" size={16} color="#007AFF" /> Reading History</Text>
+                <SegmentedControl
+                    options={['day', 'week', 'month']}
+                    selectedOption={timePeriod}
+                    onSelect={(period) => {
+                        setTimePeriod(period);
+                        setDisplayDate(new Date());
+                    }}
+                />
+                
+                <DateNavigator
+                    date={displayDate}
+                    onDateChange={setDisplayDate}
+                    period={timePeriod}
+                    onOpenCalendar={() => setIsCalendarVisible(true)}
+                />
+                
                 <View style={styles.historyHeader}>
                     <Text style={[styles.historyHeaderText, {flex: 2}]}>Date</Text>
                     <Text style={[styles.historyHeaderText, {flex: 1.5}]}>Time</Text>
                     <Text style={[styles.historyHeaderText, {flex: 1, textAlign: 'right'}]}>Value</Text>
                 </View>
-                <FlatList
-                    data={history.slice(1)}
-                    renderItem={renderHistoryItem}
-                    keyExtractor={item => item.logID.toString()}
-                    ListEmptyComponent={<Text style={styles.noDataText}>No previous history.</Text>}
-                />
+
+                {isLoading ? <ActivityIndicator style={styles.spinner}/> : (
+                    <FlatList
+                        data={history}
+                        renderItem={renderHistoryItem}
+                        keyExtractor={(item, index) => item.logID ? item.logID.toString() : index.toString()}
+                        ListEmptyComponent={<Text style={styles.noDataText}>No readings for this period.</Text>}
+                        onRefresh={refreshAllData}
+                        refreshing={isLoading}
+                    />
+                )}
             </View>
              
             <TouchableOpacity style={styles.fab} onPress={handleAddNew}>
@@ -297,7 +434,80 @@ const styles = StyleSheet.create({
     headerTitle: { fontSize: 28, fontWeight: 'bold' },
     doneButton: { fontSize: 17, color: '#007AFF', fontWeight: '600' },
     lastReadingCard: { backgroundColor: 'white', padding: 20, borderRadius: 12, marginBottom: 20, marginHorizontal: 15, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.20, shadowRadius: 1.41, elevation: 2 },
-    historyContainer: { flex: 1, backgroundColor: 'white', borderRadius: 12, paddingHorizontal: 20, paddingTop: 20, marginHorizontal: 15, marginBottom: 15 },
+    historyContainer: { flex: 1, backgroundColor: 'white', borderRadius: 12, marginHorizontal: 15, marginBottom: 15 },
+    segmentedControlContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#E9E9EF',
+        borderRadius: 8,
+        marginHorizontal: 20,
+        marginTop: 20,
+        overflow: 'hidden',
+    },
+    segment: {
+        flex: 1,
+        paddingVertical: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    segmentActive: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 6,
+        margin: 2,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 1.41,
+        elevation: 2,
+    },
+    segmentText: {
+        fontWeight: '500',
+        color: '#8E8E93',
+        fontSize: 13,
+    },
+    segmentTextActive: {
+        color: '#000000',
+        fontWeight: '600',
+    },
+    dateNavigatorContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        marginTop: 15,
+        marginBottom: 10,
+    },
+    arrowButton: {
+        backgroundColor: '#E9E9EF',
+        borderRadius: 20,
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    dateNavigatorText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+    },
+    calendarBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+    },
+    calendarModalContainer: {
+        position: 'absolute',
+        top: '20%',
+        left: '5%',
+        right: '5%',
+        backgroundColor: 'white',
+        borderRadius: 16,
+        padding: 10,
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+    },
+    historyHeader: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#EEE', paddingBottom: 10, paddingHorizontal: 20, marginTop: 10 },
     fab: { position: 'absolute', margin: 16, right: 20, bottom: 20, backgroundColor: '#007AFF', width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#000', shadowRadius: 5, shadowOpacity: 0.3, shadowOffset: { height: 2, width: 0 } },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     spinner: { marginVertical: 20 },
@@ -306,9 +516,8 @@ const styles = StyleSheet.create({
     lastReadingUnit: { fontSize: 24, fontWeight: 'normal', color: '#777' },
     cardDate: { marginTop: 10, color: '#555', alignItems: 'center' },
     noDataText: { textAlign: 'center', padding: 20, color: '#888' },
-    historyHeader: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#EEE', paddingBottom: 10 },
     historyHeaderText: { fontWeight: 'bold', color: '#555' },
-    historyRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#EEE' },
+    historyRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#EEE', paddingHorizontal: 20 },
     historyText: { fontSize: 14 },
     historyValue: { fontSize: 14, fontWeight: 'bold' },
     historyUnit: { fontWeight: 'normal', color: '#555' },

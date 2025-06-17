@@ -131,10 +131,9 @@ app.post('/api/ocr/aws-parse-image', async (req, res) => {
 
 // --- CONSOLIDATED LOGS ENDPOINTS (Protected) ---
 
-// GET history for specific types (e.g., /api/logs/history?types=3 or ?types=1,2)
 app.get('/api/logs/history', async (req, res) => {
     const userId = req.user.userId;
-    const { types } = req.query; 
+    const { types, period = 'day', targetDate, limit } = req.query;
 
     if (!types) {
         return res.status(400).json({ message: "Log type(s) are required as a query parameter." });
@@ -144,11 +143,41 @@ app.get('/api/logs/history', async (req, res) => {
         return res.status(400).json({ message: "Invalid 'types' parameter." });
     }
 
+    let query = `SELECT logID, type, amount, date FROM dataLogs WHERE userID = ? AND type IN (?)`;
+    const queryParams = [userId, typeArray];
+    
+    if (period !== 'all') {
+        const date = targetDate ? new Date(targetDate) : new Date();
+
+        if (period === 'day') {
+            query += ` AND DATE(date) = DATE(?)`;
+            queryParams.push(date);
+        } else if (period === 'week') {
+            const weekStart = new Date(date);
+            weekStart.setDate(date.getDate() - date.getDay());
+            weekStart.setHours(0, 0, 0, 0);
+
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+            weekEnd.setHours(23, 59, 59, 999);
+            
+            query += ` AND date BETWEEN ? AND ?`;
+            queryParams.push(weekStart, weekEnd);
+        } else if (period === 'month') {
+            query += ` AND YEAR(date) = ? AND MONTH(date) = ?`;
+            queryParams.push(date.getFullYear(), date.getMonth() + 1);
+        }
+    }
+    
+    query += ` ORDER BY date DESC`;
+
+    if (limit && /^\d+$/.test(limit)) {
+        query += ` LIMIT ?`;
+        queryParams.push(parseInt(limit));
+    }
+    
     try {
-        const [logs] = await dbPool.query(
-            `SELECT logID, type, amount, date FROM dataLogs WHERE userID = ? AND type IN (?) ORDER BY date DESC`,
-            [userId, typeArray]
-        );
+        const [logs] = await dbPool.query(query, queryParams);
         res.status(200).json(logs);
     } catch (error) {
         console.error('Error fetching history:', error);
@@ -156,7 +185,6 @@ app.get('/api/logs/history', async (req, res) => {
     }
 });
 
-// POST a new log (for any type)
 app.post('/api/logs', async (req, res) => {
     const userId = req.user.userId;
     const { amount, type, date } = req.body;
@@ -185,22 +213,32 @@ app.post('/api/logs', async (req, res) => {
 // PUT (update) a specific log
 app.put('/api/logs/:logId', async (req, res) => {
     const { logId } = req.params;
-    const { amount } = req.body;
-    if (amount == null) return res.status(400).json({ message: 'Amount is required.' });
+    const { amount, date } = req.body;
+
+    if (amount === undefined || amount === null || String(amount).trim() === '') {
+        return res.status(400).json({ success: false, message: 'Amount is required.' });
+    }
     
     const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount < 0) {
-        return res.status(400).json({ message: 'A valid, non-negative amount is required.' });
+        return res.status(400).json({ success: false, message: 'A valid, non-negative amount is required.' });
     }
+
     try {
-        const [result] = await dbPool.query(`UPDATE dataLogs SET amount = ? WHERE logID = ? AND userID = ?`, [numericAmount, logId, req.user.userId]);
+        const dateToUpdate = date ? new Date(date) : new Date();
+
+        const [result] = await dbPool.query(
+            `UPDATE dataLogs SET amount = ?, date = ? WHERE logID = ? AND userID = ?`, 
+            [numericAmount, dateToUpdate, logId, req.user.userId]
+        );
+
         if (result.affectedRows === 0) {
-            return res.status(404).json({ message: 'Log not found or you do not have permission to edit it.' });
+            return res.status(404).json({ success: false, message: 'Log not found or you do not have permission to edit it.' });
         }
         res.status(200).json({ success: true, message: 'Log updated successfully.' });
     } catch (error) {
         console.error('Error updating log:', error);
-        res.status(500).json({ message: 'Error updating log.' });
+        res.status(500).json({ success: false, message: 'Error updating log.' });
     }
 });
 

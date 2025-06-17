@@ -41,11 +41,19 @@ async function authenticatedFetch(endpoint, options = {}) {
 
 // --- FINAL, COMBINED AND SIMPLIFIED API OBJECT ---
 export const api = {
-    getHistory: async (types) => {
-        // Use URLSearchParams to correctly format the array for the query string
-        const params = new URLSearchParams({ types: types.join(',') });
+    getHistory: async (types, period = 'day', targetDate = null, limit = null) => {
+        const params = new URLSearchParams({ 
+            types: types.join(','),
+            period: period 
+        });
+        if (targetDate) {
+            params.append('targetDate', targetDate);
+        }
+        if (limit) {
+            params.append('limit', limit);
+        }
         const response = await authenticatedFetch(`/logs/history?${params.toString()}`);
-        if (!response.ok) throw new Error(`Failed to fetch history for types: ${types}`);
+        if (!response.ok) throw new Error(`Failed to fetch history`);
         return response.json();
     },
 
