@@ -42,3 +42,5 @@ __MACOSX/
 
 # Environment variables
 .env
+
+android/

@@ -4,7 +4,7 @@ import { View, Text, TextInput, Button, StyleSheet, Alert, ActivityIndicator } f
 import * as SecureStore from 'expo-secure-store'; // Import the secure storage library
 
 // BACKEND API URL that connects to your AWS DB for login
-const YOUR_AWS_LOGIN_API_URL = 'http://192.168.0.120:3000/api/login';
+const YOUR_AWS_LOGIN_API_URL = 'http://18.141.147.204:3000/api/login';
 
 const Login = ({ navigation }) => {
   const [email, setEmail] = useState('');

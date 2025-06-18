@@ -18,7 +18,9 @@ const ACTIVE_COLOR = '#007AFF';
 const INACTIVE_COLOR = '#8e8e93';
 
 const AppTabs = ({ navigation, route }) => {
-  const userId = route.params?.userId;
+  const userId = route.params?.userId; 
+
+
   const insets = useSafeAreaInsets();
 
   return (
@@ -26,7 +28,7 @@ const AppTabs = ({ navigation, route }) => {
       screenOptions={{
         tabBarStyle: {
           backgroundColor: Platform.OS === 'ios' ? '#F7F7F7' : '#FFFFFF',
-          height: 45 + insets.bottom, 
+          height: 60 + insets.bottom, 
           paddingBottom: insets.bottom,
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: '#D1D1D6',

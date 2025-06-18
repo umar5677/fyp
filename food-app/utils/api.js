@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
 
 // Your server's base URL. Ensure the IP address is correct for your local network or use your public deployment URL.
-const BASE_URL = 'http://192.168.0.120:3000/api';
+const BASE_URL = 'http://18.141.147.204:3000/api';
 
 async function authenticatedFetch(endpoint, options = {}) {
     let accessToken = await SecureStore.getItemAsync('accessToken');
