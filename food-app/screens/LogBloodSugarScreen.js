@@ -3,13 +3,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
     View, Text, TextInput, StyleSheet, Alert, 
     TouchableOpacity, ActivityIndicator, Modal, FlatList, 
-    KeyboardAvoidingView, Platform, SafeAreaView 
+    KeyboardAvoidingView, Platform, SafeAreaView, useColorScheme // Import useColorScheme
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { useFocusEffect } from '@react-navigation/native';
 import { Calendar } from 'react-native-calendars';
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 
 import { api } from '../utils/api'; 
 
@@ -26,10 +27,16 @@ const EditLogModal = ({
 }) => {
     const [isSaving, setIsSaving] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
+    const [logDate, setLogDate] = useState(new Date());
+    const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
+    
+    const colorScheme = useColorScheme(); // Detects 'light' or 'dark' mode
+    const today = new Date(); // Get today's date for the picker
 
     useEffect(() => {
         if (modalVisible) {
             setInputValue(String(log?.amount || ''));
+            setLogDate(log && log.date ? new Date(log.date) : new Date());
         }
     }, [log, modalVisible]);
 
@@ -40,7 +47,7 @@ const EditLogModal = ({
     const handleSave = async () => {
         if (isSaving) return;
         setIsSaving(true);
-        await onSave(log.logID, inputValue);
+        await onSave(log.logID, inputValue, logDate);
         setIsSaving(false);
         setModalVisible(false);
     };
@@ -78,6 +85,27 @@ const EditLogModal = ({
                 <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setModalVisible(false)} />
                 <View style={styles.modalContent}>
                     <Text style={styles.modalTitle}>{log.logID ? 'Edit' : 'Add New'} Reading</Text>
+                    
+                    <TouchableOpacity 
+                        onPress={() => setDatePickerVisibility(true)} 
+                        style={styles.datePickerButton} 
+                        disabled={!!log.logID}
+                    >
+                        <Ionicons name="calendar-outline" size={22} color="#007AFF" />
+                        <Text style={styles.datePickerText}>{logDate.toLocaleString()}</Text>
+                    </TouchableOpacity>
+
+                    <DateTimePickerModal
+                        isVisible={isDatePickerVisible}
+                        mode="datetime"
+                        date={logDate}
+                        onConfirm={(date) => { setDatePickerVisibility(false); setLogDate(date); }}
+                        onCancel={() => setDatePickerVisibility(false)}
+                        display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                        isDarkModeEnabled={colorScheme === 'light'} 
+                        maximumDate={today}
+                    />
+
                     <TextInput
                         style={styles.modalInput}
                         value={inputValue}
@@ -139,9 +167,13 @@ const SegmentedControl = ({ options, selectedOption, onSelect }) => {
 const DateNavigator = ({ date, onDateChange, period, onOpenCalendar }) => {
     const changeDate = (amount) => {
         const newDate = new Date(date);
-        if (period === 'day') newDate.setDate(newDate.getDate() + amount);
-        else if (period === 'week') newDate.setDate(newDate.getDate() + (amount * 7));
-        else if (period === 'month') newDate.setMonth(newDate.getMonth() + amount);
+        if (period === 'day') {
+            newDate.setDate(newDate.getDate() + amount);
+        } else if (period === 'week') {
+            newDate.setDate(newDate.getDate() + (amount * 7));
+        } else if (period === 'month') {
+            newDate.setMonth(newDate.getMonth() + amount);
+        }
         onDateChange(newDate);
     };
 
@@ -167,12 +199,9 @@ const DateNavigator = ({ date, onDateChange, period, onOpenCalendar }) => {
             <TouchableOpacity onPress={() => changeDate(-1)} style={styles.arrowButton}>
                 <Ionicons name="chevron-back" size={24} color="#007AFF" />
             </TouchableOpacity>
-            
-            {/* 3. Make the date text pressable */}
             <TouchableOpacity onPress={onOpenCalendar}>
                 <Text style={styles.dateNavigatorText}>{formatDate()}</Text>
             </TouchableOpacity>
-
             <TouchableOpacity onPress={() => changeDate(1)} style={styles.arrowButton}>
                 <Ionicons name="chevron-forward" size={24} color="#007AFF" />
             </TouchableOpacity>
@@ -180,27 +209,39 @@ const DateNavigator = ({ date, onDateChange, period, onOpenCalendar }) => {
     );
 };
 
+// --- CalendarModal Component ---
 const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate }) => {
+    // Get today's date in 'YYYY-MM-DD' format for the maxDate prop
+    const today = new Date().toISOString().split('T')[0];
+
     return (
         <Modal visible={isVisible} transparent={true} animationType="fade">
             <TouchableOpacity style={styles.calendarBackdrop} onPress={onClose} />
             <View style={styles.calendarModalContainer}>
                 <Calendar
-                    current={initialDate.toISOString().split('T')[0]} // Set the initial month to show
+                    current={initialDate.toISOString().split('T')[0]}
+                    // --- THIS IS THE FIX ---
+                    // Add the maxDate prop to disable future dates.
+                    maxDate={today}
                     onDayPress={(day) => {
-                        onDayPress(new Date(day.timestamp));
+                        const selectedDate = new Date(day.year, day.month - 1, day.day);
+                        onDayPress(selectedDate);
                         onClose();
                     }}
                     monthFormat={'MMMM yyyy'}
                     theme={{
                         backgroundColor: '#ffffff',
                         calendarBackground: '#ffffff',
-                        textSectionTitleColor: '#b6c1cd',
+                        textSectionTitleColor: '#2d4150',
+                        monthTextColor: '#111111',
+                        textMonthFontWeight: 'bold',
+                        dayTextColor: '#111111',
+                        textDayFontWeight: '500',
                         selectedDayBackgroundColor: '#007AFF',
                         selectedDayTextColor: '#ffffff',
                         todayTextColor: '#007AFF',
-                        dayTextColor: '#2d4150',
                         arrowColor: '#007AFF',
+                        textDisabledColor: '#d9e1e8'
                     }}
                 />
             </View>
@@ -241,6 +282,8 @@ const LogBloodSugarScreen = ({ navigation }) => {
             const data = await api.getHistory([3], 'all', null, 1);
             if (data.length > 0) {
                 setLastReading(data[0]);
+            } else {
+                setLastReading(null);
             }
         } catch (error) {
              console.error("Could not load last reading:", error);
@@ -252,7 +295,7 @@ const LogBloodSugarScreen = ({ navigation }) => {
     useFocusEffect(
         useCallback(() => {
             loadData(timePeriod, displayDate);
-            loadLastReading(); // Refresh last reading when screen is focused
+            loadLastReading();
         }, [timePeriod, displayDate])
     );
 
@@ -261,12 +304,12 @@ const LogBloodSugarScreen = ({ navigation }) => {
         loadData(timePeriod, displayDate);
     };
 
-    const handleSave = async (logId, amount) => {
+    const handleSave = async (logId, amount, date) => {
         try {
             if (logId) {
                 await api.updateLog(logId, amount);
             } else {
-                await api.addLog({ amount, type: 3 });
+                await api.addLog({ amount, type: 3, date: date.toISOString() });
             }
             Alert.alert('Success', 'Log saved successfully.');
         } catch(e) {
@@ -526,6 +569,29 @@ const styles = StyleSheet.create({
     modalContent: { backgroundColor: '#F0F2F5', paddingHorizontal: 20, paddingTop: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
     modalTitle: { fontSize: 16, fontWeight: '600', color: '#888', textAlign: 'center', marginBottom: 15 },
     modalInput: { backgroundColor: '#FFFFFF', borderColor: '#E0E0E0', borderWidth: 1, borderRadius: 10, padding: 15, fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
+    datePickerButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#D1D1D6',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2.0,
+        elevation: 2,
+    },
+    datePickerText: {
+        marginLeft: 12,
+        fontSize: 17,
+        fontWeight: '600',
+        color: '#007AFF',
+    },
     scanButtonsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 30 },
     scanButton: { flex: 1, flexDirection: 'row', backgroundColor: '#007AFF', paddingVertical: 14, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginHorizontal: 5 },
     scanButtonText: { color: '#fff', marginLeft: 8, fontWeight: '600', fontSize: 16 },

@@ -2,6 +2,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
 
+// Your server's base URL. Ensure the IP address is correct for your local network or use your public deployment URL.
 const BASE_URL = 'http://192.168.0.120:3000/api';
 
 async function authenticatedFetch(endpoint, options = {}) {
@@ -10,8 +11,10 @@ async function authenticatedFetch(endpoint, options = {}) {
     if (accessToken) {
         headers['Authorization'] = `Bearer ${accessToken}`;
     }
+    
     let response = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
 
+    // If the access token expired (403 Forbidden), try to refresh it.
     if (response.status === 403) {
         const refreshToken = await SecureStore.getItemAsync('refreshToken');
         if (!refreshToken) {
@@ -24,12 +27,17 @@ async function authenticatedFetch(endpoint, options = {}) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token: refreshToken }),
             });
+
             if (!refreshResponse.ok) throw new Error("Refresh failed");
+
             const newTokens = await refreshResponse.json();
             await SecureStore.setItemAsync('accessToken', newTokens.accessToken);
             headers['Authorization'] = `Bearer ${newTokens.accessToken}`;
+            
+            // Retry the original request with the new token
             response = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
         } catch (e) {
+            // If refresh fails, the session is truly over. Clear tokens and alert user.
             await SecureStore.deleteItemAsync('accessToken');
             await SecureStore.deleteItemAsync('refreshToken');
             Alert.alert("Session Expired", "Please log in again.");
@@ -41,6 +49,7 @@ async function authenticatedFetch(endpoint, options = {}) {
 
 // --- FINAL, COMBINED AND SIMPLIFIED API OBJECT ---
 export const api = {
+
     getHistory: async (types, period = 'day', targetDate = null, limit = null) => {
         const params = new URLSearchParams({ 
             types: types.join(','),
@@ -60,7 +69,8 @@ export const api = {
     addLog: async (logData) => {
         const response = await authenticatedFetch('/logs', {
             method: 'POST',
-            body: JSON.stringify({ ...logData, date: new Date().toISOString() }),
+            // The date is passed in from the frontend date picker.
+            body: JSON.stringify(logData),
         });
         return response.json();
     },
@@ -68,7 +78,7 @@ export const api = {
     updateLog: async (logId, amount) => {
         const response = await authenticatedFetch(`/logs/${logId}`, {
             method: 'PUT',
-            body: JSON.stringify({ amount }),
+            body: JSON.stringify({ amount }), // Only send the amount for an update.
         });
         return response.json();
     },

@@ -210,10 +210,10 @@ app.post('/api/logs', async (req, res) => {
     }
 });
 
-// PUT (update) a specific log
+// PUT (update) a specific log. This route now ONLY accepts and updates the `amount`.
 app.put('/api/logs/:logId', async (req, res) => {
     const { logId } = req.params;
-    const { amount, date } = req.body;
+    const { amount } = req.body;
 
     if (amount === undefined || amount === null || String(amount).trim() === '') {
         return res.status(400).json({ success: false, message: 'Amount is required.' });
@@ -225,11 +225,10 @@ app.put('/api/logs/:logId', async (req, res) => {
     }
 
     try {
-        const dateToUpdate = date ? new Date(date) : new Date();
-
+        // The SQL query now only sets the amount column. The date column is not touched.
         const [result] = await dbPool.query(
-            `UPDATE dataLogs SET amount = ?, date = ? WHERE logID = ? AND userID = ?`, 
-            [numericAmount, dateToUpdate, logId, req.user.userId]
+            `UPDATE dataLogs SET amount = ? WHERE logID = ? AND userID = ?`, 
+            [numericAmount, logId, req.user.userId]
         );
 
         if (result.affectedRows === 0) {
