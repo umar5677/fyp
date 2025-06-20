@@ -9,7 +9,7 @@ const authenticateToken = require('./authMiddleware.js');
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 
-// --- AWS SDK & DB Setup ---
+// AWS SDK & DB Setup
 const rekognitionClient = new RekognitionClient({
     region: process.env.AWS_REGION,
     credentials: {
@@ -19,7 +19,7 @@ const rekognitionClient = new RekognitionClient({
 });
 const dbPool = mysql.createPool({ host: process.env.DB_HOST, user: process.env.DB_USER, password: process.env.DB_PASSWORD, database: process.env.DB_NAME, waitForConnections: true, connectionLimit: 10, queueLimit: 0 });
 
-// --- PUBLIC ROUTES (No token needed) ---
+// PUBLIC ROUTES
 const loginApi = require('./api/login.js');
 const { createLoginRouter, hashPassword } = loginApi;
 const createSignupRouter = require('./api/signup.js');
@@ -40,10 +40,10 @@ app.post('/api/token', (req, res) => {
     });
 });
 
-// --- PROTECTED ROUTES (All routes below this line require a valid JWT) ---
+// PROTECTED ROUTES
 app.use(authenticateToken);
 
-// --- Profile Route (Protected) ---
+// Profile Route 
 app.get('/api/profile', async (req, res) => {
     const userId = req.user.userId;
     try {
@@ -56,7 +56,7 @@ app.get('/api/profile', async (req, res) => {
     }
 });
 
-// --- Universal OCR Endpoint (Protected) ---
+// Universal OCR Endpoint 
 app.post('/api/ocr/aws-parse-image', async (req, res) => {
     const { image } = req.body;
     if (!image) return res.status(400).json({ message: 'Image data is required.' });
@@ -129,7 +129,7 @@ app.post('/api/ocr/aws-parse-image', async (req, res) => {
 });
 
 
-// --- CONSOLIDATED LOGS ENDPOINTS (Protected) ---
+// CONSOLIDATED LOGS ENDPOINTS 
 
 app.get('/api/logs/history', async (req, res) => {
     const userId = req.user.userId;
@@ -198,6 +198,8 @@ app.post('/api/logs', async (req, res) => {
         return res.status(400).json({ message: 'A valid, non-negative amount is required.' });
     }
 
+    
+
     try {
         const [result] = await dbPool.query(
             'INSERT INTO dataLogs (userID, type, amount, date) VALUES (?, ?, ?, ?)',
@@ -225,7 +227,6 @@ app.put('/api/logs/:logId', async (req, res) => {
     }
 
     try {
-        // The SQL query now only sets the amount column. The date column is not touched.
         const [result] = await dbPool.query(
             `UPDATE dataLogs SET amount = ? WHERE logID = ? AND userID = ?`, 
             [numericAmount, logId, req.user.userId]
@@ -258,6 +259,7 @@ app.delete('/api/logs/:logId', async (req, res) => {
 });
 
 
-// --- Start Server ---
+// Start Server-
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
+const HOST = '0.0.0.0'; 
+app.listen(PORT, HOST, () => console.log(`Server is running on http://${HOST}:${PORT}`));

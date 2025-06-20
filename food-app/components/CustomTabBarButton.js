@@ -17,13 +17,9 @@ const CustomTabBarButton = ({ onPress }) => (
 
 const styles = StyleSheet.create({
   container: {
-    // This will make it sit above the standard tab bar, overlapping content slightly.
-    // Adjust this value if it looks too high or too low.
-    // If you want it more integrated, you might reduce 'top' or change the approach.
     top: -28,
     justifyContent: 'center',
     alignItems: 'center',
-    // Shadow for the button itself (optional, can be subtle)
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.20,
@@ -34,7 +30,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#00C49A', // Your teal color
+    backgroundColor: '#00C49A', 
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -18,8 +18,6 @@ function authenticateToken(req, res, next) {
             // Send 403 Forbidden status and stop processing the request.
             return res.sendStatus(403);
         }
-
-        // If the token is valid, the `user` object contains the payload we signed
         req.user = user;
         next();
     });

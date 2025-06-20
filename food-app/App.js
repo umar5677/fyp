@@ -22,8 +22,6 @@ const AuthLoadingScreen = ({ navigation }) => {
       } catch (e) {
         console.error("Failed to restore token", e);
       }
-      // If a token exists, go to the main app. Otherwise, go to Login.
-      // We no longer pass any params.
       navigation.replace(userToken ? 'MainApp' : 'Login');
     };
 

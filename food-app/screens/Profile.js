@@ -1,20 +1,13 @@
 // screens/Profile.js
 import React from 'react';
-// --- THIS IS THE FIX ---
-// Import 'Platform' from 'react-native' to use it.
 import { View, Text, StyleSheet, Button, Platform, Alert } from 'react-native';
-// --- END OF FIX ---
 import * as SecureStore from 'expo-secure-store';
 
 const Profile = ({ navigation }) => {
   const handleLogout = async () => {
     try {
-        // Delete the tokens from secure storage to log the user out
         await SecureStore.deleteItemAsync('accessToken');
         await SecureStore.deleteItemAsync('refreshToken');
-        
-        // Navigate the user back to the Login screen, replacing the current
-        // navigation stack so they cannot press "back" to get into the app.
         navigation.getParent('RootStack').replace('Login');
         
     } catch (error) {

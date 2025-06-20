@@ -6,7 +6,7 @@ const express = require('express');
 module.exports = function (dbPool, hashPassword) {
     const router = express.Router();
 
-    // POST / (which will be mounted, e.g., at /api/signup/)
+    // POST 
     router.post('/', async (req, res) => {
         const { email, password, first_name, last_name, dob, weight, height, diabetes } = req.body;
 
@@ -38,5 +38,5 @@ module.exports = function (dbPool, hashPassword) {
         }
     });
 
-    return router; // Return the configured router
+    return router;
 };

@@ -1,9 +1,8 @@
 // api/login.js
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken'); // <-- Correct import
+const jwt = require('jsonwebtoken'); 
 
-// --- Helper Functions (hashPassword, comparePassword) are unchanged ---
 async function hashPassword(password) {
     const saltRounds = 10;
     return await bcrypt.hash(password, saltRounds);
@@ -13,7 +12,7 @@ async function comparePassword(plainPassword, hashedPassword) {
     return await bcrypt.compare(plainPassword, hashedPassword);
 }
 
-// --- "Internal" Authentication Logic (Unchanged) ---
+// Internal Authentication Logic 
 async function authenticateUser(email, password, dbPool) {
     try {
         const [users] = await dbPool.query('SELECT userID, email, password FROM users WHERE email = ?', [email]);
@@ -33,7 +32,7 @@ async function authenticateUser(email, password, dbPool) {
 }
 
 
-// --- Router Factory Function (Remodeled for JWT) ---
+// Router Factory Function 
 function createLoginRouter(dbPool) {
     const router = express.Router();
 
@@ -49,7 +48,7 @@ function createLoginRouter(dbPool) {
                 return res.status(401).json({ message: 'Invalid email or password.' });
             }
 
-            // --- Create JWT Tokens ---
+            // Create JWT Tokens
             const userPayload = { userId: authResult.user.userId };
             const accessTokenSecret = process.env.JWT_SECRET;
             const refreshTokenSecret = process.env.JWT_REFRESH_SECRET; // A separate, second secret from your .env file
