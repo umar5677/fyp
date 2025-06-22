@@ -33,7 +33,7 @@ const Login = ({ navigation }) => {
           Alert.alert('Login Error', 'No tokens received.');
           return;
         }
-        Alert.alert('Login Success', responseData.message || 'Successfully logged in!');
+        //Alert.alert('Login Success', responseData.message || 'Successfully logged in!');
         navigation.replace('MainApp', {
           userId: responseData.userId,
           userEmail: responseData.email,
