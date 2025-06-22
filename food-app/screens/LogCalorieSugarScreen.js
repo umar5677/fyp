@@ -13,7 +13,7 @@ import { Calendar } from 'react-native-calendars';
 
 import { api } from '../utils/api';
 
-// --- Reusable Components (Defined at the top level for stability) ---
+// Reusable Components 
 const SegmentedControl = ({ options, selectedOption, onSelect }) => {
     return (
         <View style={styles.segmentedControlContainer}>
@@ -64,7 +64,6 @@ const DateNavigator = ({ date, onDateChange, period, onOpenCalendar }) => {
 };
 
 const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate }) => {
-    // --- THIS IS PART OF THE FIX ---
     const today = new Date().toISOString().split('T')[0]; // Get today's date for maxDate
 
     return (
@@ -80,7 +79,7 @@ const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate }) => {
                         onClose();
                     }}
                     monthFormat={'MMMM yyyy'}
-                    // --- APPLYING CONSISTENT THEME ---
+                    // APPLYING CONSISTENT THEME
                     theme={{
                         backgroundColor: '#ffffff',
                         calendarBackground: '#ffffff',
@@ -109,7 +108,6 @@ const EditCalorieSugarModal = ({ modalVisible, setModalVisible, logs, onSave, on
     const [isSaving, setIsSaving] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
 
-    // --- THIS IS PART OF THE FIX ---
     const colorScheme = useColorScheme();
     const today = new Date();
 
@@ -162,7 +160,6 @@ const EditCalorieSugarModal = ({ modalVisible, setModalVisible, logs, onSave, on
                         <Ionicons name="calendar-outline" size={20} color="#333" />
                         <Text style={styles.datePickerText}>{logDate.toLocaleString()}</Text>
                     </TouchableOpacity>
-                    {/* --- THIS IS THE FIX --- */}
                     <DateTimePickerModal
                         isVisible={isDatePickerVisible}
                         mode="datetime"
@@ -195,7 +192,7 @@ const EditCalorieSugarModal = ({ modalVisible, setModalVisible, logs, onSave, on
 };
 
 
-// --- Main Screen Component ---
+// Main Screen Component
 export default function LogCalorieSugarScreen({ navigation }) {
     const [history, setHistory] = useState([]);
     const [groupedHistory, setGroupedHistory] = useState([]);

@@ -1,12 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
-import { useNavigation } from '@react-navigation/native'; // ✅ Import from react-navigation
+import { useNavigation } from '@react-navigation/native'; 
 
 const screenWidth = Dimensions.get('window').width;
 
 export default function MiniGlucoseChart() {
-  const navigation = useNavigation(); // ✅ Hook to access navigation
+  const navigation = useNavigation(); 
 
   const data = {
     labels: ['8am', '10am', '12pm', '2pm', '4pm'],

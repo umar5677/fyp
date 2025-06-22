@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
-    backgroundColor: '#E0E0E0', // slightly darker grey for contrast
+    backgroundColor: '#E0E0E0', 
   },
   mainValue: {
     color: '#1E1E2D',

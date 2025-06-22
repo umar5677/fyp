@@ -2,7 +2,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
 
-// Your server's base URL. Ensure the IP address is correct for your local network or use your public deployment URL.
+// Ensure the IP address is correct for your local network or use your public deployment URL.
 const BASE_URL = 'http://192.168.0.120:3000/api';
 
 async function authenticatedFetch(endpoint, options = {}) {
@@ -47,7 +47,7 @@ async function authenticatedFetch(endpoint, options = {}) {
     return response;
 }
 
-// --- FINAL, COMBINED AND SIMPLIFIED API OBJECT ---
+// FINAL, COMBINED AND SIMPLIFIED API OBJECT
 export const api = {
 
     getHistory: async (types, period = 'day', targetDate = null, limit = null) => {

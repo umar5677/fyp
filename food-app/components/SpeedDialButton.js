@@ -3,7 +3,6 @@ import React, { useState, useRef } from 'react';
 import { View, TouchableOpacity, StyleSheet, Animated, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-// 1. Accept 'userId' as a prop instead of 'route'
 const SpeedDialButton = ({ navigation, userId }) => {
 
   const [isOpen, setIsOpen] = useState(false);
@@ -20,7 +19,7 @@ const SpeedDialButton = ({ navigation, userId }) => {
   };
 
   const handleActionPress = (action) => {
-    toggleMenu(); // Close menu after action
+    toggleMenu();
     switch (action) {
       case 'calorieSugar':
         navigation.navigate('LogCalorieSugarModal', { userId });

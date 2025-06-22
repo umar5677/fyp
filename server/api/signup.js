@@ -2,11 +2,10 @@
 const express = require('express');
 
 // This module exports a function that takes dependencies (dbPool, hashPassword)
-// and returns the configured router.
 module.exports = function (dbPool, hashPassword) {
     const router = express.Router();
 
-    // POST / (which will be mounted, e.g., at /api/signup/)
+    // POST (which will be mounted, e.g., at /api/signup/)
     router.post('/', async (req, res) => {
         const { email, password, first_name, last_name, dob, weight, height, diabetes } = req.body;
 

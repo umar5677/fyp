@@ -14,7 +14,7 @@ import DateTimePickerModal from "react-native-modal-datetime-picker";
 
 import { api } from '../utils/api'; 
 
-// --- EditLogModal Component ---
+// EditLogModal Component
 const EditLogModal = ({ 
     modalVisible, 
     setModalVisible, 
@@ -143,7 +143,7 @@ const EditLogModal = ({
 };
 
 
-// --- SegmentedControl Component ---
+// SegmentedControl Component
 const SegmentedControl = ({ options, selectedOption, onSelect }) => {
     return (
         <View style={styles.segmentedControlContainer}>
@@ -163,7 +163,7 @@ const SegmentedControl = ({ options, selectedOption, onSelect }) => {
 };
 
 
-// --- DateNavigator Component ---
+// DateNavigator Component
 const DateNavigator = ({ date, onDateChange, period, onOpenCalendar }) => {
     const changeDate = (amount) => {
         const newDate = new Date(date);
@@ -209,7 +209,7 @@ const DateNavigator = ({ date, onDateChange, period, onOpenCalendar }) => {
     );
 };
 
-// --- CalendarModal Component ---
+// CalendarModal Component 
 const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate }) => {
     // Get today's date in 'YYYY-MM-DD' format for the maxDate prop
     const today = new Date().toISOString().split('T')[0];
@@ -220,7 +220,6 @@ const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate }) => {
             <View style={styles.calendarModalContainer}>
                 <Calendar
                     current={initialDate.toISOString().split('T')[0]}
-                    // --- THIS IS THE FIX ---
                     // Add the maxDate prop to disable future dates.
                     maxDate={today}
                     onDayPress={(day) => {
@@ -470,7 +469,7 @@ const LogBloodSugarScreen = ({ navigation }) => {
     );
 };
 
-// --- Styles ---
+// Styles 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F0F2F5' },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10, marginBottom: 5, paddingHorizontal: 15, paddingTop: Platform.OS === 'android' ? 25 : 15 },

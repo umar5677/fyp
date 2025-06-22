@@ -66,7 +66,7 @@ export default function Home() {
       
     
     <FlatList
-          data={[]} // empty list; we're using ListHeaderComponent instead
+          data={[]}
           renderItem={null}
           keyExtractor={() => 'header'}
           style={{paddingTop:10}}
@@ -134,7 +134,6 @@ export default function Home() {
                 })}
               </View>
     
-              {/* Other components */}
               <MiniGlucoseChart />
               <CalorieBurnt />
             </>

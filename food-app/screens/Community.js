@@ -138,7 +138,7 @@ export default function CommunityScreen() {
         renderItem={renderPost}
         contentContainerStyle={{
           padding: 16,
-          paddingBottom: insets.bottom + /* your TAB_BAR_HEIGHT */ + 16,
+          paddingBottom: insets.bottom + 16,
         }}
       />
 
