@@ -4,11 +4,11 @@
     "slug": "GlucoBites",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/glucobites.png",
+    "icon": "./assets/GlucoBitesLogo.jpg",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/glucobites.png",
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -17,14 +17,10 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/glucobites.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ],
-      "package": "com.dope9402.GlucoBites"
+      "edgeToEdgeEnabled": true
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -36,13 +32,8 @@
           "photosPermission": "Allow $(PRODUCT_NAME) to access your photos",
           "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera"
         }
-      ],
-      "expo-build-properties"
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "4ea78716-6ca7-47a9-8638-34b6f273b00f"
-      }
-    }
+      ]
+
+    ]
   }
 }

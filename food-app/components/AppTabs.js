@@ -5,22 +5,20 @@ import { Platform, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import Home from '../screens/Home';
-import Calendar from '../screens/Calendar';
-import Stats from '../screens/Stats';
+import HomeStack from '../navigation/HomeStack';
+import Community from '../screens/Community';
+import Leaderboard from '../screens/Leaderboard';
 import Profile from '../screens/Profile';
 import SpeedDialButton from './SpeedDialButton';
 
 const Tab = createBottomTabNavigator();
 const DummyAddScreen = () => null;
 
-const ACTIVE_COLOR = '#007AFF';
+const ACTIVE_COLOR = '#E4691C';
 const INACTIVE_COLOR = '#8e8e93';
 
 const AppTabs = ({ navigation, route }) => {
-  const userId = route.params?.userId; 
-
-
+  const userId = route.params?.userId;
   const insets = useSafeAreaInsets();
 
   return (
@@ -28,7 +26,7 @@ const AppTabs = ({ navigation, route }) => {
       screenOptions={{
         tabBarStyle: {
           backgroundColor: Platform.OS === 'ios' ? '#F7F7F7' : '#FFFFFF',
-          height: 60 + insets.bottom, 
+          height: 45 + insets.bottom, 
           paddingBottom: insets.bottom,
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: '#D1D1D6',
@@ -40,18 +38,18 @@ const AppTabs = ({ navigation, route }) => {
     >
       <Tab.Screen
         name="HomeTab"
-        component={Home}
+        component={HomeStack}
         options={{
           tabBarLabel: 'Home',
           tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? "home" : "home-outline"} size={size} color={color} />,
         }}
       />
       <Tab.Screen
-        name="CalendarTab"
-        component={Calendar}
+        name="CommunityTab"
+        component={Community}
         options={{
-          tabBarLabel: 'Calendar',
-          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? "calendar" : "calendar-outline"} size={size} color={color} />,
+          tabBarLabel: 'Community',
+          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? "people" : "people-outline" } size={size} color={color} />,
         }}
       />
       <Tab.Screen
@@ -63,11 +61,11 @@ const AppTabs = ({ navigation, route }) => {
         }}
       />
       <Tab.Screen
-        name="StatsTab"
-        component={Stats}
+        name="LeaderboardTab"
+        component={Leaderboard}
         options={{
-          tabBarLabel: 'Stats',
-          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? "bar-chart" : "bar-chart-outline"} size={size} color={color} />,
+          tabBarLabel: 'Leaderboard',
+          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? "trophy" : "trophy-outline"} size={size} color={color} />,
         }}
       />
       <Tab.Screen

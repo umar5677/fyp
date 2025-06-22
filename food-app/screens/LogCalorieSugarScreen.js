@@ -13,7 +13,7 @@ import { Calendar } from 'react-native-calendars';
 
 import { api } from '../utils/api';
 
-// Reusable Components 
+// --- Reusable Components (Defined at the top level for stability) ---
 const SegmentedControl = ({ options, selectedOption, onSelect }) => {
     return (
         <View style={styles.segmentedControlContainer}>
@@ -64,6 +64,7 @@ const DateNavigator = ({ date, onDateChange, period, onOpenCalendar }) => {
 };
 
 const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate }) => {
+    // --- THIS IS PART OF THE FIX ---
     const today = new Date().toISOString().split('T')[0]; // Get today's date for maxDate
 
     return (
@@ -79,6 +80,7 @@ const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate }) => {
                         onClose();
                     }}
                     monthFormat={'MMMM yyyy'}
+                    // --- APPLYING CONSISTENT THEME ---
                     theme={{
                         backgroundColor: '#ffffff',
                         calendarBackground: '#ffffff',
@@ -106,6 +108,8 @@ const EditCalorieSugarModal = ({ modalVisible, setModalVisible, logs, onSave, on
     const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
+
+    // --- THIS IS PART OF THE FIX ---
     const colorScheme = useColorScheme();
     const today = new Date();
 
@@ -158,6 +162,7 @@ const EditCalorieSugarModal = ({ modalVisible, setModalVisible, logs, onSave, on
                         <Ionicons name="calendar-outline" size={20} color="#333" />
                         <Text style={styles.datePickerText}>{logDate.toLocaleString()}</Text>
                     </TouchableOpacity>
+                    {/* --- THIS IS THE FIX --- */}
                     <DateTimePickerModal
                         isVisible={isDatePickerVisible}
                         mode="datetime"
@@ -190,7 +195,7 @@ const EditCalorieSugarModal = ({ modalVisible, setModalVisible, logs, onSave, on
 };
 
 
-// Main Screen Component 
+// --- Main Screen Component ---
 export default function LogCalorieSugarScreen({ navigation }) {
     const [history, setHistory] = useState([]);
     const [groupedHistory, setGroupedHistory] = useState([]);
@@ -383,7 +388,7 @@ const styles = StyleSheet.create({
     doneButton: { color: '#007AFF', fontSize: 17, fontWeight: '600', paddingTop: 8 },
     summaryBox: { padding: 16, backgroundColor: '#fff', borderRadius: 12, marginHorizontal: 15, marginBottom: 15, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
     summaryText: { fontSize: 16, fontWeight: '600', color: '#555', marginBottom: 4 },
-    summaryReading: { fontSize: 20, fontWeight: 'bold', color: '#111'},
+    summaryReading: { fontSize: 20, fontWeight: 'bold' },
     historyContainer: { flex: 1, backgroundColor: 'white', borderRadius: 12, marginHorizontal: 15, marginBottom: 15 },
     segmentedControlContainer: { flexDirection: 'row', backgroundColor: '#E9E9EF', borderRadius: 8, marginHorizontal: 20, marginTop: 20, overflow: 'hidden' },
     segment: { flex: 1, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
@@ -399,7 +404,7 @@ const styles = StyleSheet.create({
     historyDate: { fontSize: 12, color: '#888', marginBottom: 8 },
     logDataRow: { flexDirection: 'row', alignItems: 'center' },
     logRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
-    historyLabel: { fontWeight: '600', fontSize: 16, color: '#555' },
+    historyLabel: { fontWeight: '600', fontSize: 16 },
     historyValue: { fontSize: 16, fontWeight: 'bold', color: '#333' },
     actionsRow: { flexDirection: 'row', marginLeft: 16 },
     noData: { textAlign: 'center', marginTop: 50, color: '#888' },
@@ -407,10 +412,10 @@ const styles = StyleSheet.create({
     modalOverlay: { flex: 1, justifyContent: 'flex-end' },
     modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
     modalContent: { backgroundColor: '#F0F2F5', padding: 24, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-    modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15, textAlign: 'center', color: '#333' },
-    modalInput: { backgroundColor: '#fff', padding: 16, fontSize: 18, borderRadius: 12, textAlign: 'center', marginBottom: 12, borderColor: '#ccc', borderWidth: 1, color: '#333' },
+    modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
+    modalInput: { backgroundColor: '#fff', padding: 16, fontSize: 18, borderRadius: 12, textAlign: 'center', marginBottom: 12, borderColor: '#ccc', borderWidth: 1 },
     datePickerButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, backgroundColor: '#fff', borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#ccc' },
-    datePickerText: { marginLeft: 10, fontSize: 16, fontWeight: '600', color: '#333' },
+    datePickerText: { marginLeft: 10, fontSize: 16, fontWeight: '600' },
     scanButtonsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
     scanButton: { flex: 1, flexDirection: 'row', backgroundColor: '#007AFF', padding: 12, marginHorizontal: 5, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
     scanButtonText: { color: 'white', marginLeft: 6, fontSize: 16 },
