@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, Alert, ActivityIndicator, TouchableOpacity, Image } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
-const YOUR_AWS_LOGIN_API_URL = 'http://172.20.10.2:3000/api/login';
+const YOUR_AWS_LOGIN_API_URL = 'http://192.168.90.222:3000/api/login';
 
 const Login = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -51,7 +51,7 @@ const Login = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <Image source={require('../assets/GlucoBites(no_bg).png')} style={styles.logo} />
+      <Image source={require('../assets/GlucoBites.png')} style={styles.logo} />
       <Text style={styles.welcome}>Welcome to <Text style={styles.appName}>GlucoBites</Text></Text>
       <TextInput
         style={styles.input}
