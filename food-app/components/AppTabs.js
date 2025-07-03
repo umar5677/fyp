@@ -5,7 +5,7 @@ import { Platform, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import HomeStack from '../navigation/HomeStack';
+import HomeStack from '../screens/HomeStack';
 import Community from '../screens/Community';
 import Leaderboard from '../screens/Leaderboard';
 import Profile from '../screens/Profile';

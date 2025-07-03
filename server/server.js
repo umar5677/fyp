@@ -143,7 +143,7 @@ app.get('/api/logs/history', async (req, res) => {
         return res.status(400).json({ message: "Invalid 'types' parameter." });
     }
 
-    let query = `SELECT logID, type, amount, date FROM dataLogs WHERE userID = ? AND type IN (?)`;
+    let query = `SELECT logID, type, amount, date, tag FROM dataLogs WHERE userID = ? AND type IN (?)`;
     const queryParams = [userId, typeArray];
     
     if (period !== 'all') {
@@ -187,12 +187,19 @@ app.get('/api/logs/history', async (req, res) => {
 
 app.post('/api/logs', async (req, res) => {
     const userId = req.user.userId;
-    const { amount, type, date } = req.body;
+    //Destructure 'tag' from the request body
+    const { amount, type, date, tag } = req.body;
     const dateToInsert = date ? new Date(date) : new Date();
 
     if (amount == null || type == null) {
         return res.status(400).json({ message: 'Amount and type are required.' });
     }
+
+    // A tag is only required if the type is 3 (blood glucose)
+    if (type === 3 && !tag) {
+         return res.status(400).json({ message: 'A tag (e.g., Fasting, Pre-Meal) is required for blood glucose logs.' });
+    }
+
     const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount < 0) {
         return res.status(400).json({ message: 'A valid, non-negative amount is required.' });
@@ -200,8 +207,10 @@ app.post('/api/logs', async (req, res) => {
 
     try {
         const [result] = await dbPool.query(
-            'INSERT INTO dataLogs (userID, type, amount, date) VALUES (?, ?, ?, ?)',
-            [userId, type, numericAmount, dateToInsert]
+            // Add 'tag' to the INSERT statement
+            'INSERT INTO dataLogs (userID, type, amount, date, tag) VALUES (?, ?, ?, ?, ?)',
+            //Add the tag value (or null if it wasn't provided for other types)
+            [userId, type, numericAmount, dateToInsert, tag || null]
         );
         res.status(201).json({ success: true, message: 'Log created successfully!', logId: result.insertId });
     } catch (error) {
@@ -213,22 +222,24 @@ app.post('/api/logs', async (req, res) => {
 // PUT (update) a specific log. This route now ONLY accepts and updates the `amount`.
 app.put('/api/logs/:logId', async (req, res) => {
     const { logId } = req.params;
-    const { amount } = req.body;
+    // Destructure 'tag' from the request body
+    const { amount, tag } = req.body;
 
-    if (amount === undefined || amount === null || String(amount).trim() === '') {
-        return res.status(400).json({ success: false, message: 'Amount is required.' });
+    // Both amount and tag must be provided for an update
+    if (amount === undefined || tag === undefined) {
+        return res.status(400).json({ success: false, message: 'Amount and tag are required for an update.' });
     }
-    
+
     const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount < 0) {
         return res.status(400).json({ success: false, message: 'A valid, non-negative amount is required.' });
     }
 
     try {
-        // The SQL query now only sets the amount column. The date column is not touched.
+        // Update both amount and tag in the query
         const [result] = await dbPool.query(
-            `UPDATE dataLogs SET amount = ? WHERE logID = ? AND userID = ?`, 
-            [numericAmount, logId, req.user.userId]
+            `UPDATE dataLogs SET amount = ?, tag = ? WHERE logID = ? AND userID = ?`,
+            [numericAmount, tag, logId, req.user.userId]
         );
 
         if (result.affectedRows === 0) {

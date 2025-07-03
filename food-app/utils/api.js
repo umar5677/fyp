@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
 
 // Ensure the IP address is correct for your local network or use your public deployment URL.
-const BASE_URL = 'http://192.168.90.222:3000/api';
+const BASE_URL = 'http://192.168.0.120:3000/api';
 
 async function authenticatedFetch(endpoint, options = {}) {
     let accessToken = await SecureStore.getItemAsync('accessToken');
@@ -67,18 +67,19 @@ export const api = {
     },
 
     addLog: async (logData) => {
+        // logData include the tag
         const response = await authenticatedFetch('/logs', {
             method: 'POST',
-            // The date is passed in from the frontend date picker.
             body: JSON.stringify(logData),
         });
         return response.json();
     },
 
-    updateLog: async (logId, amount) => {
+    updateLog: async (logId, updateData) => {
+        // updateData will be an object
         const response = await authenticatedFetch(`/logs/${logId}`, {
             method: 'PUT',
-            body: JSON.stringify({ amount }), // Only send the amount for an update.
+            body: JSON.stringify(updateData),
         });
         return response.json();
     },
