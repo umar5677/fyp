@@ -1,63 +1,146 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+// food-app/components/MiniGlucoseChart.js
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
-import { useNavigation } from '@react-navigation/native'; 
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { api } from '../utils/api';
 
 const screenWidth = Dimensions.get('window').width;
 
+// This is now a "smart" component that fetches its own data.
 export default function MiniGlucoseChart() {
-  const navigation = useNavigation(); 
+    const navigation = useNavigation();
+    const [chartData, setChartData] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-  const data = {
-    labels: ['8am', '10am', '12pm', '2pm', '4pm'],
-    datasets: [{ data: [90, 110, 140, 130, 100] }],
-  };
+    useFocusEffect(
+        useCallback(() => {
+            const fetchChartData = async () => {
+                if (!isLoading) setIsLoading(true); // Show loader again when screen is re-focused
 
-  return (
-    <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('FullGlucoseChart')}>
-      <Text style={styles.title}>Insights</Text>
-      <LineChart
-        data={data}
-        width={screenWidth - 60}
-        height={220}
-        chartConfig={{
-          backgroundColor: '#F5F0FF',
-          backgroundGradientFrom: '#F5F0FF',
-          backgroundGradientTo: '#F5F0FF',
-          decimalPlaces: 0,
-          color: () => `#3D88F8`,
-          labelColor: () => '#1E1E2D',
-          propsForDots: { r: '3', strokeWidth: '1', stroke: '#3D88F8' },
-        }}
-        bezier
-        style={styles.chart}
-      />
-      <Text style={styles.caption}>Showing today's glucose levels</Text>
-    </TouchableOpacity>
-  );
+                try {
+                    const todayISO = new Date().toISOString();
+                    // Fetch up to the last 7 glucose readings from today
+                    const glucoseRes = await api.getHistory([3], 'day', todayISO, 7); // Type 3 for glucose
+
+                    if (glucoseRes && glucoseRes.length > 1) {
+                        const reversedGlucose = [...glucoseRes].reverse(); // Chart needs chronological data
+                        setChartData({
+                            labels: reversedGlucose.map(log => new Date(log.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })),
+                            datasets: [{ data: reversedGlucose.map(log => log.amount) }]
+                        });
+                    } else {
+                        setChartData(null); // Not enough data for a chart
+                    }
+                } catch (error) {
+                    console.error("Failed to load mini glucose chart data:", error);
+                    setChartData(null);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            
+            fetchChartData();
+        }, []) // The empty dependency array means this runs when the component comes into focus
+    );
+
+    const renderContent = () => {
+        if (isLoading) {
+            return (
+                <View style={styles.placeholderContainer}>
+                    <ActivityIndicator size="large" color="#3D88F8" />
+                </View>
+            );
+        }
+
+        if (!chartData) {
+            return (
+                <View style={styles.placeholderContainer}>
+                    <Text style={styles.placeholderText}>
+                        Log at least two blood sugar readings today to see your daily chart.
+                    </Text>
+                </View>
+            );
+        }
+
+        return (
+            <LineChart
+                data={chartData}
+                width={screenWidth - 40}
+                height={220}
+                chartConfig={{
+                    backgroundColor: '#FFFFFF',
+                    backgroundGradientFrom: '#FFFFFF',
+                    backgroundGradientTo: '#FFFFFF',
+                    decimalPlaces: 0,
+                    color: (opacity = 1) => `rgba(61, 136, 248, ${opacity})`,
+                    labelColor: (opacity = 1) => `rgba(30, 30, 45, ${opacity})`,
+                    propsForDots: { r: '4', strokeWidth: '2', stroke: '#3D88F8' },
+                }}
+                bezier
+                style={styles.chart}
+            />
+        );
+    };
+
+    return (
+        <TouchableOpacity 
+            style={styles.card} 
+            onPress={() => navigation.navigate('FullGlucoseChart')}
+            activeOpacity={0.8}
+        >
+            <View style={styles.cardHeader}>
+                <Text style={styles.title}>Today's Glucose</Text>
+                <Text style={styles.viewMoreText}>View More →</Text>
+            </View>
+            {renderContent()}
+        </TouchableOpacity>
+    );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#F5F0FF', // light lavender background
-    borderRadius: 16,
-    padding: 10,
-    marginVertical: 10,
-  },
-  title: {
-    color: '#1E1E2D', // dark text for contrast
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    paddingLeft: 10,
-  },
-  chart: {
-    borderRadius: 12,
-  },
-  caption: {
-    color: '#555', // darker gray for readability
-    fontSize: 12,
-    paddingTop: 8,
-    paddingLeft: 10,
-  },
+    card: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 16,
+        marginVertical: 10,
+        shadowColor: '#000',
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
+        elevation: 5,
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    title: {
+        color: '#1E1E2D',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    viewMoreText: {
+        color: '#3D88F8',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    chart: {
+        borderRadius: 12,
+        marginVertical: 8,
+    },
+    placeholderContainer: {
+        height: 220,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#F7F7F7',
+        borderRadius: 12,
+        padding: 20,
+    },
+    placeholderText: {
+        color: '#555',
+        textAlign: 'center',
+        fontSize: 14,
+        lineHeight: 20,
+    },
 });

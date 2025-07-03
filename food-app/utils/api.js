@@ -49,6 +49,12 @@ async function authenticatedFetch(endpoint, options = {}) {
 
 // FINAL, COMBINED AND SIMPLIFIED API OBJECT
 export const api = {
+    // NEW FUNCTION TO FIX THE ERROR
+    getProfile: async () => {
+        const response = await authenticatedFetch('/profile');
+        if (!response.ok) throw new Error(`Failed to fetch profile`);
+        return response.json();
+    },
 
     getHistory: async (types, period = 'day', targetDate = null, limit = null) => {
         const params = new URLSearchParams({ 
@@ -63,6 +69,12 @@ export const api = {
         }
         const response = await authenticatedFetch(`/logs/history?${params.toString()}`);
         if (!response.ok) throw new Error(`Failed to fetch history`);
+        return response.json();
+    },
+
+    getGlucosePrediction: async () => {
+        const response = await authenticatedFetch('/predictions/glucose');
+        if (!response.ok) throw new Error(`Failed to fetch prediction`);
         return response.json();
     },
 

@@ -2,7 +2,7 @@
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
-const jwt = require('jsonwebtoken');
+const jwt = 'jsonwebtoken';
 const { RekognitionClient, DetectTextCommand } = require('@aws-sdk/client-rekognition');
 const authenticateToken = require('./authMiddleware.js');
 
@@ -128,6 +128,71 @@ app.post('/api/ocr/aws-parse-image', async (req, res) => {
     }
 });
 
+// --- GLUCOSE PREDICTION ENDPOINT (Protected) ---
+app.get('/api/predictions/glucose', async (req, res) => {
+    const userId = req.user.userId;
+    const NUM_READINGS = 5;
+
+    try {
+        const [readings] = await dbPool.query(
+            'SELECT amount, date FROM dataLogs WHERE userID = ? AND type = 3 ORDER BY date DESC LIMIT ?',
+            [userId, NUM_READINGS]
+        );
+
+        if (readings.length < 2) {
+            return res.json({ success: false, message: 'Not enough data for a prediction. Log at least two readings.' });
+        }
+
+        // Reverse to have oldest first for calculation
+        readings.reverse();
+
+        const firstTimestamp = new Date(readings[0].date).getTime();
+        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+
+        const points = readings.map(r => {
+            const y = parseFloat(r.amount);
+            const x = (new Date(r.date).getTime() - firstTimestamp) / (1000 * 60); // Time in minutes from start
+            sumX += x;
+            sumY += y;
+            sumXY += x * y;
+            sumX2 += x * x;
+            return { x, y };
+        });
+        
+        const n = points.length;
+        const denominator = (n * sumX2 - sumX * sumX);
+        if (denominator === 0) { // All readings at the same time
+             return res.json({ success: false, message: 'Readings are too close in time to predict a trend.' });
+        }
+        
+        // Linear Regression calculation
+        const slope = (n * sumXY - sumX * sumY) / denominator;
+        const intercept = (sumY - slope * sumX) / n;
+        
+        // Trend Classification
+        let trend;
+        const STABLE_THRESHOLD = 0.2;
+        if (slope > STABLE_THRESHOLD) trend = 'Rising';
+        else if (slope < -STABLE_THRESHOLD) trend = 'Falling';
+        else trend = 'Stable';
+
+        // Projection
+        const minutesAhead = 60;
+        const lastPoint = points[points.length - 1];
+        const projectedValue = Math.round(slope * (lastPoint.x + minutesAhead) + intercept);
+
+        res.json({
+            success: true,
+            trend,
+            projectedValue,
+            lastReading: { ...readings[readings.length-1], amount: Math.round(readings[readings.length-1].amount) }
+        });
+
+    } catch (error) {
+        console.error('Glucose prediction error:', error);
+        res.status(500).json({ success: false, message: 'An error occurred while calculating the prediction.' });
+    }
+});
 
 // --- CONSOLIDATED LOGS ENDPOINTS (Protected) ---
 

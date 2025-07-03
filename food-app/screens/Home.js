@@ -1,5 +1,5 @@
-// screens/Home.js
-import React, { useRef, useState } from 'react';
+// food-app/screens/Home.js
+import React, { useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,229 +9,178 @@ import {
   FlatList,
   Dimensions,
   Animated,
+  SafeAreaView,
+  Alert,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-//import components
+import { api } from '../utils/api';
+
+// Import all self-sufficient components
 import SummaryCard from '../components/SummaryCard';
-import MiniGlucoseChart from '../components/MiniGlucoseChart';
 import PredictedGlucoseCard from '../components/PredictedGlucoseCard';
+import MiniGlucoseChart from '../components/MiniGlucoseChart'; 
 import CalorieBurnt from '../components/CalorieBurnt';
 
 const { width } = Dimensions.get('window');
 
+// Main Home Screen Component
 export default function Home() {
-  const today = new Date().toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-  const navigation = useNavigation();
+    const today = new Date();
+    const todayString = today.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+    const navigation = useNavigation();
 
-  const insets = useSafeAreaInsets();
+    // State is only for things Home itself controls
+    const [userName, setUserName] = useState('User');
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const scrollX = useRef(new Animated.Value(0)).current;
-  const slidesCount = 2; // number of slides
-  const slideWidth = width - 50;
+    const scrollX = useRef(new Animated.Value(0)).current;
+    const slidesCount = 2;
+    const slideWidth = width - 40;
 
-  // Optional: derive index from scrollX
-  const currentIndex = useRef(0);
-
-  const handleScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-    {
-      useNativeDriver: false,
-      listener: (event) => {
-        const offsetX = event.nativeEvent.contentOffset.x;
-        currentIndex.current = Math.round(offsetX / slideWidth);
-      },
-    }
-  );
-
-
-  return (
-    <View style={{ flex: 1, marginBottom:90, }}>
-      {/* Fixed Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>GlucoBites</Text>
-        <TouchableOpacity
-          style={styles.notificationButton}
-          onPress={() => navigation.navigate('Notification')}
-        >
-          <Ionicons name="notifications-outline" size={24} color="#1BAEDF" />
-        </TouchableOpacity>
-      </View>
-      
+    // This function now only fetches the user's profile
+    const loadProfile = async () => {
+        try {
+            const profileRes = await api.getProfile();
+            if (profileRes.user?.first_name) {
+                setUserName(profileRes.user.first_name);
+            }
+        } catch (error) {
+            console.error("Failed to load user profile:", error);
+            // It's not critical to alert the user if just the name fails to load.
+        }
+    };
     
-    <FlatList
-          data={[]}
-          renderItem={null}
-          keyExtractor={() => 'header'}
-          style={{paddingTop:10}}
-          ListHeaderComponent={
-            <>
-              <Text style={styles.dateText}>Today ({today})</Text>
-              {/* Swipeable section */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                snapToInterval={width - 60 + 40}
-                decelerationRate="fast"
-                onScroll={Animated.event(
-                  [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                  { useNativeDriver: false }
-                )}
-                scrollEventThrottle={16}
-                contentContainerStyle={{
-                  paddingHorizontal:0,
-                  alignItems: 'center',
-                  paddingBottom:50,
-                }}
-              >
-                <View style={styles.slide}>
-                  <SummaryCard />
-                </View>
-                <View style={styles.slide}>
-                  <PredictedGlucoseCard />
-                </View>
-              </ScrollView>
-              {/* Animated Dots */}
-              <View style={styles.dotsContainer}>
-                {[...Array(slidesCount)].map((_, index) => {
-                  // Animate size of dots based on scroll
-                  const inputRange = [
-                    (index - 1) * slideWidth,
-                    index * slideWidth,
-                    (index + 1) * slideWidth,
-                  ];
+    useFocusEffect(useCallback(() => {
+        loadProfile();
+    }, []));
 
-                  const scale = scrollX.interpolate({
-                    inputRange,
-                    outputRange: [0.8, 1.4, 0.8],
-                    extrapolate: 'clamp',
-                  });
+    // Refresh will only reload the profile data. The other components handle themselves.
+    const onRefresh = useCallback(async () => {
+        setIsRefreshing(true);
+        await loadProfile();
+        setIsRefreshing(false);
+    }, []);
 
-                  const opacity = scrollX.interpolate({
-                    inputRange,
-                    outputRange: [0.3, 1, 0.3],
-                    extrapolate: 'clamp',
-                  });
+    const getGreeting = () => {
+        const hour = today.getHours();
+        if (hour < 12) return `Good Morning, ${userName}!`;
+        if (hour < 18) return `Good Afternoon, ${userName}!`;
+        return `Good Evening, ${userName}!`;
+    };
 
-                  return (
-                    <Animated.View
-                      key={index}
-                      style={[
-                        styles.dot,
-                        {
-                          opacity,
-                          transform: [{ scale }],
-                        },
-                      ]}
-                    />
-                  );
-                })}
-              </View>
-    
-              <MiniGlucoseChart />
-              <CalorieBurnt />
-            </>
-          }
-          contentContainerStyle={styles={padding: 16,
-          paddingBottom: insets.bottom - 10,}}
-        />
-  </View>
-  );
+    return (
+        <SafeAreaView style={styles.safeArea}>
+            <FlatList
+                data={[]}
+                keyExtractor={() => 'singleton'}
+                renderItem={null}
+                onRefresh={onRefresh}
+                refreshing={isRefreshing}
+                ListHeaderComponent={
+                    <View style={styles.container}>
+                        <View style={styles.header}>
+                            <View>
+                                <Text style={styles.greetingText}>{getGreeting()}</Text>
+                                <Text style={styles.dateText}>Today, {todayString}</Text>
+                            </View>
+                            <TouchableOpacity style={styles.notificationButton} onPress={() => navigation.navigate('Notification')}>
+                                <Ionicons name="notifications-outline" size={26} color="#333" />
+                            </TouchableOpacity>
+                        </View>
+                        
+                        <View>
+                             <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                snapToInterval={slideWidth}
+                                decelerationRate="fast"
+                                contentContainerStyle={styles.swiperContainer}
+                                onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
+                                scrollEventThrottle={16}
+                            >
+                                <View style={styles.slide}>
+                                    <SummaryCard />
+                                </View>
+                                <View style={styles.slide}>
+                                    <PredictedGlucoseCard />
+                                </View>
+                            </ScrollView>
+
+                            <View style={styles.dotsContainer}>
+                                {[...Array(slidesCount)].map((_, i) => {
+                                    const inputRange = [(i - 1) * slideWidth, i * slideWidth, (i + 1) * slideWidth];
+                                    const scale = scrollX.interpolate({ inputRange, outputRange: [0.8, 1.4, 0.8], extrapolate: 'clamp' });
+                                    const opacity = scrollX.interpolate({ inputRange, outputRange: [0.5, 1, 0.5], extrapolate: 'clamp' });
+                                    return <Animated.View key={`dot-${i}`} style={[styles.dot, { opacity, transform: [{ scale }] }]} />;
+                                })}
+                            </View>
+                        </View>
+                        
+                        <MiniGlucoseChart />
+                        <CalorieBurnt />
+                    </View>
+                }
+                contentContainerStyle={{ paddingBottom: 50 }}
+            />
+        </SafeAreaView>
+    );
 }
 
 const styles = StyleSheet.create({
-    header: {
-      height: 100,
-      backgroundColor: '#fff',
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: 20,
-      elevation: 5,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      zIndex: 100,
-    },
-    headerTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#313F43',
-        marginTop:50,
-    },
-    notificationButton: {
-        position: 'absolute',
-        right: 20,
-        top: 18,
-        marginTop:45,
+    safeArea: {
+        flex: 1,
+        backgroundColor: '#F4F6F8',
     },
     container: {
-        flex: 1,
-        padding: 20,
-        backgroundColor: '#f5f5f5',
-        marginBottom:90,
+        paddingHorizontal: 20,
+        paddingTop: 10,
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    greetingText: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: '#1E1E2D',
     },
     dateText: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 20,
-    },
-    section: {
-        backgroundColor: 'white',
-        borderRadius: 12,
-        padding: 20,
-        marginBottom: 20,
-    },
-    sectionTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 10,
-    },
-    valueText: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#1BAEDF',
-    },
-    viewMore: {
-        marginTop: 10,
-        alignSelf: 'flex-end',
-    },
-    viewMoreText: {
-        color: '#1BAEDF',
         fontSize: 14,
-        fontWeight: 'bold',
+        color: '#667',
+        marginTop: 4,
     },
-    chart: {
-        marginTop: 20,
-        borderRadius: 16,
+    notificationButton: {
+        padding: 8,
+        backgroundColor: '#FFF',
+        borderRadius: 20,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowRadius: 5
+    },
+    swiperContainer: {
+        paddingVertical: 10
     },
     slide: {
-        width: width - 60,
-        height: 200,
-        //marginTop: 50,
-        //marginRight: 5,
-        //marginLeft:5,
-        alignSelf: 'center',
-        marginRight: 10, // space between slides
+        width: width - 40,
+        height: 250,
+        paddingRight: 10
     },
     dotsContainer: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      //marginTop: 5,
-      marginBottom:10,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginTop: 0,
+        marginBottom: 20,
     },
     dot: {
-      width: 7,
-      height: 7,
-      borderRadius: 5,
-      backgroundColor: '#f78161',
-      marginHorizontal: 6,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#E4691C',
+        marginHorizontal: 4,
     },
 });
