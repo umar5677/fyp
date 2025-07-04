@@ -1,7 +1,6 @@
 // components/SpeedDialButton.js
 import React, { useState, useRef } from 'react';
 import { View, TouchableOpacity, StyleSheet, Animated } from 'react-native';
-// MODIFIED: Import MaterialCommunityIcons as well
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const SpeedDialButton = ({ navigation, userId }) => {
@@ -41,7 +40,6 @@ const SpeedDialButton = ({ navigation, userId }) => {
     <View style={styles.container}>
       <Animated.View style={[styles.secondaryButtonContainer, bloodSugarStyle]}>
         <TouchableOpacity style={[styles.secondaryButton, styles.bloodSugarButton]} onPress={() => handleActionPress('bloodSugar')} activeOpacity={0.7}>
-          {/* MODIFIED: Replaced Ionicons 'water-outline' with MaterialCommunityIcons 'diabetes' */}
           <MaterialCommunityIcons name="diabetes" size={24} color="#FFFFFF" />
         </TouchableOpacity>
       </Animated.View>

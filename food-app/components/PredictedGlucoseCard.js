@@ -102,7 +102,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 12,
         elevation: 5,
-        // --- MODIFIED HERE ---
         height: '100%', // Match parent container height
         justifyContent: 'space-between', // Space top, middle, and bottom content
     },

@@ -10,7 +10,9 @@ import {
   Dimensions,
   Animated,
   SafeAreaView,
-  Alert,
+  // --- MODIFIED: Import Platform and StatusBar ---
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -135,7 +137,8 @@ const styles = StyleSheet.create({
     },
     container: {
         paddingHorizontal: 20,
-        paddingTop: 10,
+        // --- MODIFIED: Added platform-specific padding for the Android status bar ---
+        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 10 : 10,
     },
     header: {
         flexDirection: 'row',
