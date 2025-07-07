@@ -9,8 +9,7 @@ import axios from 'axios';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
 import { api } from '../utils/api'; 
-
-const GEMINI_API_KEY = 'AIzaSyCvxXlqTE131TWOzsMr9zp-fI-9p1vR0Oo'; 
+import { GEMINI_API_KEY } from '@env';
 
 // A new loading overlay component for a better UX
 const LoadingOverlay = ({ visible, text }) => (
