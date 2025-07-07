@@ -49,7 +49,7 @@ const SpeedDialButton = ({ navigation, userId }) => {
       {
         translateX: animation.interpolate({
           inputRange: [0, 1],
-          outputRange: [0, -60], // Move left
+          outputRange: [0, -50], // Move left
         }),
       },
       {
@@ -69,7 +69,7 @@ const SpeedDialButton = ({ navigation, userId }) => {
       {
         translateX: animation.interpolate({
           inputRange: [0, 1],
-          outputRange: [0, 60], // Move right
+          outputRange: [0, 50], // Move right
         }),
       },
       {
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   calorieSugarButton: {
-    backgroundColor: '#00A0C4',
+    backgroundColor: '#FF5C00',
   },
   bloodSugarButton: {
     backgroundColor: '#007AFF',

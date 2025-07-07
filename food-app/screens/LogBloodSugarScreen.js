@@ -12,61 +12,60 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Calendar } from 'react-native-calendars';
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import * as Animatable from 'react-native-animatable';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { showMessage } from "react-native-flash-message";
 
 import { api } from '../utils/api';
 
 const TAG_OPTIONS = ['Fasting', 'Pre-Meal', 'Post-Meal'];
+const THRESHOLD_KEYS = ['lowThreshold', 'highFastingThreshold', 'highPostMealThreshold', 'veryHighThreshold'];
 
 const STATUS_COLORS = {
-    normal: '#4CAF50', // Green
-    high: '#FF9800', // Orange
-    veryHigh: '#F44336', // Red
-    low: '#2196F3', // Blue
+    normal: '#4CAF50',
+    high: '#FF9800',
+    veryHigh: '#F44336',
+    low: '#2196F3',
     default: '#6C757D',
 };
 
-
-const getBloodSugarStatus = (amount, tag) => {
+const getBloodSugarStatus = (amount, tag, thresholds) => {
     const numAmount = parseFloat(amount);
-
     if (isNaN(numAmount)) {
-        return { level: 'N/A', color: STATUS_COLORS.default };
+        return { level: 'N/A', color: STATUS_COLORS.default, isAlert: false };
     }
-    if (numAmount < 70) {
-        return { level: 'Low', color: STATUS_COLORS.low };
+
+    if (numAmount >= thresholds.veryHighThreshold) {
+        return { level: 'Very High', color: STATUS_COLORS.veryHigh, isAlert: true };
     }
-    if (numAmount >= 200) {
-        return { level: 'Very High', color: STATUS_COLORS.veryHigh };
+    if (numAmount < thresholds.lowThreshold) {
+        return { level: 'Low', color: STATUS_COLORS.low, isAlert: true };
     }
     
     const isFastingContext = tag === 'Fasting' || tag === 'Pre-Meal';
 
     if (isFastingContext) {
-        if (numAmount >= 70 && numAmount <= 99) {
-            return { level: 'Normal', color: STATUS_COLORS.normal };
+        if (numAmount >= thresholds.highFastingThreshold) {
+            return { level: 'High', color: STATUS_COLORS.high, isAlert: true };
         }
-        if (numAmount >= 100 && numAmount < 200) {
-            return { level: 'High', color: STATUS_COLORS.high };
+        if (numAmount >= thresholds.lowThreshold) {
+             return { level: 'Normal', color: STATUS_COLORS.normal, isAlert: false };
         }
     } else if (tag === 'Post-Meal') {
-        if (numAmount >= 70 && numAmount < 140) {
-            return { level: 'Normal', color: STATUS_COLORS.normal };
+        if (numAmount >= thresholds.highPostMealThreshold) {
+            return { level: 'High', color: STATUS_COLORS.high, isAlert: true };
         }
-        if (numAmount >= 140 && numAmount < 200) {
-            return { level: 'High', color: STATUS_COLORS.high };
+        if (numAmount >= thresholds.lowThreshold) {
+            return { level: 'Normal', color: STATUS_COLORS.normal, isAlert: false };
         }
     }
     
-    return { level: 'Check Tag', color: STATUS_COLORS.default };
+    return { level: 'Check Tag', color: STATUS_COLORS.default, isAlert: false };
 };
 
-
-// --- Sub-components (Properly Formatted) ---
-
-const LogItem = ({ item, onPress, index }) => {
+const LogItem = ({ item, onPress, index, thresholds }) => {
   const date = new Date(item.date);
   const formattedTime = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  const status = getBloodSugarStatus(item.amount, item.tag);
+  const status = getBloodSugarStatus(item.amount, item.tag, thresholds);
   
   return (
     <Animatable.View animation="fadeInUp" duration={400} delay={index * 50}>
@@ -262,9 +261,6 @@ const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate }) => {
     );
 };
 
-
-// --- Main Screen Component ---
-
 export default function LogBloodSugarScreen({ navigation }) {
     const [history, setHistory] = useState([]);
     const [lastReading, setLastReading] = useState(null);
@@ -277,35 +273,45 @@ export default function LogBloodSugarScreen({ navigation }) {
     const [displayDate, setDisplayDate] = useState(new Date());
     const [isCalendarVisible, setIsCalendarVisible] = useState(false);
     const fabRef = useRef(null);
+    const [thresholds, setThresholds] = useState({
+        lowThreshold: 70,
+        highFastingThreshold: 100,
+        highPostMealThreshold: 140,
+        veryHighThreshold: 180
+    });
 
-    const loadData = async (period, date) => {
-        if (isLoading) return;
+    const loadDependencies = async () => {
         setIsLoading(true);
-        try {
-            const data = await api.getHistory([3], period, date.toISOString());
-            setHistory(data);
-        } catch (error) {
-            Alert.alert("Error", "Could not load history.");
-        } finally {
-            setIsLoading(false);
-        }
-    };
-    
-    const loadLastReading = async () => {
         setIsLoadingLastReading(true);
         try {
-            const data = await api.getHistory([3], 'all', null, 1);
-            setLastReading(data.length > 0 ? data[0] : null);
+            const historyData = api.getHistory([3], timePeriod, displayDate.toISOString());
+            const lastReadingData = api.getHistory([3], 'all', null, 1);
+            const thresholdData = AsyncStorage.multiGet(THRESHOLD_KEYS);
+
+            const [historyResult, lastReadingResult, thresholdResult] = await Promise.all([historyData, lastReadingData, thresholdData]);
+
+            setHistory(historyResult);
+            setLastReading(lastReadingResult.length > 0 ? lastReadingResult[0] : null);
+
+            const loadedThresholds = { ...thresholds };
+            thresholdResult.forEach(([key, value]) => {
+                if (value !== null) {
+                    loadedThresholds[key] = parseFloat(value);
+                }
+            });
+            setThresholds(loadedThresholds);
+
         } catch (error) {
-            console.error("Could not load last reading:", error);
+            Alert.alert("Error", "Could not load screen data.");
+            console.error(error);
         } finally {
+            setIsLoading(false);
             setIsLoadingLastReading(false);
         }
     };
 
     useFocusEffect(useCallback(() => {
-        loadData(timePeriod, displayDate);
-        loadLastReading();
+        loadDependencies();
     }, [timePeriod, displayDate]));
 
     useEffect(() => {
@@ -314,23 +320,68 @@ export default function LogBloodSugarScreen({ navigation }) {
         }
     }, []);
 
-    const refreshAllData = () => {
-        loadLastReading();
-        loadData(timePeriod, displayDate);
+    const createNotification = async (amount, tag) => {
+        try {
+            const status = getBloodSugarStatus(amount, tag, thresholds);
+
+            if (!status.isAlert) {
+                // If it's not an alert, just show a simple success message.
+                 showMessage({
+                    message: "Log Saved",
+                    description: `Your reading of ${amount} mg/dL is within normal range.`,
+                    type: "success",
+                    icon: "success",
+                });
+                return;
+            }
+
+            // If it IS an alert, show the warning pop-up AND create the persistent notification.
+            showMessage({
+                message: `${status.level} Glucose Detected`,
+                description: `Your reading of ${amount} mg/dL is outside the normal range.`,
+                type: "danger", // Use 'danger' for red, 'warning' for orange
+                icon: "danger",
+                duration: 5000,
+            });
+
+            const newNotification = {
+                id: Date.now().toString(),
+                message: `${status.level} Glucose Detected: ${amount} mg/dL`,
+                timestamp: new Date().toISOString(),
+                type: 'alert',
+            };
+
+            const existingNotifications = await AsyncStorage.getItem('notifications');
+            const notifications = existingNotifications ? JSON.parse(existingNotifications) : [];
+            notifications.unshift(newNotification);
+            await AsyncStorage.setItem('notifications', JSON.stringify(notifications));
+
+        } catch (error) {
+            console.error("Failed to create notification:", error);
+        }
     };
+
 
     const handleSave = async (logId, amount, date, tag) => {
         try {
             const updateData = { amount, tag };
             if (logId) {
                 await api.updateLog(logId, updateData);
+                 // On update, just show a simple info message, don't trigger alerts.
+                 showMessage({
+                    message: "Log Updated",
+                    description: `Reading changed to ${amount} mg/dL.`,
+                    type: "info",
+                });
             } else {
                 await api.addLog({ amount, type: 3, date: date.toISOString(), tag });
+                // Now we call createNotification which handles BOTH the pop-up and the persistent notification logic.
+                await createNotification(amount, tag);
             }
         } catch (e) {
             Alert.alert('Error', 'An unexpected error occurred while saving.');
         }
-        refreshAllData();
+        loadDependencies();
     };
     
     const handleDelete = async (logId) => {
@@ -339,7 +390,7 @@ export default function LogBloodSugarScreen({ navigation }) {
         } catch (e) {
             Alert.alert('Error', 'An unexpected error occurred while deleting.');
         }
-        refreshAllData();
+        loadDependencies();
     };
 
     const handleScan = async (imageUri) => {
@@ -376,7 +427,7 @@ export default function LogBloodSugarScreen({ navigation }) {
         }
         
         if (lastReading) {
-            const status = getBloodSugarStatus(lastReading.amount, lastReading.tag);
+            const status = getBloodSugarStatus(lastReading.amount, lastReading.tag, thresholds);
 
             return (
                 <>
@@ -419,7 +470,7 @@ export default function LogBloodSugarScreen({ navigation }) {
                         </Text>
                     </Animatable.View>
                 )}
-                <LogItem item={item} onPress={() => handleHistoryPress(item)} index={index} />
+                <LogItem item={item} onPress={() => handleHistoryPress(item)} index={index} thresholds={thresholds} />
             </>
         );
     };
@@ -490,7 +541,7 @@ export default function LogBloodSugarScreen({ navigation }) {
                     </Animatable.View>
                 }
                 contentContainerStyle={{ paddingBottom: 120 }}
-                onRefresh={refreshAllData}
+                onRefresh={loadDependencies}
                 refreshing={isLoading}
             />
              
@@ -503,12 +554,8 @@ export default function LogBloodSugarScreen({ navigation }) {
     );
 };
 
-
-// --- Stylesheet ---
-
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
-    // MODIFIED: Reduced top and bottom padding for header
     header: { 
         flexDirection: 'row', 
         justifyContent: 'space-between', 
@@ -519,14 +566,13 @@ const styles = StyleSheet.create({
     },
     headerTitle: { fontSize: 32, fontWeight: 'bold', color: '#1E1E2D' },
     doneButton: { padding: 5 },
-    // MODIFIED: Reduced vertical padding and margin
     lastReadingCard: { 
         backgroundColor: '#FFFFFF', 
-        paddingVertical: 15, // Reduced from 20
+        paddingVertical: 15,
         paddingHorizontal: 20,
         borderRadius: 16, 
         marginHorizontal: 16, 
-        marginVertical: 8, // Reduced from 10
+        marginVertical: 8,
         shadowColor: '#999', 
         shadowOffset: { width: 0, height: 2 }, 
         shadowOpacity: 0.1, 
@@ -535,54 +581,49 @@ const styles = StyleSheet.create({
         alignItems: 'center'
     },
     cardTitle: { fontSize: 16, fontWeight: '600', color: '#6C757D' },
-    lastReadingTag: { textTransform: 'uppercase', fontSize: 13, fontWeight: 'bold', marginBottom: 4 }, // Reduced margin
-    // MODIFIED: Reduced font size for more compact view
+    lastReadingTag: { textTransform: 'uppercase', fontSize: 13, fontWeight: 'bold', marginBottom: 4 },
     lastReadingValue: { 
-        fontSize: 42, // Reduced from 48
+        fontSize: 42,
         fontWeight: 'bold', 
         color: '#1E1E2D',
     },
-    lastReadingUnit: { fontSize: 22, fontWeight: '500', color: '#6C757D' }, // Reduced from 24
-    lastReadingStatusContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 6, }, // Reduced from 8
-    lastReadingDate: { marginTop: 10, fontSize: 14, color: '#6C757D', alignItems: 'center' }, // Reduced from 12
-    // MODIFIED: Reduced margins for list title
+    lastReadingUnit: { fontSize: 22, fontWeight: '500', color: '#6C757D' },
+    lastReadingStatusContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 6, },
+    lastReadingDate: { marginTop: 10, fontSize: 14, color: '#6C757D', alignItems: 'center' },
     listTitle: { 
         fontSize: 18, 
         fontWeight: 'bold', 
         color: '#343A40', 
         marginHorizontal: 16, 
-        marginTop: 12, // Reduced from 16
-        marginBottom: 6, // Reduced from 8
+        marginTop: 12,
+        marginBottom: 6,
     },
-    // MODIFIED: Reduced vertical padding for controls container
     controlsContainer: { 
         paddingHorizontal: 16, 
-        paddingBottom: 10, // Reduced from 12
+        paddingBottom: 10,
         borderBottomWidth: 1, 
         borderBottomColor: '#E9ECEF' 
     },
-    // MODIFIED: Reduced vertical padding for segments
     segmentedControlContainer: { 
         flexDirection: 'row', 
         backgroundColor: '#E9ECEF', 
         borderRadius: 10, 
         overflow: 'hidden', 
-        marginTop: 12, // Reduced from 15
+        marginTop: 12,
     },
-    segment: { flex: 1, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' }, // Reduced from 12
+    segment: { flex: 1, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
     segmentActive: { backgroundColor: '#FFFFFF', borderRadius: 8, margin: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 3, },
     segmentText: { fontWeight: '600', color: '#6C757D', fontSize: 14 },
     segmentTextActive: { color: '#42A5F5', fontWeight: 'bold' },
-    // MODIFIED: Reduced margins and font size for date navigator
     dateNavigatorContainer: { 
         flexDirection: 'row', 
         justifyContent: 'space-between', 
         alignItems: 'center', 
         paddingHorizontal: 5, 
-        marginBottom: 8 // Reduced from 10
+        marginBottom: 8
     },
     arrowButton: { padding: 8 },
-    dateNavigatorText: { fontSize: 20, fontWeight: 'bold', color: '#343A40' }, // Reduced from 22
+    dateNavigatorText: { fontSize: 20, fontWeight: 'bold', color: '#343A40' },
     dateHeaderText: { fontSize: 15, fontWeight: 'bold', color: '#495057', marginHorizontal: 16, marginTop: 16, marginBottom: 4 },
     emptyContainer: { alignItems: 'center', marginTop: 60, paddingHorizontal: 40, },
     emptyText: { fontSize: 20, fontWeight: '600', color: '#ADB5BD', marginTop: 16, },

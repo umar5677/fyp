@@ -2,7 +2,7 @@
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
-const jwt = 'jsonwebtoken';
+const jwt = require('jsonwebtoken'); // Corrected import
 const { RekognitionClient, DetectTextCommand } = require('@aws-sdk/client-rekognition');
 const authenticateToken = require('./authMiddleware.js');
 
@@ -143,7 +143,6 @@ app.get('/api/predictions/glucose', async (req, res) => {
             return res.json({ success: false, message: 'Not enough data for a prediction. Log at least two readings.' });
         }
 
-        // Reverse to have oldest first for calculation
         readings.reverse();
 
         const firstTimestamp = new Date(readings[0].date).getTime();
@@ -151,7 +150,7 @@ app.get('/api/predictions/glucose', async (req, res) => {
 
         const points = readings.map(r => {
             const y = parseFloat(r.amount);
-            const x = (new Date(r.date).getTime() - firstTimestamp) / (1000 * 60); // Time in minutes from start
+            const x = (new Date(r.date).getTime() - firstTimestamp) / (1000 * 60);
             sumX += x;
             sumY += y;
             sumXY += x * y;
@@ -161,22 +160,19 @@ app.get('/api/predictions/glucose', async (req, res) => {
         
         const n = points.length;
         const denominator = (n * sumX2 - sumX * sumX);
-        if (denominator === 0) { // All readings at the same time
+        if (denominator === 0) {
              return res.json({ success: false, message: 'Readings are too close in time to predict a trend.' });
         }
         
-        // Linear Regression calculation
         const slope = (n * sumXY - sumX * sumY) / denominator;
         const intercept = (sumY - slope * sumX) / n;
         
-        // Trend Classification
         let trend;
         const STABLE_THRESHOLD = 0.2;
         if (slope > STABLE_THRESHOLD) trend = 'Rising';
         else if (slope < -STABLE_THRESHOLD) trend = 'Falling';
         else trend = 'Stable';
 
-        // Projection
         const minutesAhead = 60;
         const lastPoint = points[points.length - 1];
         const projectedValue = Math.round(slope * (lastPoint.x + minutesAhead) + intercept);
@@ -208,7 +204,7 @@ app.get('/api/logs/history', async (req, res) => {
         return res.status(400).json({ message: "Invalid 'types' parameter." });
     }
 
-    let query = `SELECT logID, type, amount, date, tag FROM dataLogs WHERE userID = ? AND type IN (?)`;
+    let query = `SELECT logID, type, amount, date, tag, foodName FROM dataLogs WHERE userID = ? AND type IN (?)`;
     const queryParams = [userId, typeArray];
     
     if (period !== 'all') {
@@ -252,15 +248,13 @@ app.get('/api/logs/history', async (req, res) => {
 
 app.post('/api/logs', async (req, res) => {
     const userId = req.user.userId;
-    //Destructure 'tag' from the request body
-    const { amount, type, date, tag } = req.body;
+    const { amount, type, date, tag, foodName } = req.body;
     const dateToInsert = date ? new Date(date) : new Date();
 
     if (amount == null || type == null) {
         return res.status(400).json({ message: 'Amount and type are required.' });
     }
 
-    // A tag is only required if the type is 3 (blood glucose)
     if (type === 3 && !tag) {
          return res.status(400).json({ message: 'A tag (e.g., Fasting, Pre-Meal) is required for blood glucose logs.' });
     }
@@ -272,10 +266,8 @@ app.post('/api/logs', async (req, res) => {
 
     try {
         const [result] = await dbPool.query(
-            // Add 'tag' to the INSERT statement
-            'INSERT INTO dataLogs (userID, type, amount, date, tag) VALUES (?, ?, ?, ?, ?)',
-            //Add the tag value (or null if it wasn't provided for other types)
-            [userId, type, numericAmount, dateToInsert, tag || null]
+            'INSERT INTO dataLogs (userID, type, amount, date, tag, foodName) VALUES (?, ?, ?, ?, ?, ?)',
+            [userId, type, numericAmount, dateToInsert, tag || null, foodName || null]
         );
         res.status(201).json({ success: true, message: 'Log created successfully!', logId: result.insertId });
     } catch (error) {
@@ -284,13 +276,10 @@ app.post('/api/logs', async (req, res) => {
     }
 });
 
-// PUT (update) a specific log. This route now ONLY accepts and updates the `amount`.
 app.put('/api/logs/:logId', async (req, res) => {
     const { logId } = req.params;
-    // Destructure 'tag' from the request body
     const { amount, tag } = req.body;
 
-    // Both amount and tag must be provided for an update
     if (amount === undefined || tag === undefined) {
         return res.status(400).json({ success: false, message: 'Amount and tag are required for an update.' });
     }
@@ -301,7 +290,6 @@ app.put('/api/logs/:logId', async (req, res) => {
     }
 
     try {
-        // Update both amount and tag in the query
         const [result] = await dbPool.query(
             `UPDATE dataLogs SET amount = ?, tag = ? WHERE logID = ? AND userID = ?`,
             [numericAmount, tag, logId, req.user.userId]
@@ -317,7 +305,6 @@ app.put('/api/logs/:logId', async (req, res) => {
     }
 });
 
-// DELETE a specific log
 app.delete('/api/logs/:logId', async (req, res) => {
     const { logId } = req.params;
     if (!logId) return res.status(400).json({ message: "Log ID is required." });

@@ -100,7 +100,6 @@ export default function SummaryCard() {
         <View style={styles.card}>
             <Text style={styles.title}>Calorie Summary</Text>
             
-            {/* Ring and Center Text Container */}
             <View style={styles.ringContainer}>
                 <ProgressRing progress={progress} />
                 <View style={styles.centerTextView}>
@@ -109,7 +108,6 @@ export default function SummaryCard() {
                 </View>
             </View>
             
-            {/* Divider */}
             <View style={styles.divider} />
 
             {/* Bottom Details Section */}

@@ -7,7 +7,6 @@ import { api } from '../utils/api';
 
 const screenWidth = Dimensions.get('window').width;
 
-// This is now a "smart" component that fetches its own data.
 export default function MiniGlucoseChart() {
     const navigation = useNavigation();
     const [chartData, setChartData] = useState(null);
@@ -16,21 +15,27 @@ export default function MiniGlucoseChart() {
     useFocusEffect(
         useCallback(() => {
             const fetchChartData = async () => {
-                if (!isLoading) setIsLoading(true); // Show loader again when screen is re-focused
+                if (!isLoading) setIsLoading(true);
 
                 try {
                     const todayISO = new Date().toISOString();
-                    // Fetch up to the last 7 glucose readings from today
-                    const glucoseRes = await api.getHistory([3], 'day', todayISO, 7); // Type 3 for glucose
+                    const glucoseRes = await api.getHistory([3], 'day', todayISO, 7);
 
                     if (glucoseRes && glucoseRes.length > 1) {
-                        const reversedGlucose = [...glucoseRes].reverse(); // Chart needs chronological data
+                        const reversedGlucose = [...glucoseRes].reverse();
+                        
+                        // --- ROBUST PARSING FIX ---
+                        // This is the critical change. It ensures every data point 
+                        // given to the chart is a valid number. If a log.amount from the
+                        // database is null or undefined, it will safely default to 0.
+                        const cleanData = reversedGlucose.map(log => Number(log.amount) || 0);
+
                         setChartData({
                             labels: reversedGlucose.map(log => new Date(log.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })),
-                            datasets: [{ data: reversedGlucose.map(log => log.amount) }]
+                            datasets: [{ data: cleanData }] // Use the sanitized data
                         });
                     } else {
-                        setChartData(null); // Not enough data for a chart
+                        setChartData(null);
                     }
                 } catch (error) {
                     console.error("Failed to load mini glucose chart data:", error);
@@ -41,7 +46,7 @@ export default function MiniGlucoseChart() {
             };
             
             fetchChartData();
-        }, []) // The empty dependency array means this runs when the component comes into focus
+        }, [])
     );
 
     const renderContent = () => {

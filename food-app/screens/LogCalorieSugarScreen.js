@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Alert,
-  KeyboardAvoidingView, Platform, FlatList, Modal, ActivityIndicator, SafeAreaView, useColorScheme
+  KeyboardAvoidingView, Platform, FlatList, Modal, ActivityIndicator, SafeAreaView, useColorScheme,
+  Animated
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -11,13 +12,12 @@ import { useFocusEffect } from '@react-navigation/native';
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { Calendar } from 'react-native-calendars';
 import * as Animatable from 'react-native-animatable';
-
 import { api } from '../utils/api';
-
 
 const FoodLogItem = ({ item, onEdit, onDelete, index }) => {
     const calorieLog = item.logs.find(l => l.type === 1);
     const sugarLog = item.logs.find(l => l.type === 2);
+    const foodName = item.logs.find(l => l.foodName)?.foodName;
     const date = new Date(item.timestamp);
     const formattedTime = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
@@ -28,20 +28,25 @@ const FoodLogItem = ({ item, onEdit, onDelete, index }) => {
                     <Text style={styles.logItemTimeText}>{formattedTime}</Text>
                 </View>
                 <View style={styles.logItemDetails}>
-                    {calorieLog && (
-                        <View style={styles.logDetailRow}>
-                            <Ionicons name="flame" size={20} color="#F57C00" />
-                            <Text style={styles.logValueText}>{parseInt(calorieLog.amount, 10)}</Text>
-                            <Text style={styles.logUnitText}>kcal</Text>
-                        </View>
+                    {foodName && (
+                        <Text style={styles.foodNameText} numberOfLines={1}>{foodName}</Text>
                     )}
-                    {sugarLog && (
-                        <View style={[styles.logDetailRow, {marginTop: calorieLog ? 8 : 0}]}>
-                            <MaterialCommunityIcons name="candy" size={20} color="#D32F2F" />
-                            <Text style={styles.logValueText}>{parseFloat(sugarLog.amount).toFixed(1)}</Text>
-                            <Text style={styles.logUnitText}>grams</Text>
-                        </View>
-                    )}
+                    <View style={styles.nutritionRow}>
+                        {calorieLog && (
+                            <View style={styles.logDetailRow}>
+                                <Ionicons name="flame" size={18} color="#F57C00" />
+                                <Text style={styles.logValueText}>{parseInt(calorieLog.amount, 10)}</Text>
+                                <Text style={styles.logUnitText}>kcal</Text>
+                            </View>
+                        )}
+                        {sugarLog && (
+                            <View style={[styles.logDetailRow, {marginLeft: calorieLog ? 15 : 0}]}>
+                                <MaterialCommunityIcons name="candy" size={18} color="#D32F2F" />
+                                <Text style={styles.logValueText}>{parseFloat(sugarLog.amount).toFixed(1)}</Text>
+                                <Text style={styles.logUnitText}>g</Text>
+                            </View>
+                        )}
+                    </View>
                 </View>
                 <View style={styles.logItemActions}>
                     <TouchableOpacity onPress={() => onEdit(item.logs)} style={styles.actionButton}>
@@ -57,6 +62,7 @@ const FoodLogItem = ({ item, onEdit, onDelete, index }) => {
 };
 
 const EditModal = ({ modalVisible, setModalVisible, logs, onSave, onScan }) => {
+    const [foodName, setFoodName] = useState('');
     const [calories, setCalories] = useState('');
     const [sugar, setSugar] = useState('');
     const [logDate, setLogDate] = useState(new Date());
@@ -65,61 +71,53 @@ const EditModal = ({ modalVisible, setModalVisible, logs, onSave, onScan }) => {
     const [isScanning, setIsScanning] = useState(false);
     const colorScheme = useColorScheme();
     const today = new Date();
-
     useEffect(() => {
         if (modalVisible && logs) {
+            setFoodName(logs.find(l => l.foodName)?.foodName || '');
             setCalories(logs.find(l => l.type === 1)?.amount?.toString() || '');
             setSugar(logs.find(l => l.type === 2)?.amount?.toString() || '');
-            setLogDate(logs.length > 0 ? new Date(logs[0].date) : new Date());
+            setLogDate(logs.length > 0 && logs[0].date ? new Date(logs[0].date) : new Date());
         }
     }, [logs, modalVisible]);
-
     if (!logs) return null;
-
     const handleSave = async () => {
         setIsSaving(true);
-        await onSave(logs, { calories, sugar }, logDate);
+        await onSave(logs, { calories, sugar }, logDate, foodName);
         setIsSaving(false);
         setModalVisible(false);
     };
-
     const handlePickImage = async (type) => {
         const permissions = type === 'camera' ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (!permissions.granted) { Alert.alert('Permission Denied'); return; }
-
         const pickerResult = type === 'camera' ? await ImagePicker.launchCameraAsync() : await ImagePicker.launchImageLibraryAsync();
         if (pickerResult.canceled || !pickerResult.assets?.length) return;
-
         setIsScanning(true);
         const scanResult = await onScan(pickerResult.assets[0].uri);
         setIsScanning(false);
-        
         if (scanResult) {
             if (scanResult.calories != null) setCalories(scanResult.calories.toString());
             if (scanResult.sugar != null) setSugar(scanResult.sugar.toString());
         }
     };
-
     return (
         <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
                 <TouchableOpacity style={styles.modalBackdrop} onPress={() => setModalVisible(false)} />
                 <View style={styles.modalContent}>
-                    <Text style={styles.modalTitle}>{logs.length > 0 ? "Edit Log" : "Log Calories & Sugar"}</Text>
-                    <TouchableOpacity onPress={() => setDatePickerVisibility(true)} style={styles.datePickerButton} disabled={logs.length > 0}>
+                    <Text style={styles.modalTitle}>{logs.some(l => l.logID) ? "Edit Log" : "Log Calories & Sugar"}</Text>
+                    <TouchableOpacity onPress={() => setDatePickerVisibility(true)} style={styles.datePickerButton} disabled={logs.some(l => l.logID)}>
                         <Ionicons name="calendar-outline" size={22} color="#F57C00" />
                         <Text style={styles.datePickerText}>{logDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</Text>
                     </TouchableOpacity>
                     <DateTimePickerModal isVisible={isDatePickerVisible} mode="datetime" date={logDate} onConfirm={(d) => { setDatePickerVisibility(false); setLogDate(d); }} onCancel={() => setDatePickerVisibility(false)} display={Platform.OS === 'ios' ? 'inline' : 'default'} isDarkModeEnabled={colorScheme === 'light'} maximumDate={today} />
-                    
+                    <TextInput style={styles.foodNameInput} placeholder="Food Name (e.g., Apple)" placeholderTextColor="#999" value={foodName} onChangeText={setFoodName} />
                     <View style={styles.inputRow}>
                         <TextInput style={[styles.modalInput, {flex: 1}]} keyboardType="decimal-pad" value={calories} onChangeText={setCalories} placeholder="Calories" placeholderTextColor="#999" />
-                        <TextInput style={[styles.modalInput, {flex: 1, marginLeft: 10}]} keyboardType="decimal-pad" value={sugar} onChangeText={setSugar} placeholder="Sugar" placeholderTextColor="#999" />
+                        <TextInput style={[styles.modalInput, {flex: 1, marginLeft: 10}]} keyboardType="decimal-pad" value={sugar} onChangeText={setSugar} placeholder="Sugar (g)" placeholderTextColor="#999" />
                     </View>
-                    
                     {isScanning ? <ActivityIndicator /> : (
                         <View style={styles.scanButtonsContainer}>
-                            <TouchableOpacity style={styles.scanButton} onPress={() => handlePickImage('camera')}><Ionicons name="camera-outline" size={20} color="#fff" /><Text style={styles.scanButtonText}>Scan</Text></TouchableOpacity>
+                            <TouchableOpacity style={styles.scanButton} onPress={() => handlePickImage('camera')}><Ionicons name="camera-outline" size={20} color="#fff" /><Text style={styles.scanButtonText}>Scan Label</Text></TouchableOpacity>
                             <TouchableOpacity style={styles.scanButton} onPress={() => handlePickImage('gallery')}><Ionicons name="image-outline" size={20} color="#fff" /><Text style={styles.scanButtonText}>Upload</Text></TouchableOpacity>
                         </View>
                     )}
@@ -183,7 +181,6 @@ const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate }) => {
     );
 };
 
-// Main Screen Component
 export default function LogCalorieSugarScreen({ navigation }) {
     const [history, setHistory] = useState([]);
     const [groupedHistory, setGroupedHistory] = useState([]);
@@ -193,7 +190,8 @@ export default function LogCalorieSugarScreen({ navigation }) {
     const [timePeriod, setTimePeriod] = useState('day');
     const [displayDate, setDisplayDate] = useState(new Date());
     const [isCalendarVisible, setIsCalendarVisible] = useState(false);
-    const fabRef = useRef();
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const menuAnimation = useRef(new Animated.Value(0)).current;
 
     const loadData = async (period, date) => {
         if (isLoading) return;
@@ -221,10 +219,21 @@ export default function LogCalorieSugarScreen({ navigation }) {
         finally { setIsLoading(false); }
     };
 
-    useFocusEffect(useCallback(() => { loadData(timePeriod, displayDate); }, [timePeriod, displayDate]));
-    useEffect(() => { if (fabRef.current) fabRef.current.bounceIn(800); }, []);
+    useFocusEffect(useCallback(() => {
+        loadData(timePeriod, displayDate);
+    }, [timePeriod, displayDate]));
 
-    const handleScan = async (imageUri) => {
+    const toggleMenu = () => {
+        const toValue = isMenuOpen ? 0 : 1;
+        Animated.spring(menuAnimation, {
+            toValue,
+            friction: 7,
+            useNativeDriver: true
+        }).start();
+        setIsMenuOpen(!isMenuOpen);
+    };
+
+    const handleLabelScan = async (imageUri) => {
         try {
             const manipulated = await manipulateAsync(imageUri, [], { compress: 0.8, format: SaveFormat.JPEG, base64: true });
             const result = await api.scanImage(manipulated.base64);
@@ -236,8 +245,13 @@ export default function LogCalorieSugarScreen({ navigation }) {
         } catch (error) { Alert.alert('Scan Error', 'An error occurred.'); }
         return null;
     };
+    
+    const handleAiScan = () => {
+        toggleMenu();
+        navigation.navigate('AiFoodScan');
+    };
 
-    const handleSave = async (logsToEdit, newValues, logDate) => {
+    const handleSave = async (logsToEdit, newValues, logDate, foodName) => {
         setIsLoading(true);
         try {
             const { calories, sugar } = newValues;
@@ -245,12 +259,14 @@ export default function LogCalorieSugarScreen({ navigation }) {
             const hasSugar = sugar && !isNaN(parseFloat(sugar));
             
             if (logsToEdit && logsToEdit.length > 0) {
-                 for(const log of logsToEdit) { await api.deleteLog(log.logID); }
+                 for(const log of logsToEdit) { 
+                    if(log.logID) await api.deleteLog(log.logID); 
+                }
             }
             
             const date = logDate.toISOString();
-            if (hasCalories) await api.addLog({ amount: parseFloat(calories), type: 1, date });
-            if (hasSugar) await api.addLog({ amount: parseFloat(sugar), type: 2, date });
+            if (hasCalories) await api.addLog({ amount: parseFloat(calories), type: 1, date, foodName });
+            if (hasSugar) await api.addLog({ amount: parseFloat(sugar), type: 2, date, foodName });
         } catch (error) { Alert.alert('Error', 'Failed to save log entry.'); } 
         finally { loadData(timePeriod, displayDate); }
     };
@@ -267,15 +283,32 @@ export default function LogCalorieSugarScreen({ navigation }) {
         ]);
     };
 
-    const handleEditGroup = (logs) => setEditingLogs(logs) & setModalVisible(true);
-    const handleAddNew = () => setEditingLogs([]) & setModalVisible(true) & fabRef.current?.rubberBand(800);
+    const handleEditGroup = (logs) => {
+        setEditingLogs(logs);
+        setModalVisible(true);
+    };
+
+    const handleAddNew = () => {
+        toggleMenu();
+        setEditingLogs([]);
+        setModalVisible(true);
+    };
 
     const totalCalories = history.filter(l => l.type === 1).reduce((sum, l) => sum + Number(l.amount || 0), 0);
     const totalSugar = history.filter(l => l.type === 2).reduce((sum, l) => sum + Number(l.amount || 0), 0);
+    const mainFabRotate = menuAnimation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] });
+    const aiScanStyle = {
+        transform: [ { scale: menuAnimation }, { translateY: menuAnimation.interpolate({ inputRange: [0, 1], outputRange: [0, -60] }) } ],
+        opacity: menuAnimation
+    };
+    const manualAddStyle = {
+        transform: [ { scale: menuAnimation }, { translateY: menuAnimation.interpolate({ inputRange: [0, 1], outputRange: [0, -115] }) } ],
+        opacity: menuAnimation
+    };
 
     return (
         <SafeAreaView style={styles.container}>
-            <EditModal modalVisible={modalVisible} setModalVisible={setModalVisible} logs={editingLogs} onSave={handleSave} onScan={handleScan} />
+            <EditModal modalVisible={modalVisible} setModalVisible={setModalVisible} logs={editingLogs} onSave={handleSave} onScan={handleLabelScan} />
             <CalendarModal isVisible={isCalendarVisible} onClose={() => setIsCalendarVisible(false)} onDayPress={setDisplayDate} initialDate={displayDate}/>
             
             <View style={styles.header}>
@@ -299,7 +332,6 @@ export default function LogCalorieSugarScreen({ navigation }) {
                         </View>
                     </View>
                 </View>
-
                 <View style={styles.controlsContainer}>
                     <DateNavigator date={displayDate} onDateChange={setDisplayDate} period={timePeriod} onOpenCalendar={() => setIsCalendarVisible(true)} />
                     <SegmentedControl options={['day', 'week', 'month']} selectedOption={timePeriod} onSelect={(p) => { setTimePeriod(p); setDisplayDate(new Date()); }} />
@@ -309,26 +341,9 @@ export default function LogCalorieSugarScreen({ navigation }) {
             <FlatList
                 data={groupedHistory}
                 keyExtractor={(item) => item.timestamp}
-                renderItem={({ item, index }) => {
-                    // Check if the date is different from the previous item's date
-                    const currentItemDate = new Date(item.timestamp).toDateString();
-                    const prevItemDate = index > 0 ? new Date(groupedHistory[index - 1].timestamp).toDateString() : null;
-                    const showDateHeader = currentItemDate !== prevItemDate;
-
-                    return (
-                        // Use a Fragment to return multiple components
-                        <>
-                            {showDateHeader && (
-                                <Animatable.View animation="fadeIn" duration={400}>
-                                    <Text style={styles.dateHeaderText}>
-                                        {new Date(item.timestamp).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                                    </Text>
-                                </Animatable.View>
-                            )}
-                            <FoodLogItem item={item} onEdit={handleEditGroup} onDelete={handleDeleteGroup} index={index}/>
-                        </>
-                    )
-                }}
+                renderItem={({ item, index }) => (
+                    <FoodLogItem item={item} onEdit={handleEditGroup} onDelete={handleDeleteGroup} index={index}/>
+                )}
                 ListEmptyComponent={
                     <Animatable.View animation="fadeIn" delay={300} style={styles.emptyContainer}>
                         {isLoading ? <ActivityIndicator size="large" /> : (
@@ -345,29 +360,40 @@ export default function LogCalorieSugarScreen({ navigation }) {
                 refreshing={isLoading}
             />
 
-            <Animatable.View ref={fabRef} style={styles.fabContainer}>
-                <TouchableOpacity style={[styles.fab, {backgroundColor: '#F57C00'}]} onPress={handleAddNew} activeOpacity={0.8}>
-                    <Ionicons name="add" size={34} color="white" />
+            <View style={styles.fabContainer}>
+                <Animated.View style={[styles.secondaryFab, manualAddStyle]}>
+                    <TouchableOpacity style={[styles.fab, styles.manualFab]} onPress={handleAddNew} activeOpacity={0.8}>
+                        <Ionicons name="pencil" size={22} color="white" />
+                    </TouchableOpacity>
+                </Animated.View>
+
+                <Animated.View style={[styles.secondaryFab, aiScanStyle]}>
+                    <TouchableOpacity style={[styles.fab, styles.aiFab]} onPress={handleAiScan} activeOpacity={0.8}>
+                        <MaterialCommunityIcons name="brain" size={22} color="white" />
+                    </TouchableOpacity>
+                </Animated.View>
+                
+                <TouchableOpacity style={[styles.fab, styles.mainFab]} onPress={toggleMenu} activeOpacity={0.8}>
+                    <Animated.View style={{transform: [{rotate: mainFabRotate}]}}>
+                        <Ionicons name="add" size={30} color="white" />
+                    </Animated.View>
                 </TouchableOpacity>
-            </Animatable.View>
+            </View>
         </SafeAreaView>
     );
 }
 
-// Unified StyleSheet
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 25 : 15, paddingBottom: 10, },
     headerTitle: { fontSize: 32, fontWeight: 'bold', color: '#1E1E2D' },
     doneButton: { padding: 5 },
-
     summaryCard: { backgroundColor: '#fff', borderRadius: 16, padding: 20, marginHorizontal: 16, marginTop: 10, shadowColor: '#999', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 5, elevation: 2, },
     summaryTitle: { fontSize: 16, fontWeight: '600', color: '#6C757D', marginBottom: 16 },
     summaryDetails: { flexDirection: 'row', justifyContent: 'space-around' },
     summaryItem: { alignItems: 'center' },
     summaryValue: { fontSize: 24, fontWeight: 'bold' },
     summaryLabel: { fontSize: 14, color: '#6C757D', marginTop: 4 },
-
     controlsContainer: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#E9ECEF' },
     segmentedControlContainer: { flexDirection: 'row', backgroundColor: '#E9ECEF', borderRadius: 10, overflow: 'hidden', marginTop: 15, },
     segment: { flex: 1, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
@@ -377,8 +403,6 @@ const styles = StyleSheet.create({
     dateNavigatorContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 5, marginBottom: 10 },
     arrowButton: { padding: 8 },
     dateNavigatorText: { fontSize: 22, fontWeight: 'bold', color: '#343A40' },
-    
-    // NEW style for date headers
     dateHeaderText: {
         fontSize: 15,
         fontWeight: 'bold',
@@ -387,30 +411,33 @@ const styles = StyleSheet.create({
         marginTop: 20,
         marginBottom: 4,
     },
-
     emptyContainer: { alignItems: 'center', marginTop: 60, paddingHorizontal: 40 },
     emptyText: { fontSize: 20, fontWeight: '600', color: '#ADB5BD', marginTop: 16 },
     emptySubtext: { fontSize: 15, color: '#CED4DA', marginTop: 8, textAlign: 'center' },
-
-    fabContainer: { position: 'absolute', bottom: 35, right: 25 },
-    fab: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#000', shadowRadius: 8, shadowOpacity: 0.3, shadowOffset: { height: 4, width: 0 } },
-    
     logItemCard: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, marginVertical: 6, marginHorizontal: 16, shadowColor: '#999', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2, alignItems: 'center' },
     logItemTimestamp: { alignItems: 'center', justifyContent: 'center', marginRight: 16, borderRightWidth: 1, borderRightColor: '#F1F3F5', paddingRight: 16, minWidth: 70 },
     logItemTimeText: { color: '#495057', fontWeight: '600', fontSize: 16 },
     logItemDetails: { flex: 1 },
     logDetailRow: { flexDirection: 'row', alignItems: 'center' },
-    logValueText: { fontSize: 18, fontWeight: 'bold', color: '#212529', marginLeft: 8 },
-    logUnitText: { fontSize: 14, color: '#6C757D', marginLeft: 4 },
+    logValueText: { fontSize: 16, fontWeight: '600', color: '#212529', marginLeft: 5 },
+    logUnitText: { fontSize: 13, color: '#6C757D', marginLeft: 3 },
     logItemActions: { justifyContent: 'space-around', flexDirection: 'row' },
     actionButton: { padding: 5 },
-    
-    calendarBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
-    calendarModalContainer: { position: 'absolute', top: '25%', left: '5%', right: '5%', backgroundColor: 'white', borderRadius: 16, elevation: 10, overflow: 'hidden'},
     modalOverlay: { flex: 1, justifyContent: 'flex-end' },
     modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
     modalContent: { backgroundColor: '#F8F9FA', paddingHorizontal: 20, paddingTop: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
     modalTitle: { fontSize: 16, fontWeight: '600', color: '#6C757D', textAlign: 'center', marginBottom: 20 },
+    foodNameInput: {
+        backgroundColor: '#FFFFFF',
+        borderColor: '#E0E0E0',
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: 15,
+        fontSize: 18,
+        fontWeight: '500',
+        color: '#1E1E2D',
+        marginBottom: 15,
+    },
     inputRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
     modalInput: { backgroundColor: '#FFFFFF', borderColor: '#E0E0E0', borderWidth: 1, borderRadius: 12, paddingVertical: 15, fontSize: 18, fontWeight: '600', textAlign: 'center', color: '#1E1E2D' },
     datePickerButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, backgroundColor: '#FFFFFF', borderRadius: 12, marginBottom: 20, borderWidth: 1, borderColor: '#D1D1D6' },
@@ -420,4 +447,55 @@ const styles = StyleSheet.create({
     scanButtonText: { color: '#fff', marginLeft: 8, fontWeight: '600', fontSize: 16 },
     modalActions: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', marginTop: 10 },
     modalButtonText: { color: '#F57C00', fontSize: 17, padding: 10, fontWeight: '500' },
+    calendarBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+    calendarModalContainer: { position: 'absolute', top: '25%', left: '5%', right: '5%', backgroundColor: 'white', borderRadius: 16, elevation: 10, overflow: 'hidden'},
+    foodNameText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#34495e',
+        marginBottom: 8,
+    },
+    nutritionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    fabContainer: { 
+        position: 'absolute', 
+        bottom: 35, 
+        right: 25, 
+        alignItems: 'center' 
+    },
+    fab: { 
+        width: 48, 
+        height: 48, 
+        borderRadius: 24, 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        elevation: 6, 
+        shadowColor: '#000', 
+        shadowRadius: 4, 
+        shadowOpacity: 0.3, 
+        shadowOffset: { height: 3, width: 0 } 
+    },
+    mainFab: { 
+        backgroundColor: '#F57C00', 
+        width: 60, 
+        height: 60, 
+        borderRadius: 30,
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        elevation: 8,
+    },
+    secondaryFab: { 
+        position: 'absolute',
+        bottom: 6,
+        right: 6, 
+    },
+    aiFab: { 
+        backgroundColor: '#E67E22'
+    },
+    manualFab: { 
+        backgroundColor: '#0096FF' 
+    },
 });

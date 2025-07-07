@@ -3,34 +3,31 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ActivityIndicator, FlatList } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../utils/api';
 
 const screenWidth = Dimensions.get('window').width;
 const CHART_BLUE = '#42A5F5';
 const CHART_BACKGROUND = '#F5F9FF';
 
-const STATUS_COLORS = {
-    normal: '#4CAF50', // Green
-    elevated: '#FF9800', // Orange
-    high: '#F44336', // Red
-    low: '#2196F3', // Blue
-    default: '#6C757D',
-};
-
-// Simplified status helper for this screen
-const getBloodSugarStatus = (amount) => {
+// This function now correctly requires thresholds to be passed in.
+const getBloodSugarStatus = (amount, thresholds) => {
     const numAmount = parseFloat(amount);
-    if (isNaN(numAmount)) return { level: 'N/A', color: STATUS_COLORS.default };
-    if (numAmount < 70) return { level: 'Low', color: STATUS_COLORS.low };
-    if (numAmount >= 180) return { level: 'High', color: STATUS_COLORS.high };
-    if (numAmount <= 140) return { level: 'Normal', color: STATUS_COLORS.normal };
-    return { level: 'Elevated', color: STATUS_COLORS.elevated };
+    if (isNaN(numAmount)) return { level: 'N/A', color: '#6C757D' };
+
+    // Use the dynamic thresholds loaded from storage.
+    if (numAmount >= thresholds.veryHighThreshold) return { level: 'Very High', color: '#F44336' };
+    if (numAmount < thresholds.lowThreshold) return { level: 'Low', color: '#2196F3' };
+    
+    // For a summary chart, it's reasonable to use the fasting threshold as a general "high" benchmark.
+    if (numAmount >= thresholds.highFastingThreshold) return { level: 'High', color: '#FF9800' };
+
+    return { level: 'Normal', color: '#4CAF50' };
 };
 
-// Helper to get week number in a month
 const getWeekOfMonth = (date) => {
   const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
   return Math.ceil((date.getDate() + firstDay) / 7);
@@ -43,17 +40,53 @@ export default function FullGlucoseChart() {
   const [chartData, setChartData] = useState(null);
   const [readings, setReadings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // State for new statistics card
   const [average, setAverage] = useState(0);
   const [high, setHigh] = useState(0);
   const [low, setLow] = useState(0);
+  
+  // State to hold user-defined thresholds, with safe defaults.
+  const [thresholds, setThresholds] = useState({
+    lowThreshold: 70,
+    highFastingThreshold: 100,
+    highPostMealThreshold: 140,
+    veryHighThreshold: 180,
+  });
+
+  useFocusEffect(
+    useCallback(() => {
+        const loadDataAndThresholds = async () => {
+            setIsLoading(true);
+            try {
+                const thresholdKeys = ['lowThreshold', 'highFastingThreshold', 'highPostMealThreshold', 'veryHighThreshold'];
+                const [storedThresholds, logs] = await Promise.all([
+                    AsyncStorage.multiGet(thresholdKeys),
+                    api.getHistory([3], period, displayDate.toISOString())
+                ]);
+
+                const loadedThresholds = { ...thresholds };
+                storedThresholds.forEach(([key, value]) => {
+                    if (value !== null) loadedThresholds[key] = parseFloat(value);
+                });
+                setThresholds(loadedThresholds);
+
+                processData(logs, period);
+
+            } catch (error) {
+                console.error("Error fetching glucose data/thresholds:", error);
+                setChartData(null); setReadings([]); setAverage(0); setHigh(0); setLow(0);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadDataAndThresholds();
+    }, [period, displayDate])
+  );
 
   const processData = useCallback((logs, currentPeriod) => {
     const allReadings = logs ? [...logs].reverse() : [];
     setReadings(allReadings);
     
-    // Calculate stats
     if (allReadings.length > 0) {
         const amounts = allReadings.map(log => Number(log.amount) || 0);
         const sum = amounts.reduce((a, b) => a + b, 0);
@@ -74,7 +107,7 @@ export default function FullGlucoseChart() {
   
     if (currentPeriod === 'day') {
       labels = allReadings.map(log => new Date(log.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }));
-      dataPoints = allReadings.map(log => log.amount);
+      dataPoints = allReadings.map(log => Number(log.amount) || 0); // Sanitize data
     } else if (currentPeriod === 'week') {
       const dailyAverages = {};
       allReadings.forEach(log => {
@@ -106,21 +139,6 @@ export default function FullGlucoseChart() {
       setChartData({ labels, datasets: [{ data: dataPoints }] });
     }
   }, []);
-
-  const fetchData = useCallback(async (currentPeriod, currentDate) => {
-    setIsLoading(true);
-    try {
-      const logs = await api.getHistory([3], currentPeriod, currentDate.toISOString());
-      processData(logs, currentPeriod);
-    } catch (error) {
-      console.error("Error fetching glucose history:", error);
-      setChartData(null); setReadings([]); setAverage(0); setHigh(0); setLow(0);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [processData]);
-
-  useEffect(() => { fetchData(period, displayDate); }, [period, displayDate, fetchData]);
 
   const changeDate = (amount) => {
     const newDate = new Date(displayDate);
@@ -158,9 +176,6 @@ export default function FullGlucoseChart() {
         data={chartData}
         width={screenWidth - 32}
         height={220}
-        onDataPointClick={({ value, dataset, getColor }) => 
-            console.log(value, dataset, getColor(0.5)) // Example, can be used for custom tooltips
-        }
         chartConfig={{
           backgroundColor: CHART_BACKGROUND,
           backgroundGradientFrom: CHART_BACKGROUND,
@@ -179,7 +194,7 @@ export default function FullGlucoseChart() {
   
   const renderReadingItem = ({ item, index }) => {
     const date = new Date(item.date);
-    const status = getBloodSugarStatus(item.amount);
+    const status = getBloodSugarStatus(item.amount, thresholds);
     return (
       <Animatable.View animation="fadeInUp" duration={400} delay={index * 50}>
         <View style={styles.readingRow}>
@@ -203,12 +218,12 @@ export default function FullGlucoseChart() {
             </View>
             <View style={styles.divider}/>
             <View style={styles.statItem}>
-                <Text style={[styles.statValue, {color: STATUS_COLORS.high}]}>{high}</Text>
+                <Text style={[styles.statValue, {color: '#F44336'}]}>{high}</Text>
                 <Text style={styles.statLabel}>Highest</Text>
             </View>
             <View style={styles.divider}/>
             <View style={styles.statItem}>
-                <Text style={[styles.statValue, {color: STATUS_COLORS.low}]}>{low}</Text>
+                <Text style={[styles.statValue, {color: '#2196F3'}]}>{low}</Text>
                 <Text style={styles.statLabel}>Lowest</Text>
             </View>
         </View>
@@ -226,7 +241,6 @@ export default function FullGlucoseChart() {
             <Text style={styles.title}>Glucose Insights</Text>
             <View style={{width: 40}} />
         </View>
-
         <View style={styles.controlsContainer}>
             <View style={styles.dateNavigator}>
                 <TouchableOpacity onPress={() => changeDate(-1)} style={styles.arrowButton}><Ionicons name="chevron-back-circle-outline" size={30} color="#555" /></TouchableOpacity>
@@ -241,7 +255,6 @@ export default function FullGlucoseChart() {
               ))}
             </View>
         </View>
-        
         <FlatList
           data={readings.reverse()}
           keyExtractor={(item) => item.logID.toString()}
