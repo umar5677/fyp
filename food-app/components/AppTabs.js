@@ -14,7 +14,7 @@ import SpeedDialButton from './SpeedDialButton';
 const Tab = createBottomTabNavigator();
 const DummyAddScreen = () => null;
 
-const ACTIVE_COLOR = '#E4691C';
+const ACTIVE_COLOR = '#0096FF';
 const INACTIVE_COLOR = '#8e8e93';
 
 const AppTabs = ({ navigation, route }) => {
