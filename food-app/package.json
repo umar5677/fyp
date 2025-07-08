@@ -34,7 +34,8 @@
     "react-native-flash-message": "^0.4.2",
     "react-native-modal-datetime-picker": "^18.0.0",
     "react-native-safe-area-context": "^5.4.0",
-    "react-native-svg": "15.11.2"
+    "react-native-svg": "15.11.2",
+    "expo-notifications": "~0.31.4"
   },
   "private": true
 }

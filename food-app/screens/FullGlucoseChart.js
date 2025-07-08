@@ -10,21 +10,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../utils/api';
 
 const screenWidth = Dimensions.get('window').width;
-const CHART_BLUE = '#42A5F5';
-const CHART_BACKGROUND = '#F5F9FF';
+const CHART_BLUE = '#3D88F8';
+const CHART_BACKGROUND = '#FFFFFF';
 
-// This function now correctly requires thresholds to be passed in.
 const getBloodSugarStatus = (amount, thresholds) => {
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount)) return { level: 'N/A', color: '#6C757D' };
-
-    // Use the dynamic thresholds loaded from storage.
     if (numAmount >= thresholds.veryHighThreshold) return { level: 'Very High', color: '#F44336' };
     if (numAmount < thresholds.lowThreshold) return { level: 'Low', color: '#2196F3' };
-    
-    // For a summary chart, it's reasonable to use the fasting threshold as a general "high" benchmark.
     if (numAmount >= thresholds.highFastingThreshold) return { level: 'High', color: '#FF9800' };
-
     return { level: 'Normal', color: '#4CAF50' };
 };
 
@@ -44,7 +38,6 @@ export default function FullGlucoseChart() {
   const [high, setHigh] = useState(0);
   const [low, setLow] = useState(0);
   
-  // State to hold user-defined thresholds, with safe defaults.
   const [thresholds, setThresholds] = useState({
     lowThreshold: 70,
     highFastingThreshold: 100,
@@ -68,7 +61,6 @@ export default function FullGlucoseChart() {
                     if (value !== null) loadedThresholds[key] = parseFloat(value);
                 });
                 setThresholds(loadedThresholds);
-
                 processData(logs, period);
 
             } catch (error) {
@@ -107,7 +99,7 @@ export default function FullGlucoseChart() {
   
     if (currentPeriod === 'day') {
       labels = allReadings.map(log => new Date(log.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }));
-      dataPoints = allReadings.map(log => Number(log.amount) || 0); // Sanitize data
+      dataPoints = allReadings.map(log => Number(log.amount) || 0);
     } else if (currentPeriod === 'week') {
       const dailyAverages = {};
       allReadings.forEach(log => {
@@ -136,7 +128,7 @@ export default function FullGlucoseChart() {
     if (dataPoints.length < 2) {
       setChartData(null); 
     } else {
-      setChartData({ labels, datasets: [{ data: dataPoints }] });
+      setChartData({ labels, datasets: [{ data: dataPoints, strokeWidth: 2 }] });
     }
   }, []);
 
@@ -173,21 +165,51 @@ export default function FullGlucoseChart() {
     }
     return (
       <LineChart
-        data={chartData}
-        width={screenWidth - 32}
+        data={{ labels: [], datasets: chartData.datasets }}
+        width={screenWidth} // Use full width for calculations
         height={220}
-        chartConfig={{
-          backgroundColor: CHART_BACKGROUND,
-          backgroundGradientFrom: CHART_BACKGROUND,
-          backgroundGradientTo: CHART_BACKGROUND,
-          decimalPlaces: 0,
-          color: () => CHART_BLUE,
-          labelColor: () => '#1E1E2D',
-          propsForDots: { r: '5', strokeWidth: '2', stroke: CHART_BLUE },
-          style: { borderRadius: 16 }
-        }}
+        withVerticalLabels={false}
+        withShadow={false}
+        fromZero
         bezier
-        style={styles.chart}
+        chartConfig={{
+            backgroundColor: CHART_BACKGROUND,
+            backgroundGradientFrom: CHART_BACKGROUND,
+            backgroundGradientTo: CHART_BACKGROUND,
+            decimalPlaces: 0,
+            color: (opacity = 1) => `rgba(61, 136, 248, ${opacity})`,
+            labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+            style: { borderRadius: 16 },
+            propsForDots: { r: '4', strokeWidth: '2', stroke: CHART_BLUE },
+            propsForBackgroundLines: { strokeDasharray: '4', stroke: '#E5E7EB' },
+            fillShadowGradientFrom: CHART_BLUE,
+            fillShadowGradientFromOpacity: 0.1,
+            fillShadowGradientTo: CHART_BACKGROUND,
+            fillShadowGradientToOpacity: 0,
+        }}
+        style={styles.chart} // Apply padding in the style
+        renderDotContent={({x, y, index}) => {
+            const labelCount = chartData.labels.length;
+            const showLabelModulo = labelCount > 6 ? Math.ceil(labelCount / 6) : 1;
+            if (index % showLabelModulo !== 0) return null;
+
+            const isFirstLabel = index === 0;
+
+            return (
+                <Text
+                    key={index}
+                    style={{
+                        position: 'absolute',
+                        top: y + 15,
+                        left: isFirstLabel ? x : x - 20,
+                        textAlign: isFirstLabel ? 'left' : 'center',
+                        color: '#6B7280', fontSize: 10, width: 40,
+                    }}
+                >
+                    {chartData.labels[index]}
+                </Text>
+            );
+        }}
       />
     );
   };
@@ -281,18 +303,24 @@ const styles = StyleSheet.create({
     rangeButtonActive: { backgroundColor: CHART_BLUE, borderRadius: 8, margin: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 3 },
     rangeButtonText: { color: '#1E1E2D', fontSize: 14, fontWeight: '600' },
     rangeButtonTextActive: { color: '#FFF' },
-    container: { paddingHorizontal: 16, paddingBottom: 40 },
-    statsCard: { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: 'white', borderRadius: 16, paddingVertical: 20, marginTop: 16, marginBottom: 16, shadowColor: "#999", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 5 },
+    container: { paddingBottom: 40 },
+    statsCard: { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: 'white', borderRadius: 16, paddingVertical: 20, margin: 16, marginTop: 16, marginBottom: 16, shadowColor: "#999", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 5 },
     statItem: { alignItems: 'center' },
     statValue: { fontSize: 22, fontWeight: 'bold', color: '#1E1E2D', marginBottom: 4 },
     statLabel: { fontSize: 14, color: '#6C757D', fontWeight: '500' },
     divider: { width: 1, backgroundColor: '#F0F0F0' },
-    chart: { borderRadius: 16, marginTop: 10 },
-    placeholderContainer: { height: 220, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F7F7F7', borderRadius: 12, marginTop: 10, paddingHorizontal: 20 },
+    chart: { 
+        borderRadius: 16, 
+        marginTop: 10,
+        // --- FIX: Add padding to prevent cutoff ---
+        paddingRight: 35, 
+        paddingLeft: 10,
+    },
+    placeholderContainer: { marginHorizontal:16, height: 220, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F7F7F7', borderRadius: 12, marginTop: 10, paddingHorizontal: 20 },
     placeholderText: { fontSize: 16, fontWeight: '600', color: '#555', textAlign: 'center', marginTop: 12 },
     placeholderSubText: { fontSize: 14, color: '#777', marginTop: 4, textAlign: 'center' },
-    listHeader: { fontSize: 18, fontWeight: 'bold', color: '#1E1E2D', marginTop: 24, marginBottom: 8 },
-    readingRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#F0F0F0', marginBottom: 10 },
+    listHeader: { fontSize: 18, fontWeight: 'bold', color: '#1E1E2D', marginTop: 24, marginBottom: 8, paddingHorizontal: 16 },
+    readingRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#F0F0F0', marginBottom: 10, marginHorizontal: 16 },
     statusDot: { width: 10, height: 10, borderRadius: 5, marginRight: 12 },
     readingInfo: { flex: 1 },
     timeLabel: { color: '#333', fontSize: 14, fontWeight: '500' },

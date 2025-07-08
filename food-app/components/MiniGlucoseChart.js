@@ -7,6 +7,15 @@ import { api } from '../utils/api';
 
 const screenWidth = Dimensions.get('window').width;
 
+// Helper to format the time label
+const formatTimeLabel = (dateString) => {
+    return new Date(dateString).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+    });
+};
+
 export default function MiniGlucoseChart() {
     const navigation = useNavigation();
     const [chartData, setChartData] = useState(null);
@@ -23,16 +32,14 @@ export default function MiniGlucoseChart() {
 
                     if (glucoseRes && glucoseRes.length > 1) {
                         const reversedGlucose = [...glucoseRes].reverse();
-                        
-                        // --- ROBUST PARSING FIX ---
-                        // This is the critical change. It ensures every data point 
-                        // given to the chart is a valid number. If a log.amount from the
-                        // database is null or undefined, it will safely default to 0.
                         const cleanData = reversedGlucose.map(log => Number(log.amount) || 0);
 
                         setChartData({
-                            labels: reversedGlucose.map(log => new Date(log.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })),
-                            datasets: [{ data: cleanData }] // Use the sanitized data
+                            labels: reversedGlucose.map(log => formatTimeLabel(log.date)),
+                            datasets: [{
+                                data: cleanData,
+                                strokeWidth: 2,
+                            }],
                         });
                     } else {
                         setChartData(null);
@@ -70,20 +77,63 @@ export default function MiniGlucoseChart() {
 
         return (
             <LineChart
-                data={chartData}
-                width={screenWidth - 40}
+                data={{
+                    labels: [], 
+                    datasets: chartData.datasets
+                }}
+                width={screenWidth - 32}
                 height={220}
+                withInnerLines={true}
+                withOuterLines={true}
+                withHorizontalLabels={true}
+                withVerticalLabels={false}
+                withShadow={false}
+                fromZero={true}
+                bezier
                 chartConfig={{
                     backgroundColor: '#FFFFFF',
                     backgroundGradientFrom: '#FFFFFF',
                     backgroundGradientTo: '#FFFFFF',
                     decimalPlaces: 0,
                     color: (opacity = 1) => `rgba(61, 136, 248, ${opacity})`,
-                    labelColor: (opacity = 1) => `rgba(30, 30, 45, ${opacity})`,
+                    labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+                    style: { borderRadius: 16 },
                     propsForDots: { r: '4', strokeWidth: '2', stroke: '#3D88F8' },
+                    propsForBackgroundLines: {
+                        strokeDasharray: '4',
+                        stroke: '#E5E7EB',
+                    },
+                    fillShadowGradientFrom: '#3D88F8',
+                    fillShadowGradientFromOpacity: 0.1,
+                    fillShadowGradientTo: '#FFFFFF',
+                    fillShadowGradientToOpacity: 0
                 }}
-                bezier
                 style={styles.chart}
+                formatXLabel={() => ''}
+                renderDotContent={({x, y, index}) => {
+                    // --- THE FIX: Only show labels for odd-indexed points ---
+                    // This naturally skips the first point (index 0) and alternates.
+                    if (index % 2 === 0) {
+                        return null; // Don't render a label for this point
+                    }
+
+                    return (
+                        <Text
+                            key={index}
+                            style={{
+                                position: 'absolute',
+                                top: y + 15,
+                                left: x - 20,
+                                textAlign: 'center',
+                                color: '#6B7280',
+                                fontSize: 10,
+                                width: 40,
+                            }}
+                        >
+                            {chartData.labels[index]}
+                        </Text>
+                    );
+                }}
             />
         );
     };
@@ -107,7 +157,9 @@ const styles = StyleSheet.create({
     card: {
         backgroundColor: '#FFFFFF',
         borderRadius: 16,
-        padding: 16,
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: 8,
         marginVertical: 10,
         shadowColor: '#000',
         shadowOpacity: 0.08,
@@ -122,7 +174,7 @@ const styles = StyleSheet.create({
     },
     title: {
         color: '#1E1E2D',
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: 'bold',
     },
     viewMoreText: {
@@ -133,6 +185,7 @@ const styles = StyleSheet.create({
     chart: {
         borderRadius: 12,
         marginVertical: 8,
+        paddingRight: 30,
     },
     placeholderContainer: {
         height: 220,

@@ -33,14 +33,22 @@ export default function RemindersScreen({ navigation }) {
 
   useEffect(() => {
     loadReminders();
+    
+    let intervalId = null;
     const now = new Date();
     const delay = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
-    const timerId = setTimeout(() => {
+    
+    const timeoutId = setTimeout(() => {
       checkReminders(); 
-      const intervalId = setInterval(checkReminders, 60000); 
-      return () => clearInterval(intervalId);
+      intervalId = setInterval(checkReminders, 60000); 
     }, delay);
-    return () => clearTimeout(timerId);
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, []);
 
   useEffect(() => { remindersRef.current = reminders; }, [reminders]);
@@ -64,6 +72,7 @@ export default function RemindersScreen({ navigation }) {
 
     for (const reminder of remindersRef.current) {
       if (reminder.enabled && reminder.time === currentTime && (reminder.repeat.length === 0 || reminder.repeat.includes(currentDay))) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         showMessage({ message: reminder.label, type: 'info', icon: 'info', duration: 5000 });
         const existing = await AsyncStorage.getItem('notifications');
         const notifications = existing ? JSON.parse(existing) : [];
@@ -150,7 +159,7 @@ export default function RemindersScreen({ navigation }) {
             <Ionicons name="chevron-back" size={28} color="#333" />
         </TouchableOpacity>
         <Text style={styles.title}>Reminders</Text>
-        <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.headerButton}>
+        <TouchableOpacity onPress={() => { resetModal(); setModalVisible(true); }} style={styles.headerButton}>
             <Ionicons name="add" size={28} color="#007AFF" />
         </TouchableOpacity>
       </View>
@@ -170,14 +179,20 @@ export default function RemindersScreen({ navigation }) {
       />
 
       <Modal visible={modalVisible} animationType="slide" transparent={true} onRequestClose={resetModal}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={resetModal}>
+          <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
             <Text style={styles.modalTitle}>{editingReminder ? 'Edit Reminder' : 'Add Reminder'}</Text>
             
-            {/* --- FIX: Container for iOS Time Picker with background color --- */}
             <View style={styles.timePickerContainer}>
                 {Platform.OS === 'ios' ? (
-                    <DateTimePicker mode="time" value={newTime} onChange={(e, date) => date && setNewTime(date)} display="spinner" />
+                    <DateTimePicker 
+                        mode="time" 
+                        value={newTime} 
+                        onChange={(e, date) => date && setNewTime(date)} 
+                        display="spinner"
+                        // --- FIX 1: Add textColor prop for iOS ---
+                        textColor="black"
+                    />
                 ) : (
                     <TouchableOpacity onPress={() => setShowPicker(true)} style={styles.timeButtonAndroid}>
                         <Text style={styles.timeButtonTextAndroid}>{newTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
@@ -190,7 +205,13 @@ export default function RemindersScreen({ navigation }) {
             )}
             
             <Text style={styles.label}>Label</Text>
-            <TextInput value={newLabel} onChangeText={setNewLabel} placeholder="e.g., Check blood sugar" style={styles.input} />
+            <TextInput 
+                value={newLabel} 
+                onChangeText={setNewLabel} 
+                placeholder="e.g., Check blood sugar"
+                placeholderTextColor="#9CA3AF"
+                style={styles.input} 
+            />
 
             <Text style={styles.label}>Repeat On</Text>
             <DropDownPicker
@@ -219,8 +240,8 @@ export default function RemindersScreen({ navigation }) {
                     <Text style={styles.deleteButtonText}>Delete Reminder</Text>
                 </TouchableOpacity>
             )}
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );
@@ -233,13 +254,13 @@ const styles = StyleSheet.create({
     title: { color: '#111827', fontSize: 20, fontWeight: 'bold' },
     listContainer: { paddingHorizontal: 16, paddingVertical: 8, flexGrow: 1 },
     reminderCard: { backgroundColor: '#fff', padding: 20, marginVertical: 8, borderRadius: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' },
-    reminderCardDisabled: { backgroundColor: '#F9FAFB' },
+    reminderCardDisabled: { backgroundColor: '#F3F4F6' },
     reminderDetails: { flex: 1, marginRight: 10 },
     reminderTime: { fontSize: 32, fontWeight: '200', color: '#1F2937', letterSpacing: 1 },
     reminderLabel: { fontSize: 16, color: '#1F2937', fontWeight: '600', marginTop: 4 },
     reminderRepeat: { fontSize: 14, color: '#6B7280', marginTop: 2, fontStyle: 'italic' },
     reminderTextDisabled: { color: '#9CA3AF' },
-    emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+    emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, marginTop: '20%'},
     emptyText: { marginTop: 16, fontSize: 18, fontWeight: '600', color: '#9CA3AF' },
     emptySubText: { marginTop: 8, color: '#D1D5DB', fontSize: 14, textAlign: 'center' },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
@@ -247,16 +268,24 @@ const styles = StyleSheet.create({
     modalTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' },
     
     timePickerContainer: {
-        backgroundColor: Platform.OS === 'ios' ? '#C0C0C0' : 'transparent',
+        backgroundColor: Platform.OS === 'ios' ? '#f0f0f0' : 'transparent',
         borderRadius: 10,
         justifyContent: 'center',
         marginVertical: 5,
+        overflow: 'hidden',
     },
     timeButtonAndroid: { backgroundColor: '#F3F4F6', padding: 12, borderRadius: 8, marginVertical: 10 },
     timeButtonTextAndroid: { fontSize: 20, textAlign: 'center', fontWeight: '500' },
     
     label: { marginTop: 15, marginBottom: 8, fontSize: 14, fontWeight: '600', color: '#374151' },
-    input: { borderWidth: 1, borderColor: '#D1D5DB', padding: 12, borderRadius: 8, fontSize: 16, backgroundColor: '#F9FAFB' },
+    input: { 
+        borderWidth: 1, 
+        borderColor: '#D1D5DB', 
+        padding: 12, 
+        borderRadius: 8, 
+        fontSize: 16, 
+        backgroundColor: '#F9FAFB'
+    },
     dropdown: { backgroundColor: '#F9FAFB', borderColor: '#D1D5DB' },
     dropdownContainer: { borderColor: '#D1D5DB' },
     buttonRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20, paddingTop: 20, borderTopWidth: 1, borderTopColor: '#E5E7EB' },

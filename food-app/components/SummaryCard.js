@@ -180,6 +180,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#F0F0F0',
         width: '100%',
         alignSelf: 'center',
+        marginTop: 10,
     },
     detailsContainer: {
         flexDirection: 'row',
