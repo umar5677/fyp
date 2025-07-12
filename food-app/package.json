@@ -4,8 +4,8 @@
   "main": "index.js",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web"
   },
   "dependencies": {
@@ -23,6 +23,7 @@
     "expo-haptics": "~14.1.4",
     "expo-image-manipulator": "~13.1.7",
     "expo-image-picker": "~16.1.4",
+    "expo-notifications": "~0.31.4",
     "expo-secure-store": "~14.2.3",
     "react": "19.0.0",
     "react-native": "^0.79.5",
@@ -32,10 +33,11 @@
     "react-native-dotenv": "^3.4.11",
     "react-native-dropdown-picker": "^5.4.6",
     "react-native-flash-message": "^0.4.2",
+    "react-native-gesture-handler": "^2.27.1",
     "react-native-modal-datetime-picker": "^18.0.0",
     "react-native-safe-area-context": "^5.4.0",
-    "react-native-svg": "15.11.2",
-    "expo-notifications": "~0.31.4"
+    "react-native-screens": "^4.11.1",
+    "react-native-svg": "15.11.2"
   },
   "private": true
 }

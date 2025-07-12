@@ -2,7 +2,7 @@
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
-const jwt = require('jsonwebtoken'); // Corrected import
+const jwt = require('jsonwebtoken'); 
 const { RekognitionClient, DetectTextCommand } = require('@aws-sdk/client-rekognition');
 const authenticateToken = require('./authMiddleware.js');
 

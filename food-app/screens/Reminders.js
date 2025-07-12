@@ -11,14 +11,15 @@ import { showMessage } from 'react-native-flash-message';
 import DropDownPicker from 'react-native-dropdown-picker';
 import * as Animatable from 'react-native-animatable';
 import * as Haptics from 'expo-haptics';
+// --- NEW: Import StatusBar ---
+import { StatusBar } from 'react-native';
 
 export default function RemindersScreen({ navigation }) {
+  // ... (all existing state and functions up to the return statement remain the same)
   const [reminders, setReminders] = useState([]);
   const remindersRef = useRef([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingReminder, setEditingReminder] = useState(null);
-
-  // Modal State
   const [newTime, setNewTime] = useState(new Date());
   const [newLabel, setNewLabel] = useState('');
   const [newRepeat, setNewRepeat] = useState([]);
@@ -33,16 +34,13 @@ export default function RemindersScreen({ navigation }) {
 
   useEffect(() => {
     loadReminders();
-    
     let intervalId = null;
     const now = new Date();
     const delay = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
-    
     const timeoutId = setTimeout(() => {
       checkReminders(); 
       intervalId = setInterval(checkReminders, 60000); 
     }, delay);
-
     return () => {
       clearTimeout(timeoutId);
       if (intervalId) {
@@ -69,7 +67,6 @@ export default function RemindersScreen({ navigation }) {
     const now = new Date();
     const currentTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     const currentDay = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][now.getDay()];
-
     for (const reminder of remindersRef.current) {
       if (reminder.enabled && reminder.time === currentTime && (reminder.repeat.length === 0 || reminder.repeat.includes(currentDay))) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -173,7 +170,7 @@ export default function RemindersScreen({ navigation }) {
             <Animatable.View animation="fadeIn" delay={300} style={styles.emptyContainer}>
                 <Ionicons name="alarm-outline" size={80} color="#D1D5DB" />
                 <Text style={styles.emptyText}>No Reminders Set</Text>
-                <Text style={styles.emptySubText}>Tap the '+' button to schedule a new reminder for meals, medication, or checks.</Text>
+                <Text style={styles.emptySubText}>Tap the '+' button to schedule a new reminder.</Text>
             </Animatable.View>
         }
       />
@@ -183,15 +180,13 @@ export default function RemindersScreen({ navigation }) {
           <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
             <Text style={styles.modalTitle}>{editingReminder ? 'Edit Reminder' : 'Add Reminder'}</Text>
             
-            <View style={styles.timePickerContainer}>
+            <View style={styles.iosPickerWrapper}>
                 {Platform.OS === 'ios' ? (
-                    <DateTimePicker 
-                        mode="time" 
-                        value={newTime} 
-                        onChange={(e, date) => date && setNewTime(date)} 
+                    <DateTimePicker
+                        mode="time"
+                        value={newTime}
+                        onChange={(e, date) => date && setNewTime(date)}
                         display="spinner"
-                        // --- FIX 1: Add textColor prop for iOS ---
-                        textColor="black"
                     />
                 ) : (
                     <TouchableOpacity onPress={() => setShowPicker(true)} style={styles.timeButtonAndroid}>
@@ -208,7 +203,7 @@ export default function RemindersScreen({ navigation }) {
             <TextInput 
                 value={newLabel} 
                 onChangeText={setNewLabel} 
-                placeholder="e.g., Check blood sugar"
+                placeholder="e.g., Check blood sugar" 
                 placeholderTextColor="#9CA3AF"
                 style={styles.input} 
             />
@@ -221,7 +216,6 @@ export default function RemindersScreen({ navigation }) {
               multiple={true} mode="BADGE" theme="LIGHT"
               placeholder="Select days (or leave blank for once)"
               listMode="SCROLLVIEW"
-              closeAfterSelecting={true}
               style={styles.dropdown}
               dropDownContainerStyle={styles.dropdownContainer}
               containerStyle={{ zIndex: 1000 }}
@@ -248,7 +242,12 @@ export default function RemindersScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-    safeArea: { flex: 1, backgroundColor: '#F9FAFB' },
+    safeArea: { 
+        flex: 1, 
+        backgroundColor: '#F9FAFB',
+        // --- FIX: Add padding for the Android status bar ---
+        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
     headerButton: { padding: 5 },
     title: { color: '#111827', fontSize: 20, fontWeight: 'bold' },
@@ -266,17 +265,14 @@ const styles = StyleSheet.create({
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
     modalContent: { backgroundColor: 'white', padding: 20, borderRadius: 16, width: '100%', shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5 },
     modalTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' },
-    
-    timePickerContainer: {
-        backgroundColor: Platform.OS === 'ios' ? '#f0f0f0' : 'transparent',
+    iosPickerWrapper: {
+        backgroundColor: '#E5E7EB',
         borderRadius: 10,
-        justifyContent: 'center',
         marginVertical: 5,
         overflow: 'hidden',
     },
-    timeButtonAndroid: { backgroundColor: '#F3F4F6', padding: 12, borderRadius: 8, marginVertical: 10 },
+    timeButtonAndroid: { backgroundColor: '#F3F4F6', padding: 12, borderRadius: 8, marginVertical: 10, alignItems: 'center' },
     timeButtonTextAndroid: { fontSize: 20, textAlign: 'center', fontWeight: '500' },
-    
     label: { marginTop: 15, marginBottom: 8, fontSize: 14, fontWeight: '600', color: '#374151' },
     input: { 
         borderWidth: 1, 
