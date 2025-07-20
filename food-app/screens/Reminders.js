@@ -11,11 +11,9 @@ import { showMessage } from 'react-native-flash-message';
 import DropDownPicker from 'react-native-dropdown-picker';
 import * as Animatable from 'react-native-animatable';
 import * as Haptics from 'expo-haptics';
-// --- NEW: Import StatusBar ---
 import { StatusBar } from 'react-native';
 
 export default function RemindersScreen({ navigation }) {
-  // ... (all existing state and functions up to the return statement remain the same)
   const [reminders, setReminders] = useState([]);
   const remindersRef = useRef([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -245,7 +243,6 @@ const styles = StyleSheet.create({
     safeArea: { 
         flex: 1, 
         backgroundColor: '#F9FAFB',
-        // --- FIX: Add padding for the Android status bar ---
         paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
     },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },

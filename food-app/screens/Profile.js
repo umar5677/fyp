@@ -1,25 +1,19 @@
 // screens/Profile.js
 import React, { useState, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  Alert,
-  ScrollView,
-  ActivityIndicator,
-  // --- NEW: Import Linking ---
-  Linking,
+  View, Text, StyleSheet, TouchableOpacity, Image,
+  Alert, ScrollView, ActivityIndicator, Linking, Platform, StatusBar
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
+import * as ImagePicker from 'expo-image-picker';
 import { api } from '../utils/api';
 
-// Reusable button component for the profile screen
+const DEFAULT_AVATAR = 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png';
+
 const ProfileButton = ({ icon, text, onPress, isLogout = false }) => (
     <TouchableOpacity
         style={[styles.buttonRow, isLogout && styles.logoutButton]}
@@ -37,28 +31,84 @@ const ProfileButton = ({ icon, text, onPress, isLogout = false }) => (
 const ProfileScreen = ({ navigation }) => {
     const [user, setUser] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [cacheBuster, setCacheBuster] = useState(Date.now());
 
-    // Fetch profile data when the screen comes into focus
     useFocusEffect(
         useCallback(() => {
+            let isActive = true;
             const fetchProfile = async () => {
+                if (isActive) {
+                    setIsLoading(true); 
+                }
+                
                 try {
                     const profileRes = await api.getProfile();
-                    setUser(profileRes.user);
+                    if (isActive) {
+                        setUser(profileRes.user);
+                        setCacheBuster(Date.now());
+                    }
                 } catch (error) {
                     console.error("Failed to load user profile:", error);
-                    Alert.alert("Error", "Could not load your profile data.");
+                    if (isActive) {
+                        Alert.alert("Error", "Could not load your profile data.");
+                    }
                 } finally {
-                    setIsLoading(false);
+                    if (isActive) {
+                        setIsLoading(false);
+                    }
                 }
             };
             fetchProfile();
+
+            return () => {
+              isActive = false;
+            };
         }, [])
     );
 
-    // --- NEW: Handler for the feedback button ---
+    const pickImageAndUpload = async () => {
+        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permissionResult.granted) {
+            Alert.alert("Permission Required", "You need to allow access to your photos to change your profile picture.");
+            return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.5,
+        });
+
+        if (result.canceled) return;
+
+        const asset = result.assets[0];
+        const uri = asset.uri;
+
+        const formData = new FormData();
+        const fileName = uri.split('/').pop();
+        const fileType = fileName.split('.').pop();
+        
+        formData.append('photo', { uri, name: fileName, type: `image/${fileType}` });
+
+        try {
+            const data = await api.uploadProfilePhoto(formData);
+
+            if (data.imageUrl) {
+                setUser(currentUser => ({ ...currentUser, pfpUrl: data.imageUrl }));
+                setCacheBuster(Date.now());
+                Alert.alert('Success!', 'Your profile picture has been updated.');
+            } else {
+                Alert.alert('Upload Failed', data.message || 'The server did not return an image URL.');
+            }
+        } catch (err) {
+            console.error('Upload error:', err);
+            Alert.alert('Error', err.message || 'Something went wrong during the upload.');
+        }
+    };
+
     const handleFeedback = async () => {
-        const to = 'support@glucobites.com'; // Your support email
+        const to = 'support@glucobites.com';
         const subject = 'GlucoBites App Feedback';
         const url = `mailto:${to}?subject=${subject}`;
 
@@ -110,10 +160,15 @@ const ProfileScreen = ({ navigation }) => {
         <SafeAreaView style={styles.safeArea}>
             <ScrollView contentContainerStyle={styles.container}>
                 <Animatable.View animation="fadeInDown" duration={600} style={styles.profileCard}>
-                    <Image
-                        source={{ uri: `https://i.pravatar.cc/150?u=${user?.email}` }} // Placeholder avatar
-                        style={styles.avatar}
-                    />
+                    <TouchableOpacity onPress={pickImageAndUpload}>
+                        <Image
+                            source={{ uri: `${user?.pfpUrl}?t=${cacheBuster}` || DEFAULT_AVATAR }}
+                            style={styles.avatar}
+                        />
+                        <View style={styles.cameraIconContainer}>
+                            <Ionicons name="camera-reverse" size={18} color="#FFF" />
+                        </View>
+                    </TouchableOpacity>
                     <Text style={styles.name}>{user?.first_name || ''} {user?.last_name || ''}</Text>
                     <Text style={styles.email}>{user?.email}</Text>
                 </Animatable.View>
@@ -123,12 +178,12 @@ const ProfileScreen = ({ navigation }) => {
                     <ProfileButton
                         icon={<Feather name="user" size={20} color="#555" />}
                         text="Edit Profile"
-                        onPress={() => Alert.alert("Navigate", "Navigate to Edit Profile screen.")}
+                        onPress={() => navigation.navigate('EditProfile')}
                     />
                     <ProfileButton
                         icon={<MaterialCommunityIcons name="lock-outline" size={22} color="#555" />}
                         text="Change Password"
-                        onPress={() => Alert.alert("Navigate", "Navigate to Change Password screen.")}
+                        onPress={() => navigation.navigate('ChangePassword')}
                     />
                     
                     <Text style={styles.sectionHeader}>Application</Text>
@@ -140,21 +195,18 @@ const ProfileScreen = ({ navigation }) => {
                      <ProfileButton
                         icon={<MaterialCommunityIcons name="shield-alert-outline" size={22} color="#555" />}
                         text="Alerts & Sharing"
-                        onPress={() => Alert.alert("Navigate", "Navigate to Alerts screen.")}
+                        onPress={() => navigation.navigate('Alerts')}
                     />
                     <ProfileButton
                         icon={<Ionicons name="settings-outline" size={20} color="#555" />}
                         text="Settings"
-                        onPress={() => Alert.alert("Navigate", "Navigate to Settings screen.")}
+                        onPress={() => navigation.navigate('Settings')}
                     />
-                    
-                    {/* --- NEW: Feedback Button --- */}
                     <ProfileButton
                         icon={<MaterialCommunityIcons name="comment-quote-outline" size={20} color="#555" />}
                         text="Feedback & Suggestions"
                         onPress={handleFeedback}
                     />
-
                      <ProfileButton
                         icon={<Ionicons name="help-circle-outline" size={22} color="#555" />}
                         text="Help & Support"
@@ -179,6 +231,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#F7F8FA',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   loadingContainer: {
     flex: 1,
@@ -220,6 +273,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6C757D',
     marginTop: 4,
+  },
+  cameraIconContainer: {
+      position: 'absolute',
+      bottom: 20,
+      right: 5,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      padding: 8,
+      borderRadius: 20,
+      borderWidth: 2,
+      borderColor: '#FFF'
   },
   menuContainer: {
     width: '100%',

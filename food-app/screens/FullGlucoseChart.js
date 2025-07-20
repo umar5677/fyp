@@ -166,7 +166,7 @@ export default function FullGlucoseChart() {
     return (
       <LineChart
         data={{ labels: [], datasets: chartData.datasets }}
-        width={screenWidth} // Use full width for calculations
+        width={screenWidth} 
         height={220}
         withVerticalLabels={false}
         withShadow={false}
@@ -187,7 +187,7 @@ export default function FullGlucoseChart() {
             fillShadowGradientTo: CHART_BACKGROUND,
             fillShadowGradientToOpacity: 0,
         }}
-        style={styles.chart} // Apply padding in the style
+        style={styles.chart} 
         renderDotContent={({x, y, index}) => {
             const labelCount = chartData.labels.length;
             const showLabelModulo = labelCount > 6 ? Math.ceil(labelCount / 6) : 1;
@@ -312,7 +312,6 @@ const styles = StyleSheet.create({
     chart: { 
         borderRadius: 16, 
         marginTop: 10,
-        // --- FIX: Add padding to prevent cutoff ---
         paddingRight: 35, 
         paddingLeft: 10,
     },

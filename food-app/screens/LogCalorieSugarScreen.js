@@ -77,7 +77,6 @@ const EditModal = ({ modalVisible, setModalVisible, logs, onSave, onDelete, onSc
     if (!logs) return null;
 
     const handleSave = async () => {
-        // --- FIX: Add validation for the food name ---
         if (!foodName.trim()) {
             Alert.alert("Food Name Required", "Please enter a name for the food before saving.");
             return;

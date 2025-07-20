@@ -5,11 +5,14 @@ const mysql = require('mysql2/promise');
 const jwt = require('jsonwebtoken'); 
 const { RekognitionClient, DetectTextCommand } = require('@aws-sdk/client-rekognition');
 const authenticateToken = require('./authMiddleware.js');
+const multer = require('multer');
+const { S3Client } = require('@aws-sdk/client-s3');
+const multerS3 = require('multer-s3');
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 
-// --- AWS SDK & DB Setup ---
+// AWS SDK & DB Setup
 const rekognitionClient = new RekognitionClient({
     region: process.env.AWS_REGION,
     credentials: {
@@ -19,9 +22,36 @@ const rekognitionClient = new RekognitionClient({
 });
 const dbPool = mysql.createPool({ host: process.env.DB_HOST, user: process.env.DB_USER, password: process.env.DB_PASSWORD, database: process.env.DB_NAME, waitForConnections: true, connectionLimit: 10, queueLimit: 0 });
 
-// --- PUBLIC ROUTES (No token needed) ---
+// S3 and Multer Setup
+const s3 = new S3Client({
+    region: process.env.AWS_REGION,
+    credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    }
+});
+
+const upload = multer({
+    storage: multerS3({
+        s3: s3,
+        bucket: process.env.S3_BUCKET_NAME,
+        metadata: function (req, file, cb) {
+            cb(null, { fieldName: file.fieldname });
+        },
+        key: function (req, file, cb) {
+            const userId = req.user.userId;
+            const fileName = 'profile'; 
+            const folderPath = `profile-pictures/${userId}`;
+            const fullPath = `${folderPath}/${fileName}`;
+            
+            cb(null, fullPath);
+        }
+    })
+});
+
+// PUBLIC ROUTES 
 const loginApi = require('./api/login.js');
-const { createLoginRouter, hashPassword } = loginApi;
+const { createLoginRouter, hashPassword, comparePassword } = loginApi;
 const createSignupRouter = require('./api/signup.js');
 app.use('/api/login', createLoginRouter(dbPool));
 app.use('/api/signup', createSignupRouter(dbPool, hashPassword));
@@ -40,14 +70,100 @@ app.post('/api/token', (req, res) => {
     });
 });
 
-// --- PROTECTED ROUTES (All routes below this line require a valid JWT) ---
+// PROFILE PICTURE UPLOAD ROUTE
+app.post('/api/upload/profile-picture', authenticateToken, upload.single('photo'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).send('No file uploaded.');
+    }
+    
+    const imageUrl = req.file.location;
+
+    try {
+        await dbPool.query(
+            'UPDATE users SET pfpUrl = ? WHERE userID = ?',
+            [imageUrl, req.user.userId]
+        );
+        res.status(200).json({ success: true, imageUrl });
+    } catch (error) {
+        console.error('Failed to update pfpUrl in database:', error);
+        res.status(500).json({ success: false, message: 'File uploaded, but failed to save profile link.' });
+    }
+});
+
+
+
+// PROTECTED ROUTES
 app.use(authenticateToken);
 
-// --- Profile Route (Protected) ---
+app.put('/api/profile-setup', async (req, res) => {
+    const userId = req.user.userId;
+    const { dob, weight, height, diabetesType, gender, isInsulin } = req.body;
+
+    if (dob === undefined || weight === undefined || height === undefined || gender === null || diabetesType === null || isInsulin === undefined) {
+        return res.status(400).json({ message: 'All fields are required.' });
+    }
+
+    try {
+        const [result] = await dbPool.query(
+            `UPDATE users SET dob = ?, weight = ?, height = ?, diabetes = ?, gender = ?, isInsulin = ?, hasProfileSetup = 1 WHERE userID = ?`,
+            [dob, weight, height, diabetesType, gender, isInsulin, userId]
+        );
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        res.status(200).json({ success: true, message: 'Profile setup complete!' });
+
+    } catch (error) {
+        console.error('Profile setup error:', error);
+        res.status(500).json({ message: 'Error updating profile.' });
+    }
+});
+
+app.post('/api/profile/change-password', async (req, res) => {
+    const userId = req.user.userId;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: 'Current and new passwords are required.' });
+    }
+    
+    if (newPassword.length < 8) {
+        return res.status(400).json({ message: 'Your new password must be at least 8 characters long.' });
+    }
+
+    try {
+        const [users] = await dbPool.query('SELECT password FROM users WHERE userID = ?', [userId]);
+
+        if (users.length === 0) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const user = users[0];
+        const isMatch = await comparePassword(currentPassword, user.password);
+
+        if (!isMatch) {
+            return res.status(401).json({ message: 'Incorrect current password.' });
+        }
+
+        const newHashedPassword = await hashPassword(newPassword);
+        await dbPool.query('UPDATE users SET password = ? WHERE userID = ?', [newHashedPassword, userId]);
+
+        res.status(200).json({ success: true, message: 'Password changed successfully.' });
+    } catch (error) {
+        console.error('Change password error:', error);
+        res.status(500).json({ message: 'Error changing password.' });
+    }
+});
+
 app.get('/api/profile', async (req, res) => {
     const userId = req.user.userId;
     try {
-        const [users] = await dbPool.query('SELECT userID, email, first_name, last_name, dob, weight, height, diabetes FROM users WHERE userID = ?', [userId]);
+        const [users] = await dbPool.query(
+            'SELECT userID, email, first_name, last_name, dob, weight, height, gender, diabetes, isInsulin, pfpUrl FROM users WHERE userID = ?',
+            [userId]
+        );
         if (users.length === 0) return res.status(404).json({ message: 'User not found.' });
         res.json({ user: users[0] });
     } catch (error) {
@@ -56,7 +172,54 @@ app.get('/api/profile', async (req, res) => {
     }
 });
 
-// --- Universal OCR Endpoint (Protected) ---
+app.put('/api/profile', async (req, res) => {
+    const userId = req.user.userId;
+    const { first_name, last_name, email, dob, height, weight, gender, diabetes, isInsulin } = req.body;
+
+    let queryFields = [];
+    let queryParams = [];
+
+    if (req.body.hasOwnProperty('first_name')) { queryFields.push('first_name = ?'); queryParams.push(first_name); }
+    if (req.body.hasOwnProperty('last_name')) { queryFields.push('last_name = ?'); queryParams.push(last_name); }
+    if (req.body.hasOwnProperty('email')) { queryFields.push('email = ?'); queryParams.push(email); }
+    if (req.body.hasOwnProperty('dob')) { queryFields.push('dob = ?'); queryParams.push(dob); }
+    if (req.body.hasOwnProperty('height') && height) { queryFields.push('height = ?'); queryParams.push(parseFloat(height)); }
+    if (req.body.hasOwnProperty('weight') && weight) { queryFields.push('weight = ?'); queryParams.push(parseFloat(weight)); }
+    if (req.body.hasOwnProperty('gender')) { queryFields.push('gender = ?'); queryParams.push(gender); }
+    if (req.body.hasOwnProperty('diabetes')) { queryFields.push('diabetes = ?'); queryParams.push(diabetes); }
+    if (req.body.hasOwnProperty('isInsulin')) { queryFields.push('isInsulin = ?'); queryParams.push(isInsulin); }
+
+    if (queryFields.length === 0) {
+        return res.status(400).json({ message: 'No fields to update.' });
+    }
+
+    const queryString = `UPDATE users SET ${queryFields.join(', ')} WHERE userID = ?`;
+    queryParams.push(userId);
+    
+    try {
+        const [result] = await dbPool.query(queryString, queryParams);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: "User not found." });
+        }
+        res.status(200).json({ message: "Profile updated successfully." });
+    } catch (error) {
+        console.error("Profile update error:", error);
+        res.status(500).json({ message: "Error updating profile." });
+    }
+});
+
+app.delete('/api/profile', async (req, res) => {
+    const userId = req.user.userId;
+    try {
+        await dbPool.query('DELETE FROM dataLogs WHERE userID = ?', [userId]);
+        await dbPool.query('DELETE FROM users WHERE userID = ?', [userId]);
+        res.status(200).json({ message: "Account deleted successfully." });
+    } catch (error) {
+        console.error("Account deletion error:", error);
+        res.status(500).json({ message: "Error deleting account." });
+    }
+});
+
 app.post('/api/ocr/aws-parse-image', async (req, res) => {
     const { image } = req.body;
     if (!image) return res.status(400).json({ message: 'Image data is required.' });
@@ -128,7 +291,6 @@ app.post('/api/ocr/aws-parse-image', async (req, res) => {
     }
 });
 
-// --- GLUCOSE PREDICTION ENDPOINT (Protected) ---
 app.get('/api/predictions/glucose', async (req, res) => {
     const userId = req.user.userId;
     const NUM_READINGS = 5;
@@ -189,8 +351,6 @@ app.get('/api/predictions/glucose', async (req, res) => {
         res.status(500).json({ success: false, message: 'An error occurred while calculating the prediction.' });
     }
 });
-
-// --- CONSOLIDATED LOGS ENDPOINTS (Protected) ---
 
 app.get('/api/logs/history', async (req, res) => {
     const userId = req.user.userId;
@@ -321,6 +481,5 @@ app.delete('/api/logs/:logId', async (req, res) => {
 });
 
 
-// --- Start Server ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));

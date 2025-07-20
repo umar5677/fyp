@@ -1,5 +1,6 @@
+// food-app/screens/Login.js
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Alert, ActivityIndicator, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Alert, ActivityIndicator, TouchableOpacity, Image, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 const YOUR_AWS_LOGIN_API_URL = 'http://192.168.0.120:3000/api/login';
@@ -36,10 +37,13 @@ const Login = ({ navigation }) => {
                     setIsLoading(false);
                     return;
                 }
-                navigation.replace('MainApp', {
-                    userId: responseData.userId,
-                    userEmail: responseData.email,
-                });
+                
+                if (responseData.hasProfileSetup) {
+                    navigation.replace('MainApp');
+                } else {
+                    navigation.replace('ProfileSetup');
+                }
+                
             } else {
                 Alert.alert('Login Failed', responseData.message || 'Invalid email or password.');
             }
@@ -52,70 +56,84 @@ const Login = ({ navigation }) => {
     };
 
     return (
-        <View style={styles.container}>
-            <Image source={require('../assets/GlucoBites.png')} style={styles.logo} />
-            <Text style={styles.welcome}>Welcome to <Text style={styles.appName}>GlucoBites</Text></Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Email"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-            />
-            <TextInput
-                style={styles.input}
-                placeholder="Password"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-            />
-            {isLoading ? (
-                <ActivityIndicator size="large" color="#00AEEF" />
-            ) : (
-                <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-                    <Text style={styles.loginText}>Login</Text>
-                </TouchableOpacity>
-            )}
-            <Text style={styles.signupText}>
-                Don’t have an account?{' '}
-                <Text style={styles.signupLink} onPress={() => navigation.navigate('Signup')}>
-                    Sign up
+        <KeyboardAvoidingView
+            style={styles.keyboardAvoidingContainer}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+            <ScrollView
+                contentContainerStyle={styles.container}
+                keyboardShouldPersistTaps="handled"
+            >
+                <Image source={require('../assets/GlucoBites.png')} style={styles.logo} />
+                <Text style={styles.welcome}>Welcome to <Text style={styles.appName}>GlucoBites</Text></Text>
+                
+                <View style={styles.formContainer}>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Email"
+                        value={email}
+                        onChangeText={setEmail}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                    />
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Password"
+                        value={password}
+                        onChangeText={setPassword}
+                        secureTextEntry
+                    />
+                    {isLoading ? (
+                        <ActivityIndicator size="large" color="#00AEEF" style={{ marginVertical: 18 }} />
+                    ) : (
+                        <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
+                            <Text style={styles.loginText}>Login</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                <Text style={styles.signupText}>
+                    Don’t have an account?{' '}
+                    <Text style={styles.signupLink} onPress={() => navigation.navigate('Signup')}>
+                        Sign up
+                    </Text>
                 </Text>
-            </Text>
-        </View>
+            </ScrollView>
+        </KeyboardAvoidingView>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
+    keyboardAvoidingContainer: {
         flex: 1,
+    },
+    container: {
+        flexGrow: 1, 
         backgroundColor: '#F8F8F8',
         alignItems: 'center',
+        justifyContent: 'center', 
         padding: 20,
-        paddingTop: 80,
     },
     logo: {
-        width: 300,
-        height: 300,
+        width: 250, 
+        height: 250,
         resizeMode: 'contain',
-        marginTop: 20,
-    },
-    appTitle: {
-        fontSize: 20,
-        fontWeight: '600',
-        color: '#3B3B3B',
         marginBottom: 10,
     },
     welcome: {
-        fontSize: 16,
+        fontSize: 18,
         color: '#333',
         marginBottom: 20,
+        textAlign: 'center',
     },
     appName: {
         fontSize: 26,
         fontWeight: 'bold',
         color: '#000',
+    },
+    formContainer: {
+        width: '100%',
+        alignItems: 'center',
     },
     input: {
         width: '100%',
@@ -133,6 +151,7 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         borderRadius: 8,
         alignItems: 'center',
+        marginTop: 5, 
         marginBottom: 20,
     },
     loginText: {
@@ -146,7 +165,7 @@ const styles = StyleSheet.create({
     },
     signupLink: {
         color: '#007AFF',
-        textDecorationLine: 'underline',
+        fontWeight: 'bold' 
     },
 });
 

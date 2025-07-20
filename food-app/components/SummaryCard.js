@@ -22,7 +22,6 @@ const ProgressRing = ({ progress = 0, size = 140 }) => {
                         <Stop offset="1" stopColor="#3D88F8" stopOpacity="1" />
                     </LinearGradient>
                 </Defs>
-                {/* Background Track */}
                 <Circle
                     cx={size / 2}
                     cy={size / 2}
@@ -31,12 +30,11 @@ const ProgressRing = ({ progress = 0, size = 140 }) => {
                     strokeWidth={strokeWidth}
                     fill="none"
                 />
-                {/* Foreground Progress */}
                 <Circle
                     cx={size / 2}
                     cy={size / 2}
                     r={radius}
-                    stroke="url(#grad)" // Apply the gradient
+                    stroke="url(#grad)" 
                     strokeWidth={strokeWidth}
                     strokeDasharray={circumference}
                     strokeDashoffset={strokeDashoffset}
@@ -110,7 +108,6 @@ export default function SummaryCard() {
             
             <View style={styles.divider} />
 
-            {/* Bottom Details Section */}
             <View style={styles.detailsContainer}>
                 <View style={styles.detailItem}>
                     <View style={[styles.detailDot, { backgroundColor: '#4CAF50' }]} />
@@ -140,8 +137,8 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 12,
         elevation: 5,
-        height: '100%', // Crucial for matching parent slide height
-        justifyContent: 'flex-start', // To space out top, middle, and bottom
+        height: '100%',
+        justifyContent: 'flex-start', 
     },
     loadingContainer: {
         justifyContent: 'center',

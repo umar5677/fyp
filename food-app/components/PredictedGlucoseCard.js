@@ -102,8 +102,8 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 12,
         elevation: 5,
-        height: '100%', // Match parent container height
-        justifyContent: 'space-between', // Space top, middle, and bottom content
+        height: '100%',
+        justifyContent: 'space-between', 
     },
     title: {
         color: '#1E1E2D',
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 20, // Increased margin for better spacing
+        marginBottom: 20, 
     },
     trendText: {
         fontSize: 22,
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-around',
         alignItems: 'center',
-        paddingVertical: 15, // Increased padding
+        paddingVertical: 15, 
         backgroundColor: '#F8F9FA',
         borderRadius: 12,
     },

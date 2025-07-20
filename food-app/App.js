@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Text, StyleSheet } from 'react-native';
 import FlashMessage from "react-native-flash-message";
 import * as Notifications from 'expo-notifications';
+import { UserProvider, useUser } from './context/UserContext';
 
 // Font Imports
 import {
@@ -29,16 +30,17 @@ import AiFoodScanScreen from './screens/AiFoodScanScreen';
 import NotificationScreen from './screens/Notifications';
 import AlertsScreen from './screens/Alerts';
 import RemindersScreen from './screens/Reminders';
+import ProfileSetupScreen from './screens/ProfileSetup';
+import EditProfileScreen from './screens/EditProfile'; 
+import ChangePasswordScreen from './screens/ChangePassword';
 
 const Stack = createStackNavigator();
 
-// --- NOTIFICATION HANDLER CONFIGURATION ---
-// This tells the app how to behave when a notification is received while the app is in the foreground.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
-    shouldSetBadge: false, // You can set this to true if you manage badge counts
+    shouldSetBadge: false,
   }),
 });
 
@@ -54,19 +56,17 @@ export default function App() {
     Inter_700Bold,
   });
 
-  // --- GLOBAL FONT OVERRIDE LOGIC (SAFE VERSION) ---
+  //  GLOBAL FONT OVERRIDE LOGIC 
   if (fontsLoaded && !fontError && !fontOverrideApplied) {
     const oldRender = Text.render;
     Text.render = function (...args) {
       const origin = oldRender.call(this, ...args);
       const style = StyleSheet.flatten(origin.props.style);
 
-      // If a fontFamily is already set (e.g., for an icon font), do not override it.
       if (style && style.fontFamily) {
         return origin;
       }
 
-      // Apply our Inter font based on fontWeight.
       let fontFamily = 'Inter_400Regular'; // Default
       if (style?.fontWeight === '500') fontFamily = 'Inter_500Medium';
       if (style?.fontWeight === '600' || style?.fontWeight === 'semibold') fontFamily = 'Inter_600SemiBold';
@@ -79,7 +79,6 @@ export default function App() {
     fontOverrideApplied = true; // Set the flag to prevent re-applying
   }
 
-  // Optional: Listen for notification responses (e.g., when a user taps a notification)
   useEffect(() => {
     const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
       console.log('Notification tapped!', response.notification.request.content.data);
@@ -91,9 +90,8 @@ export default function App() {
     };
   }, []);
 
-  // Wait for fonts to load before rendering the app
   if (!fontsLoaded && !fontError) {
-    return null; // Or return a loading indicator
+    return null; 
   }
 
   return (
@@ -105,7 +103,16 @@ export default function App() {
           screenOptions={{ headerShown: false }}
         >
           <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
           <Stack.Screen name="MainApp" component={AppTabs} />
+          <Stack.Screen 
+          name="EditProfile" 
+          component={EditProfileScreen} 
+          options={{
+              headerShown: true,
+              headerTitle: 'Edit Profile',
+          }} 
+      />
           
           {/* Modal Screens */}
           <Stack.Screen name="LogBloodSugarModal" component={LogBloodSugarScreen} options={{ presentation: 'transparentModal' }} />
@@ -113,11 +120,11 @@ export default function App() {
           <Stack.Screen name="AiFoodScan" component={AiFoodScanScreen} options={{ presentation: 'modal' }} />
           <Stack.Screen name="Notifications" component={NotificationScreen} options={{ presentation: 'modal' }} />
           <Stack.Screen name="Alerts" component={AlertsScreen} options={{ presentation: 'modal' }} />
+          <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ headerShown: true, headerTitle: 'Change Password' }} />
           <Stack.Screen name="Reminders" component={RemindersScreen} options={{ presentation: 'modal' }} />
         </Stack.Navigator>
       </NavigationContainer>
       
-      {/* FlashMessage must be last and outside NavigationContainer */}
       <FlashMessage position="top" />
     </SafeAreaProvider>
   );

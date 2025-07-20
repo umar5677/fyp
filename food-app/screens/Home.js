@@ -87,7 +87,6 @@ export default function Home() {
                                 <Text style={styles.greetingText}>{getGreeting()}</Text>
                                 <Text style={styles.dateText}>Today, {todayString}</Text>
                             </View>
-                            {/* --- MODIFIED: This button now navigates to Notifications --- */}
                             <TouchableOpacity style={styles.notificationButton} onPress={() => navigation.navigate('Notifications')}>
                                 <Ionicons name="notifications-outline" size={26} color="#333" />
                                 {hasUnread && <View style={styles.notificationDot} />}

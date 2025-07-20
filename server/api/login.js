@@ -1,3 +1,4 @@
+// server/api/login.js
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -13,7 +14,8 @@ async function comparePassword(plainPassword, hashedPassword) {
 
 async function authenticateUser(email, password, dbPool) {
     try {
-        const [users] = await dbPool.query('SELECT userID, email, password, is_verified FROM users WHERE email = ?', [email]);
+        // Fetches hasProfileSetup along with other user data
+        const [users] = await dbPool.query('SELECT userID, email, password, is_verified, hasProfileSetup FROM users WHERE email = ?', [email]);
         
         if (users.length === 0) {
             return { success: false, code: 'INVALID_CREDENTIALS', message: 'User not found.' };
@@ -30,7 +32,8 @@ async function authenticateUser(email, password, dbPool) {
             return { success: false, code: 'EMAIL_NOT_VERIFIED', message: 'Please verify your email address before logging in.' };
         }
         
-        return { success: true, user: { userId: user.userID, email: user.email } };
+        // Returns the hasProfileSetup status
+        return { success: true, user: { userId: user.userID, email: user.email, hasProfileSetup: user.hasProfileSetup } };
 
     } catch (error) {
         console.error('Authentication service error (within login.js):', error);
@@ -69,6 +72,8 @@ function createLoginRouter(dbPool) {
                 userId: authResult.user.userId,
                 accessToken: accessToken,
                 refreshToken: refreshToken,
+                // Sends the hasProfileSetup flag to the mobile app
+                hasProfileSetup: authResult.user.hasProfileSetup, 
             });
 
         } catch (error) {
@@ -82,5 +87,6 @@ function createLoginRouter(dbPool) {
 
 module.exports = {
     createLoginRouter,
-    hashPassword
+    hashPassword,
+    comparePassword,
 };

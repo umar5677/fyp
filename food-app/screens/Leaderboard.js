@@ -164,9 +164,8 @@ const styles = StyleSheet.create({
         marginTop:8,
     },
     youRowFull: {
-        backgroundColor: '#f6fff6', // Same background color as before
+        backgroundColor: '#f6fff6', 
         borderRadius: 12,
-        //marginBottom: 8, // Keep consistent marginBottom
     },
     youText: {
         fontSize:20,

@@ -111,10 +111,8 @@ export default function MiniGlucoseChart() {
                 style={styles.chart}
                 formatXLabel={() => ''}
                 renderDotContent={({x, y, index}) => {
-                    // --- THE FIX: Only show labels for odd-indexed points ---
-                    // This naturally skips the first point (index 0) and alternates.
                     if (index % 2 === 0) {
-                        return null; // Don't render a label for this point
+                        return null; 
                     }
 
                     return (

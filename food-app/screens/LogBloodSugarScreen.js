@@ -339,7 +339,7 @@ export default function LogBloodSugarScreen({ navigation }) {
             showMessage({
                 message: `${status.level} Glucose Detected`,
                 description: `Your reading of ${amount} mg/dL is outside the normal range.`,
-                type: "danger", // Use 'danger' for red, 'warning' for orange
+                type: "danger", 
                 icon: "danger",
                 duration: 5000,
             });
@@ -367,7 +367,6 @@ export default function LogBloodSugarScreen({ navigation }) {
             const updateData = { amount, tag };
             if (logId) {
                 await api.updateLog(logId, updateData);
-                 // On update, just show a simple info message, don't trigger alerts.
                  showMessage({
                     message: "Log Updated",
                     description: `Reading changed to ${amount} mg/dL.`,
@@ -375,7 +374,6 @@ export default function LogBloodSugarScreen({ navigation }) {
                 });
             } else {
                 await api.addLog({ amount, type: 3, date: date.toISOString(), tag });
-                // Now we call createNotification which handles BOTH the pop-up and the persistent notification logic.
                 await createNotification(amount, tag);
             }
         } catch (e) {
