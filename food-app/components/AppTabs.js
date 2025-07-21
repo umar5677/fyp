@@ -1,9 +1,11 @@
-// components/AppTabs.js
+// fyp/food-app/components/AppTabs.js
+
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Platform, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext'; 
 
 import HomeStack from '../screens/HomeStack';
 import Community from '../screens/Community';
@@ -14,25 +16,27 @@ import SpeedDialButton from './SpeedDialButton';
 const Tab = createBottomTabNavigator();
 const DummyAddScreen = () => null;
 
-const ACTIVE_COLOR = '#0096FF';
-const INACTIVE_COLOR = '#8e8e93';
-
 const AppTabs = ({ navigation, route }) => {
   const userId = route.params?.userId;
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+
+  // Define active and inactive colors from our theme context
+  const ACTIVE_COLOR = colors.primary;
+  const INACTIVE_COLOR = colors.textSecondary;
 
   return (
     <Tab.Navigator
       screenOptions={{
         tabBarStyle: {
-          backgroundColor: Platform.OS === 'ios' ? '#F7F7F7' : '#FFFFFF',
+          backgroundColor: colors.card, 
           height: 45 + insets.bottom, 
           paddingBottom: insets.bottom,
           borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: '#D1D1D6',
+          borderTopColor: colors.border, 
         },
         tabBarActiveTintColor: ACTIVE_COLOR,
-        tabBarInactiveTintColor: INACTIVE_COLOR,
+        tabBarInactiveTintColor: INACTIVE_COLOR, 
         headerShown: false,
       }}
     >

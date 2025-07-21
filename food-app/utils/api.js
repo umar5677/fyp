@@ -109,6 +109,91 @@ export const api = {
         return response.json();
     },
 
+    getUserThresholds: async () => {
+        const response = await authenticatedFetch('/user-settings/thresholds');
+        if (!response.ok) throw new Error('Failed to fetch thresholds');
+        return response.json();
+    },
+
+    getProviders: async () => {
+        const response = await authenticatedFetch('/providers');
+        if (!response.ok) throw new Error('Failed to fetch healthcare providers');
+        return response.json();
+    },
+
+    saveUserThresholds: async (thresholds) => {
+        const response = await authenticatedFetch('/user-settings/thresholds', {
+            method: 'POST',
+            body: JSON.stringify(thresholds),
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to save thresholds.');
+        }
+        return response.json();
+    },
+
+    // User Settings - Provider
+    getPreferredProvider: async () => {
+        const response = await authenticatedFetch('/user-settings/provider');
+        if (!response.ok) throw new Error('Failed to fetch provider');
+        return response.json();
+    },
+    
+    savePreferredProvider: async (provider) => {
+        const payload = { providerUserID: provider.userID }; 
+
+        const response = await authenticatedFetch('/user-settings/provider', {
+            method: 'POST',
+            body: JSON.stringify(payload), 
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to save provider.');
+        }
+        return response.json();
+    },
+
+    getReportPreference: async () => {
+        const response = await authenticatedFetch('/user-settings/report-preference');
+        if (!response.ok) throw new Error('Failed to get preference');
+        return response.json();
+    },
+
+    saveReportPreference: async (frequency) => {
+        const response = await authenticatedFetch('/user-settings/report-preference', {
+            method: 'PUT',
+            body: JSON.stringify({ frequency }),
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to save preference.');
+        }
+        return response.json();
+    },
+
+    // Report Generation
+    generateReport: async (payload) => {
+        const response = await authenticatedFetch('/generate-report', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to generate report.');
+        }
+
+        // Handle both JSON (email) and PDF (export) responses
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/pdf')) {
+            return response; // Return the whole response for file handling
+        } else {
+            return response.json(); // Return JSON for email success message
+        }
+    },
+
     changePassword: async (passwordData) => {
         const response = await authenticatedFetch('/profile/change-password', {
             method: 'POST',
@@ -154,7 +239,14 @@ export const api = {
 
     getGlucosePrediction: async () => {
         const response = await authenticatedFetch('/predictions/glucose');
-        if (!response.ok) throw new Error(`Failed to fetch prediction`);
+        if (!response.ok) {
+            try {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to fetch prediction');
+            } catch (e) {
+                throw new Error(e.message || 'Failed to fetch prediction');
+            }
+        }
         return response.json();
     },
 

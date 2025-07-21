@@ -2,12 +2,12 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Svg, Circle, Defs, LinearGradient, Stop } from 'react-native-svg'; // Using SVG for a clean progress ring
+import { Svg, Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { api } from '../utils/api';
+import { useTheme } from '../context/ThemeContext';
 
 
-// This component creates the circular progress bar using SVG. It's more robust than the previous CSS-hack.
-const ProgressRing = ({ progress = 0, size = 140 }) => {
+const ProgressRing = ({ progress = 0, size = 140, colors }) => {
     const strokeWidth = 18;
     const radius = (size - strokeWidth) / 2;
     const circumference = radius * 2 * Math.PI;
@@ -26,7 +26,7 @@ const ProgressRing = ({ progress = 0, size = 140 }) => {
                     cx={size / 2}
                     cy={size / 2}
                     r={radius}
-                    stroke="#E9ECEF"
+                    stroke={colors.border}
                     strokeWidth={strokeWidth}
                     fill="none"
                 />
@@ -49,6 +49,8 @@ const ProgressRing = ({ progress = 0, size = 140 }) => {
 
 
 export default function SummaryCard() {
+    const { colors } = useTheme(); 
+    const styles = getStyles(colors);
     const [summary, setSummary] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -86,7 +88,7 @@ export default function SummaryCard() {
     if (isLoading || !summary) {
         return (
             <View style={[styles.card, styles.loadingContainer]}>
-                <ActivityIndicator size="large" color="#3D88F8" />
+                <ActivityIndicator size="large" color={colors.primary} />
             </View>
         );
     }
@@ -99,7 +101,7 @@ export default function SummaryCard() {
             <Text style={styles.title}>Calorie Summary</Text>
             
             <View style={styles.ringContainer}>
-                <ProgressRing progress={progress} />
+                <ProgressRing progress={progress} colors={colors} />
                 <View style={styles.centerTextView}>
                     <Text style={styles.mainValue}>{remaining.toLocaleString()}</Text>
                     <Text style={styles.unit}>Remaining</Text>
@@ -126,9 +128,9 @@ export default function SummaryCard() {
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
     card: {
-        backgroundColor: '#FFFFFF', 
+        backgroundColor: colors.card, 
         borderRadius: 16,
         paddingHorizontal: 20,
         paddingVertical: 15,
@@ -145,7 +147,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     title: {
-        color: '#1E1E2D',
+        color: colors.text,
         fontSize: 18,
         fontWeight: 'bold',
         textAlign: 'center',
@@ -163,18 +165,18 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     mainValue: {
-        color: '#1E1E2D',
+        color: colors.text,
         fontSize: 32,
         fontWeight: 'bold',
     },
     unit: {
-        color: '#6c757d',
+        color: colors.textSecondary,
         fontSize: 14,
         fontWeight: '500',
     },
     divider: {
         height: 1,
-        backgroundColor: '#F0F0F0',
+        backgroundColor: colors.border,
         width: '100%',
         alignSelf: 'center',
         marginTop: 10,
@@ -194,7 +196,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     detailText: {
-        color: '#333',
+        color: colors.text,
         fontSize: 13,
         fontWeight: '500',
     },

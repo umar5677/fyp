@@ -1,4 +1,3 @@
-// screens/FullGlucoseChart.js
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ActivityIndicator, FlatList } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
@@ -8,10 +7,10 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../utils/api';
+import { useTheme } from '../context/ThemeContext';
 
 const screenWidth = Dimensions.get('window').width;
 const CHART_BLUE = '#3D88F8';
-const CHART_BACKGROUND = '#FFFFFF';
 
 const getBloodSugarStatus = (amount, thresholds) => {
     const numAmount = parseFloat(amount);
@@ -27,8 +26,49 @@ const getWeekOfMonth = (date) => {
   return Math.ceil((date.getDate() + firstDay) / 7);
 };
 
+const getStyles = (colors) => StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: colors.background },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.card },
+    backButton: { padding: 5 },
+    title: { color: colors.text, fontSize: 20, fontWeight: 'bold' },
+    controlsContainer: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 10, backgroundColor: colors.card },
+    dateNavigator: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+    arrowButton: { padding: 5 },
+    dateText: { fontSize: 18, fontWeight: '600', color: colors.text },
+    rangeSelector: { flexDirection: 'row', backgroundColor: colors.background, borderRadius: 10, overflow: 'hidden' },
+    rangeButton: { flex: 1, paddingVertical: 12, alignItems: 'center' },
+    rangeButtonActive: { backgroundColor: CHART_BLUE, borderRadius: 8, margin: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 3 },
+    rangeButtonText: { color: colors.text, fontSize: 14, fontWeight: '600' },
+    rangeButtonTextActive: { color: '#FFF' },
+    container: { paddingBottom: 40 },
+    statsCard: { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: colors.card, borderRadius: 16, paddingVertical: 20, margin: 16, marginTop: 16, marginBottom: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 5 },
+    statItem: { alignItems: 'center' },
+    statValue: { fontSize: 22, fontWeight: 'bold', color: colors.text, marginBottom: 4 },
+    statLabel: { fontSize: 14, color: colors.textSecondary, fontWeight: '500' },
+    divider: { width: 1, backgroundColor: colors.border },
+    chart: { 
+        borderRadius: 16, 
+        marginTop: 10,
+        paddingRight: 35, 
+        paddingLeft: 10,
+    },
+    placeholderContainer: { marginHorizontal:16, height: 220, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background, borderRadius: 12, marginTop: 10, paddingHorizontal: 20 },
+    placeholderText: { fontSize: 16, fontWeight: '600', color: colors.textSecondary, textAlign: 'center', marginTop: 12 },
+    placeholderSubText: { fontSize: 14, color: colors.textSecondary, marginTop: 4, textAlign: 'center' },
+    listHeader: { fontSize: 18, fontWeight: 'bold', color: colors.text, marginTop: 24, marginBottom: 8, paddingHorizontal: 16 },
+    readingRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.border, marginBottom: 10, marginHorizontal: 16 },
+    statusDot: { width: 10, height: 10, borderRadius: 5, marginRight: 12 },
+    readingInfo: { flex: 1 },
+    timeLabel: { color: colors.text, fontSize: 14, fontWeight: '500' },
+    statusLabel: { fontSize: 12, fontWeight: 'bold', marginTop: 2 },
+    glucoseValue: { color: colors.text, fontWeight: 'bold', fontSize: 16 },
+});
+
 export default function FullGlucoseChart() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const navigation = useNavigation();
+  
   const [period, setPeriod] = useState('day');
   const [displayDate, setDisplayDate] = useState(new Date());
   const [chartData, setChartData] = useState(null);
@@ -37,12 +77,8 @@ export default function FullGlucoseChart() {
   const [average, setAverage] = useState(0);
   const [high, setHigh] = useState(0);
   const [low, setLow] = useState(0);
-  
   const [thresholds, setThresholds] = useState({
-    lowThreshold: 70,
-    highFastingThreshold: 100,
-    highPostMealThreshold: 140,
-    veryHighThreshold: 180,
+    lowThreshold: 70, highFastingThreshold: 100, highPostMealThreshold: 140, veryHighThreshold: 180,
   });
 
   useFocusEffect(
@@ -55,14 +91,10 @@ export default function FullGlucoseChart() {
                     AsyncStorage.multiGet(thresholdKeys),
                     api.getHistory([3], period, displayDate.toISOString())
                 ]);
-
                 const loadedThresholds = { ...thresholds };
-                storedThresholds.forEach(([key, value]) => {
-                    if (value !== null) loadedThresholds[key] = parseFloat(value);
-                });
+                storedThresholds.forEach(([key, value]) => { if (value !== null) loadedThresholds[key] = parseFloat(value); });
                 setThresholds(loadedThresholds);
                 processData(logs, period);
-
             } catch (error) {
                 console.error("Error fetching glucose data/thresholds:", error);
                 setChartData(null); setReadings([]); setAverage(0); setHigh(0); setLow(0);
@@ -70,15 +102,14 @@ export default function FullGlucoseChart() {
                 setIsLoading(false);
             }
         };
-
         loadDataAndThresholds();
     }, [period, displayDate])
   );
 
   const processData = useCallback((logs, currentPeriod) => {
+    // This function's logic remains entirely the same.
     const allReadings = logs ? [...logs].reverse() : [];
     setReadings(allReadings);
-    
     if (allReadings.length > 0) {
         const amounts = allReadings.map(log => Number(log.amount) || 0);
         const sum = amounts.reduce((a, b) => a + b, 0);
@@ -88,15 +119,10 @@ export default function FullGlucoseChart() {
     } else {
         setAverage(0); setHigh(0); setLow(0);
     }
-
     if (!logs || logs.length === 0) {
-      setChartData(null);
-      return;
+      setChartData(null); return;
     }
-  
-    let labels = [];
-    let dataPoints = [];
-  
+    let labels = []; let dataPoints = [];
     if (currentPeriod === 'day') {
       labels = allReadings.map(log => new Date(log.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }));
       dataPoints = allReadings.map(log => Number(log.amount) || 0);
@@ -124,15 +150,12 @@ export default function FullGlucoseChart() {
         labels = sortedWeeks;
         dataPoints = sortedWeeks.map(week => Math.round(weeklyAverages[week].total / weeklyAverages[week].count));
     }
-  
-    if (dataPoints.length < 2) {
-      setChartData(null); 
-    } else {
-      setChartData({ labels, datasets: [{ data: dataPoints, strokeWidth: 2 }] });
-    }
+    if (dataPoints.length < 2) { setChartData(null); } 
+    else { setChartData({ labels, datasets: [{ data: dataPoints, strokeWidth: 2 }] }); }
   }, []);
 
   const changeDate = (amount) => {
+    // This function's logic remains entirely the same.
     const newDate = new Date(displayDate);
     if (period === 'day') newDate.setDate(newDate.getDate() + amount);
     else if (period === 'week') newDate.setDate(newDate.getDate() + (amount * 7));
@@ -141,6 +164,7 @@ export default function FullGlucoseChart() {
   };
 
   const formatDate = () => {
+    // This function's logic remains entirely the same.
     if (period === 'day') return displayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     if (period === 'week') {
         const start = new Date(displayDate); start.setDate(displayDate.getDate() - displayDate.getDay());
@@ -151,9 +175,7 @@ export default function FullGlucoseChart() {
   };
 
   const renderChart = () => {
-    if (isLoading) {
-      return <ActivityIndicator size="large" color={CHART_BLUE} style={styles.placeholderContainer} />;
-    }
+    if (isLoading) return <ActivityIndicator size="large" color={colors.primary} style={styles.placeholderContainer} />;
     if (!chartData) {
       return (
         <View style={styles.placeholderContainer}>
@@ -168,23 +190,20 @@ export default function FullGlucoseChart() {
         data={{ labels: [], datasets: chartData.datasets }}
         width={screenWidth} 
         height={220}
-        withVerticalLabels={false}
-        withShadow={false}
-        fromZero
-        bezier
+        withVerticalLabels={false} withShadow={false} fromZero bezier
         chartConfig={{
-            backgroundColor: CHART_BACKGROUND,
-            backgroundGradientFrom: CHART_BACKGROUND,
-            backgroundGradientTo: CHART_BACKGROUND,
+            backgroundColor: colors.card,
+            backgroundGradientFrom: colors.card,
+            backgroundGradientTo: colors.card,
             decimalPlaces: 0,
             color: (opacity = 1) => `rgba(61, 136, 248, ${opacity})`,
-            labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+            labelColor: (opacity = 1) => colors.textSecondary,
             style: { borderRadius: 16 },
             propsForDots: { r: '4', strokeWidth: '2', stroke: CHART_BLUE },
-            propsForBackgroundLines: { strokeDasharray: '4', stroke: '#E5E7EB' },
+            propsForBackgroundLines: { strokeDasharray: '4', stroke: colors.border },
             fillShadowGradientFrom: CHART_BLUE,
             fillShadowGradientFromOpacity: 0.1,
-            fillShadowGradientTo: CHART_BACKGROUND,
+            fillShadowGradientTo: colors.card,
             fillShadowGradientToOpacity: 0,
         }}
         style={styles.chart} 
@@ -192,20 +211,12 @@ export default function FullGlucoseChart() {
             const labelCount = chartData.labels.length;
             const showLabelModulo = labelCount > 6 ? Math.ceil(labelCount / 6) : 1;
             if (index % showLabelModulo !== 0) return null;
-
             const isFirstLabel = index === 0;
-
             return (
-                <Text
-                    key={index}
-                    style={{
-                        position: 'absolute',
-                        top: y + 15,
-                        left: isFirstLabel ? x : x - 20,
-                        textAlign: isFirstLabel ? 'left' : 'center',
-                        color: '#6B7280', fontSize: 10, width: 40,
-                    }}
-                >
+                <Text key={index} style={{
+                    position: 'absolute', top: y + 15, left: isFirstLabel ? x : x - 20,
+                    textAlign: isFirstLabel ? 'left' : 'center', color: colors.textSecondary, fontSize: 10, width: 40,
+                }}>
                     {chartData.labels[index]}
                 </Text>
             );
@@ -258,16 +269,20 @@ export default function FullGlucoseChart() {
     <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                <Ionicons name="chevron-back" size={28} color="#333" />
+                <Ionicons name="chevron-back" size={28} color={colors.text} />
             </TouchableOpacity>
             <Text style={styles.title}>Glucose Insights</Text>
             <View style={{width: 40}} />
         </View>
         <View style={styles.controlsContainer}>
             <View style={styles.dateNavigator}>
-                <TouchableOpacity onPress={() => changeDate(-1)} style={styles.arrowButton}><Ionicons name="chevron-back-circle-outline" size={30} color="#555" /></TouchableOpacity>
+                <TouchableOpacity onPress={() => changeDate(-1)} style={styles.arrowButton}>
+                    <Ionicons name="chevron-back-circle-outline" size={30} color={colors.icon} />
+                </TouchableOpacity>
                 <Text style={styles.dateText}>{formatDate()}</Text>
-                <TouchableOpacity onPress={() => changeDate(1)} style={styles.arrowButton}><Ionicons name="chevron-forward-circle-outline" size={30} color="#555" /></TouchableOpacity>
+                <TouchableOpacity onPress={() => changeDate(1)} style={styles.arrowButton}>
+                    <Ionicons name="chevron-forward-circle-outline" size={30} color={colors.icon} />
+                </TouchableOpacity>
             </View>
             <View style={styles.rangeSelector}>
               {['day', 'week', 'month'].map((option) => (
@@ -288,41 +303,3 @@ export default function FullGlucoseChart() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-    safeArea: { flex: 1, backgroundColor: '#fdfdff' },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
-    backButton: { padding: 5 },
-    title: { color: '#1E1E2D', fontSize: 20, fontWeight: 'bold' },
-    controlsContainer: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 10, backgroundColor: 'white' },
-    dateNavigator: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-    arrowButton: { padding: 5 },
-    dateText: { fontSize: 18, fontWeight: '600', color: '#333' },
-    rangeSelector: { flexDirection: 'row', backgroundColor: '#E9ECEF', borderRadius: 10, overflow: 'hidden' },
-    rangeButton: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-    rangeButtonActive: { backgroundColor: CHART_BLUE, borderRadius: 8, margin: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 3 },
-    rangeButtonText: { color: '#1E1E2D', fontSize: 14, fontWeight: '600' },
-    rangeButtonTextActive: { color: '#FFF' },
-    container: { paddingBottom: 40 },
-    statsCard: { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: 'white', borderRadius: 16, paddingVertical: 20, margin: 16, marginTop: 16, marginBottom: 16, shadowColor: "#999", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 5 },
-    statItem: { alignItems: 'center' },
-    statValue: { fontSize: 22, fontWeight: 'bold', color: '#1E1E2D', marginBottom: 4 },
-    statLabel: { fontSize: 14, color: '#6C757D', fontWeight: '500' },
-    divider: { width: 1, backgroundColor: '#F0F0F0' },
-    chart: { 
-        borderRadius: 16, 
-        marginTop: 10,
-        paddingRight: 35, 
-        paddingLeft: 10,
-    },
-    placeholderContainer: { marginHorizontal:16, height: 220, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F7F7F7', borderRadius: 12, marginTop: 10, paddingHorizontal: 20 },
-    placeholderText: { fontSize: 16, fontWeight: '600', color: '#555', textAlign: 'center', marginTop: 12 },
-    placeholderSubText: { fontSize: 14, color: '#777', marginTop: 4, textAlign: 'center' },
-    listHeader: { fontSize: 18, fontWeight: 'bold', color: '#1E1E2D', marginTop: 24, marginBottom: 8, paddingHorizontal: 16 },
-    readingRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#F0F0F0', marginBottom: 10, marginHorizontal: 16 },
-    statusDot: { width: 10, height: 10, borderRadius: 5, marginRight: 12 },
-    readingInfo: { flex: 1 },
-    timeLabel: { color: '#333', fontSize: 14, fontWeight: '500' },
-    statusLabel: { fontSize: 12, fontWeight: 'bold', marginTop: 2 },
-    glucoseValue: { color: '#1E1E2D', fontWeight: 'bold', fontSize: 16 },
-});

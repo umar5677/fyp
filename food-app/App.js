@@ -11,6 +11,7 @@ import { Text, StyleSheet } from 'react-native';
 import FlashMessage from "react-native-flash-message";
 import * as Notifications from 'expo-notifications';
 import { UserProvider, useUser } from './context/UserContext';
+import { ThemeProvider } from './context/ThemeContext';
 
 // Font Imports
 import {
@@ -95,13 +96,14 @@ export default function App() {
   }
 
   return (
+    <ThemeProvider>
     <SafeAreaProvider>
-      <NavigationContainer>
-        <Stack.Navigator
-          initialRouteName="Login"
-          id="RootStack"
-          screenOptions={{ headerShown: false }}
-        >
+        <NavigationContainer>
+          <Stack.Navigator
+            initialRouteName="Login"
+            id="RootStack"
+            screenOptions={{ headerShown: false }}
+          >
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
           <Stack.Screen name="MainApp" component={AppTabs} />
@@ -127,5 +129,6 @@ export default function App() {
       
       <FlashMessage position="top" />
     </SafeAreaProvider>
+    </ThemeProvider>
   );
 }

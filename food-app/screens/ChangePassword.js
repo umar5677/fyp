@@ -1,17 +1,66 @@
-// screens/ChangePassword.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, Alert, StyleSheet,
-  TouchableOpacity, ActivityIndicator, Platform
+  TouchableOpacity, ActivityIndicator, Platform, KeyboardAvoidingView
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native';
 import { api } from '../utils/api';
+import { useTheme } from '../context/ThemeContext';
+
+const getStyles = (colors) => StyleSheet.create({
+    container: {
+        flex: 1,
+        padding: 20,
+        backgroundColor: colors.background,
+    },
+    label: {
+      fontSize: 14,
+      fontWeight: '500',
+      color: colors.textSecondary,
+      marginBottom: 8,
+      marginLeft: 4,
+    },
+    input: {
+      backgroundColor: colors.card,
+      paddingHorizontal: 15,
+      paddingVertical: Platform.OS === 'ios' ? 16 : 14,
+      borderRadius: 12,
+      fontSize: 16,
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+      color: colors.text,
+    },
+    button: {
+      marginTop: 30,
+      backgroundColor: colors.primary,
+      paddingVertical: 16,
+      borderRadius: 12,
+      alignItems: 'center',
+    },
+    buttonText: {
+      color: '#fff',
+      fontWeight: 'bold',
+      fontSize: 16,
+    },
+});
 
 export default function ChangePasswordScreen({ navigation }) {
+    const { colors } = useTheme();
+    const styles = getStyles(colors);
+
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+      // Update navigation header style based on theme
+      navigation.setOptions({
+          headerStyle: { backgroundColor: colors.card },
+          headerTintColor: colors.text,
+          headerTitleStyle: { color: colors.text },
+      });
+    }, [colors, navigation]);
 
     const handlePasswordChange = async () => {
         if (!currentPassword || !newPassword || !confirmPassword) {
@@ -59,6 +108,7 @@ export default function ChangePasswordScreen({ navigation }) {
                 value={currentPassword}
                 onChangeText={setCurrentPassword}
                 placeholder="Enter your current password"
+                placeholderTextColor={colors.textSecondary}
             />
             
             <Text style={styles.label}>New Password</Text>
@@ -68,6 +118,7 @@ export default function ChangePasswordScreen({ navigation }) {
                 value={newPassword}
                 onChangeText={setNewPassword}
                 placeholder="Must be at least 8 characters"
+                placeholderTextColor={colors.textSecondary}
             />
             
             <Text style={styles.label}>Confirm New Password</Text>
@@ -77,10 +128,11 @@ export default function ChangePasswordScreen({ navigation }) {
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 placeholder="Confirm your new password"
+                placeholderTextColor={colors.textSecondary}
             />
 
             {loading ? (
-                <ActivityIndicator size="large" color="#007AFF" style={{marginTop: 30}} />
+                <ActivityIndicator size="large" color={colors.primary} style={{marginTop: 30}} />
             ) : (
                 <TouchableOpacity onPress={handlePasswordChange} style={styles.button}>
                     <Text style={styles.buttonText}>Change Password</Text>
@@ -89,41 +141,3 @@ export default function ChangePasswordScreen({ navigation }) {
         </KeyboardAvoidingView>
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        padding: 20,
-        backgroundColor: '#F9FAFB',
-    },
-    label: {
-      fontSize: 14,
-      fontWeight: '500',
-      color: '#374151',
-      marginBottom: 8,
-      marginLeft: 4,
-    },
-    input: {
-      backgroundColor: '#FFFFFF',
-      paddingHorizontal: 15,
-      paddingVertical: Platform.OS === 'ios' ? 16 : 14,
-      borderRadius: 12,
-      fontSize: 16,
-      marginBottom: 20,
-      borderWidth: 1,
-      borderColor: '#E5E7EB',
-      color: '#111827',
-    },
-    button: {
-      marginTop: 30,
-      backgroundColor: '#007AFF',
-      paddingVertical: 16,
-      borderRadius: 12,
-      alignItems: 'center',
-    },
-    buttonText: {
-      color: '#fff',
-      fontWeight: 'bold',
-      fontSize: 16,
-    },
-});

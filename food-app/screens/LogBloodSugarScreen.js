@@ -1,9 +1,8 @@
-// screens/LogBloodSugarScreen.js
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View, Text, TextInput, StyleSheet, Alert,
     TouchableOpacity, ActivityIndicator, Modal, FlatList,
-    KeyboardAvoidingView, Platform, SafeAreaView, useColorScheme
+    KeyboardAvoidingView, Platform, SafeAreaView
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -16,53 +15,101 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { showMessage } from "react-native-flash-message";
 
 import { api } from '../utils/api';
+import { useTheme } from '../context/ThemeContext';
 
 const TAG_OPTIONS = ['Fasting', 'Pre-Meal', 'Post-Meal'];
 const THRESHOLD_KEYS = ['lowThreshold', 'highFastingThreshold', 'highPostMealThreshold', 'veryHighThreshold'];
 
 const STATUS_COLORS = {
-    normal: '#4CAF50',
-    high: '#FF9800',
-    veryHigh: '#F44336',
-    low: '#2196F3',
-    default: '#6C757D',
+    normal: '#4CAF50', high: '#FF9800', veryHigh: '#F44336', low: '#2196F3', default: '#6C757D',
 };
 
 const getBloodSugarStatus = (amount, tag, thresholds) => {
     const numAmount = parseFloat(amount);
-    if (isNaN(numAmount)) {
-        return { level: 'N/A', color: STATUS_COLORS.default, isAlert: false };
-    }
-
-    if (numAmount >= thresholds.veryHighThreshold) {
-        return { level: 'Very High', color: STATUS_COLORS.veryHigh, isAlert: true };
-    }
-    if (numAmount < thresholds.lowThreshold) {
-        return { level: 'Low', color: STATUS_COLORS.low, isAlert: true };
-    }
-    
+    if (isNaN(numAmount)) return { level: 'N/A', color: STATUS_COLORS.default, isAlert: false };
+    if (numAmount >= thresholds.veryHighThreshold) return { level: 'Very High', color: STATUS_COLORS.veryHigh, isAlert: true };
+    if (numAmount < thresholds.lowThreshold) return { level: 'Low', color: STATUS_COLORS.low, isAlert: true };
     const isFastingContext = tag === 'Fasting' || tag === 'Pre-Meal';
-
     if (isFastingContext) {
-        if (numAmount >= thresholds.highFastingThreshold) {
-            return { level: 'High', color: STATUS_COLORS.high, isAlert: true };
-        }
-        if (numAmount >= thresholds.lowThreshold) {
-             return { level: 'Normal', color: STATUS_COLORS.normal, isAlert: false };
-        }
+        if (numAmount >= thresholds.highFastingThreshold) return { level: 'High', color: STATUS_COLORS.high, isAlert: true };
+        if (numAmount >= thresholds.lowThreshold) return { level: 'Normal', color: STATUS_COLORS.normal, isAlert: false };
     } else if (tag === 'Post-Meal') {
-        if (numAmount >= thresholds.highPostMealThreshold) {
-            return { level: 'High', color: STATUS_COLORS.high, isAlert: true };
-        }
-        if (numAmount >= thresholds.lowThreshold) {
-            return { level: 'Normal', color: STATUS_COLORS.normal, isAlert: false };
-        }
+        if (numAmount >= thresholds.highPostMealThreshold) return { level: 'High', color: STATUS_COLORS.high, isAlert: true };
+        if (numAmount >= thresholds.lowThreshold) return { level: 'Normal', color: STATUS_COLORS.normal, isAlert: false };
     }
-    
     return { level: 'Check Tag', color: STATUS_COLORS.default, isAlert: false };
 };
 
-const LogItem = ({ item, onPress, index, thresholds }) => {
+const getStyles = (colors) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    header: { 
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', 
+        paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 20 : 10, paddingBottom: 5,
+    },
+    headerTitle: { fontSize: 32, fontWeight: 'bold', color: colors.text },
+    doneButton: { padding: 5 },
+    lastReadingCard: { 
+        backgroundColor: colors.card, paddingVertical: 15, paddingHorizontal: 20,
+        borderRadius: 16, marginHorizontal: 16, marginVertical: 8,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, 
+        shadowRadius: 5, elevation: 3, alignItems: 'center'
+    },
+    cardTitle: { fontSize: 16, fontWeight: '600', color: colors.textSecondary },
+    lastReadingTag: { textTransform: 'uppercase', fontSize: 13, fontWeight: 'bold', marginBottom: 4 },
+    lastReadingValue: { fontSize: 42, fontWeight: 'bold', color: colors.text },
+    lastReadingUnit: { fontSize: 22, fontWeight: '500', color: colors.textSecondary },
+    lastReadingStatusContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
+    lastReadingDate: { marginTop: 10, fontSize: 14, color: colors.textSecondary, alignItems: 'center' },
+    listTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text, marginHorizontal: 16, marginTop: 12, marginBottom: 6 },
+    controlsContainer: { paddingHorizontal: 16, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
+    segmentedControlContainer: { flexDirection: 'row', backgroundColor: colors.background, borderRadius: 10, overflow: 'hidden', marginTop: 12 },
+    segment: { flex: 1, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
+    segmentActive: { backgroundColor: colors.card, borderRadius: 8, margin: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 3 },
+    segmentText: { fontWeight: '600', color: colors.textSecondary, fontSize: 14 },
+    segmentTextActive: { color: '#42A5F5', fontWeight: 'bold' },
+    dateNavigatorContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 5, marginBottom: 8 },
+    arrowButton: { padding: 8 },
+    dateNavigatorText: { fontSize: 20, fontWeight: 'bold', color: colors.text },
+    dateHeaderText: { fontSize: 15, fontWeight: 'bold', color: colors.text, marginHorizontal: 16, marginTop: 16, marginBottom: 4 },
+    emptyContainer: { alignItems: 'center', marginTop: 60, paddingHorizontal: 40 },
+    emptyText: { fontSize: 20, fontWeight: '600', color: '#ADB5BD', marginTop: 16 },
+    emptySubtext: { fontSize: 15, color: '#CED4DA', marginTop: 8, textAlign: 'center' },
+    fabContainer: { position: 'absolute', bottom: 35, right: 25 },
+    fab: { backgroundColor: '#42A5F5', width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#42A5F5', shadowRadius: 8, shadowOpacity: 0.4, shadowOffset: { height: 4, width: 0 } },
+    logItemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16, marginVertical: 6, marginHorizontal: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 3 },
+    logItemIconContainer: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+    logItemDataContainer: { flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+    logItemValueText: { fontSize: 22, fontWeight: 'bold', color: colors.text },
+    logItemUnitText: { fontSize: 14, color: colors.textSecondary },
+    tagBadge: { backgroundColor: '#E3F2FD', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+    tagBadgeText: { color: '#1E88E5', fontWeight: '600', fontSize: 12 },
+    logItemTimeText: { fontSize: 14, color: colors.textSecondary, fontWeight: '500' },
+    statusContainer: { flexDirection: 'row', alignItems: 'center', width: '100%', marginTop: 4 },
+    statusDot: { width: 10, height: 10, borderRadius: 5, marginRight: 6 },
+    statusText: { fontSize: 14, fontWeight: '500' },
+    calendarBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+    calendarModalContainer: { position: 'absolute', top: '25%', left: '5%', right: '5%', borderRadius: 16, elevation: 10, overflow: 'hidden'},
+    modalOverlay: { flex: 1, justifyContent: 'flex-end' },
+    modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+    modalContent: { backgroundColor: colors.background, paddingHorizontal: 20, paddingTop: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+    modalTitle: { fontSize: 16, fontWeight: '600', color: colors.textSecondary, textAlign: 'center', marginBottom: 15 },
+    tagSelectorContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
+    tagOption: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: colors.border, marginHorizontal: 4, alignItems: 'center' },
+    tagOptionSelected: { backgroundColor: '#42A5F5' },
+    tagOptionText: { color: colors.text, fontWeight: '600' },
+    tagOptionTextSelected: { color: 'white' },
+    modalInput: { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 12, padding: 15, fontSize: 36, fontWeight: 'bold', textAlign: 'center', marginBottom: 20, color: colors.text },
+    datePickerButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, backgroundColor: colors.card, borderRadius: 12, marginBottom: 20, borderWidth: 1, borderColor: colors.border },
+    datePickerText: { marginLeft: 12, fontSize: 17, fontWeight: '600', color: '#42A5F5' },
+    scanButtonsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 25 },
+    scanButton: { flex: 1, flexDirection: 'row', backgroundColor: '#42A5F5', paddingVertical: 14, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginHorizontal: 5 },
+    scanButtonText: { color: '#fff', marginLeft: 8, fontWeight: '600', fontSize: 16 },
+    modalActions: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', marginTop: 10 },
+    modalButtonText: { color: '#42A5F5', fontSize: 17, padding: 10, fontWeight: '500' },
+});
+
+const LogItem = ({ item, onPress, index, thresholds, colors }) => {
+  const styles = getStyles(colors);
   const date = new Date(item.date);
   const formattedTime = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   const status = getBloodSugarStatus(item.amount, item.tag, thresholds);
@@ -88,28 +135,31 @@ const LogItem = ({ item, onPress, index, thresholds }) => {
   );
 };
 
-const TagSelector = ({ selectedTag, onSelectTag }) => (
-    <View style={styles.tagSelectorContainer}>
-        {TAG_OPTIONS.map(tag => (
-            <TouchableOpacity 
-                key={tag}
-                style={[styles.tagOption, selectedTag === tag && styles.tagOptionSelected]}
-                onPress={() => onSelectTag(tag)}
-            >
-                <Text style={[styles.tagOptionText, selectedTag === tag && styles.tagOptionTextSelected]}>{tag}</Text>
-            </TouchableOpacity>
-        ))}
-    </View>
-);
+const TagSelector = ({ selectedTag, onSelectTag, colors }) => {
+    const styles = getStyles(colors);
+    return (
+        <View style={styles.tagSelectorContainer}>
+            {TAG_OPTIONS.map(tag => (
+                <TouchableOpacity 
+                    key={tag}
+                    style={[styles.tagOption, selectedTag === tag && styles.tagOptionSelected]}
+                    onPress={() => onSelectTag(tag)}
+                >
+                    <Text style={[styles.tagOptionText, selectedTag === tag && styles.tagOptionTextSelected]}>{tag}</Text>
+                </TouchableOpacity>
+            ))}
+        </View>
+    );
+};
 
-const EditLogModal = ({ modalVisible, setModalVisible, log, onSave, onDelete, onScan, inputValue, setInputValue }) => {
+const EditLogModal = ({ modalVisible, setModalVisible, log, onSave, onDelete, onScan, inputValue, setInputValue, colors }) => {
+    const { theme } = useTheme();
+    const styles = getStyles(colors);
     const [isSaving, setIsSaving] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
     const [logDate, setLogDate] = useState(new Date());
     const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
     const [tag, setTag] = useState(null);
-    
-    const colorScheme = useColorScheme();
     const today = new Date();
 
     useEffect(() => {
@@ -163,13 +213,19 @@ const EditLogModal = ({ modalVisible, setModalVisible, log, onSave, onDelete, on
                         <Ionicons name="calendar-outline" size={22} color="#42A5F5" />
                         <Text style={styles.datePickerText}>{logDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</Text>
                     </TouchableOpacity>
-                    <DateTimePickerModal isVisible={isDatePickerVisible} mode="datetime" date={logDate} onConfirm={(d) => { setDatePickerVisibility(false); setLogDate(d); }} onCancel={() => setDatePickerVisibility(false)} display={Platform.OS === 'ios' ? 'inline' : 'default'} isDarkModeEnabled={colorScheme === 'light'} maximumDate={today} />
+                    <DateTimePickerModal 
+                        isVisible={isDatePickerVisible} mode="datetime" date={logDate}
+                        onConfirm={(d) => { setDatePickerVisibility(false); setLogDate(d); }} 
+                        onCancel={() => setDatePickerVisibility(false)}
+                        display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                        isDarkModeEnabled={theme === 'dark'} maximumDate={today} 
+                    />
                     
-                    <TagSelector selectedTag={tag} onSelectTag={setTag} />
+                    <TagSelector selectedTag={tag} onSelectTag={setTag} colors={colors} />
                     
-                    <TextInput style={styles.modalInput} value={inputValue} onChangeText={setInputValue} keyboardType="decimal-pad" placeholder="0" placeholderTextColor="#999" autoFocus={!log.logID} />
+                    <TextInput style={styles.modalInput} value={inputValue} onChangeText={setInputValue} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.textSecondary} autoFocus={!log.logID} />
                     
-                    {isScanning ? <ActivityIndicator /> : (
+                    {isScanning ? <ActivityIndicator color={colors.primary} /> : (
                         <View style={styles.scanButtonsContainer}>
                             <TouchableOpacity style={styles.scanButton} onPress={() => handlePickImage('camera')}><Ionicons name="camera-outline" size={20} color="#fff" /><Text style={styles.scanButtonText}>Scan</Text></TouchableOpacity>
                             <TouchableOpacity style={styles.scanButton} onPress={() => handlePickImage('gallery')}><Ionicons name="image-outline" size={20} color="#fff" /><Text style={styles.scanButtonText}>Upload</Text></TouchableOpacity>
@@ -186,7 +242,8 @@ const EditLogModal = ({ modalVisible, setModalVisible, log, onSave, onDelete, on
     );
 };
 
-const SegmentedControl = ({ options, selectedOption, onSelect }) => {
+const SegmentedControl = ({ options, selectedOption, onSelect, colors }) => {
+    const styles = getStyles(colors);
     return (
         <View style={styles.segmentedControlContainer}>
             {options.map(option => (
@@ -200,7 +257,8 @@ const SegmentedControl = ({ options, selectedOption, onSelect }) => {
     );
 };
 
-const DateNavigator = ({ date, onDateChange, period, onOpenCalendar }) => {
+const DateNavigator = ({ date, onDateChange, period, onOpenCalendar, colors }) => {
+    const styles = getStyles(colors);
     const changeDate = (amount) => {
         const newDate = new Date(date);
         if (period === 'day') newDate.setDate(newDate.getDate() + amount);
@@ -210,41 +268,50 @@ const DateNavigator = ({ date, onDateChange, period, onOpenCalendar }) => {
     };
 
     const formatDate = () => {
-        if (period === 'day') {
-            return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-        }
+        if (period === 'day') return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
         if (period === 'week') {
             const start = new Date(date); start.setDate(date.getDate() - date.getDay());
             const end = new Date(start); end.setDate(start.getDate() + 6);
             return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
         }
-        if (period === 'month') {
-            return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-        }
+        if (period === 'month') return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
         return '';
     };
 
     return (
         <View style={styles.dateNavigatorContainer}>
             <TouchableOpacity onPress={() => changeDate(-1)} style={styles.arrowButton}>
-                <Ionicons name="chevron-back" size={24} color="#333" />
+                <Ionicons name="chevron-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <TouchableOpacity onPress={onOpenCalendar}>
                 <Text style={styles.dateNavigatorText}>{formatDate()}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => changeDate(1)} style={styles.arrowButton}>
-                <Ionicons name="chevron-forward" size={24} color="#333" />
+                <Ionicons name="chevron-forward" size={24} color={colors.text} />
             </TouchableOpacity>
         </View>
     );
 };
 
-const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate }) => {
+const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate, colors }) => {
+    const styles = getStyles(colors);
     const today = new Date().toISOString().split('T')[0];
+    const calendarTheme = {
+        calendarBackground: colors.card,
+        textSectionTitleColor: colors.textSecondary,
+        dayTextColor: colors.text,
+        todayTextColor: colors.primary,
+        selectedDayBackgroundColor: colors.primary,
+        selectedDayTextColor: '#FFFFFF',
+        monthTextColor: colors.text,
+        indicatorColor: colors.primary,
+        arrowColor: colors.primary,
+        'stylesheet.calendar.header': { week: { marginTop: 5, flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.border } }
+    };
     return (
         <Modal visible={isVisible} transparent={true} animationType="fade">
             <TouchableOpacity style={styles.calendarBackdrop} onPress={onClose} />
-            <View style={styles.calendarModalContainer}>
+            <View style={[styles.calendarModalContainer, { backgroundColor: colors.card }]}>
                 <Calendar 
                     current={initialDate.toISOString().split('T')[0]} 
                     maxDate={today} 
@@ -254,7 +321,7 @@ const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate }) => {
                         onDayPress(newDate); 
                         onClose(); 
                     }} 
-                    theme={{ arrowColor: '#42A5F5', selectedDayBackgroundColor: '#42A5F5', todayTextColor: '#42A5F5' }}
+                    theme={calendarTheme}
                 />
             </View>
         </Modal>
@@ -262,6 +329,9 @@ const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate }) => {
 };
 
 export default function LogBloodSugarScreen({ navigation }) {
+    const { theme, colors } = useTheme();
+    const styles = getStyles(colors);
+
     const [history, setHistory] = useState([]);
     const [lastReading, setLastReading] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -274,10 +344,8 @@ export default function LogBloodSugarScreen({ navigation }) {
     const [isCalendarVisible, setIsCalendarVisible] = useState(false);
     const fabRef = useRef(null);
     const [thresholds, setThresholds] = useState({
-        lowThreshold: 70,
-        highFastingThreshold: 100,
-        highPostMealThreshold: 140,
-        veryHighThreshold: 180
+        lowThreshold: 70, highFastingThreshold: 100,
+        highPostMealThreshold: 140, veryHighThreshold: 180
     });
 
     const loadDependencies = async () => {
@@ -295,12 +363,9 @@ export default function LogBloodSugarScreen({ navigation }) {
 
             const loadedThresholds = { ...thresholds };
             thresholdResult.forEach(([key, value]) => {
-                if (value !== null) {
-                    loadedThresholds[key] = parseFloat(value);
-                }
+                if (value !== null) loadedThresholds[key] = parseFloat(value);
             });
             setThresholds(loadedThresholds);
-
         } catch (error) {
             Alert.alert("Error", "Could not load screen data.");
             console.error(error);
@@ -315,79 +380,42 @@ export default function LogBloodSugarScreen({ navigation }) {
     }, [timePeriod, displayDate]));
 
     useEffect(() => {
-        if (fabRef.current) {
-            fabRef.current.bounceIn(800);
-        }
+        if (fabRef.current) fabRef.current.bounceIn(800);
     }, []);
 
     const createNotification = async (amount, tag) => {
         try {
             const status = getBloodSugarStatus(amount, tag, thresholds);
-
             if (!status.isAlert) {
-                // If it's not an alert, just show a simple success message.
-                 showMessage({
-                    message: "Log Saved",
-                    description: `Your reading of ${amount} mg/dL is within normal range.`,
-                    type: "success",
-                    icon: "success",
-                });
+                showMessage({ message: "Log Saved", description: `Your reading of ${amount} mg/dL is within normal range.`, type: "success", icon: "success" });
                 return;
             }
-
-            // If it IS an alert, show the warning pop-up AND create the persistent notification.
-            showMessage({
-                message: `${status.level} Glucose Detected`,
-                description: `Your reading of ${amount} mg/dL is outside the normal range.`,
-                type: "danger", 
-                icon: "danger",
-                duration: 5000,
-            });
-
-            const newNotification = {
-                id: Date.now().toString(),
-                message: `${status.level} Glucose Detected: ${amount} mg/dL`,
-                timestamp: new Date().toISOString(),
-                type: 'alert',
-            };
-
+            showMessage({ message: `${status.level} Glucose Detected`, description: `Your reading of ${amount} mg/dL is outside the normal range.`, type: "danger", icon: "danger", duration: 5000 });
+            const newNotification = { id: Date.now().toString(), message: `${status.level} Glucose Detected: ${amount} mg/dL`, timestamp: new Date().toISOString(), type: 'alert' };
             const existingNotifications = await AsyncStorage.getItem('notifications');
             const notifications = existingNotifications ? JSON.parse(existingNotifications) : [];
             notifications.unshift(newNotification);
             await AsyncStorage.setItem('notifications', JSON.stringify(notifications));
-
-        } catch (error) {
-            console.error("Failed to create notification:", error);
-        }
+        } catch (error) { console.error("Failed to create notification:", error); }
     };
-
 
     const handleSave = async (logId, amount, date, tag) => {
         try {
             const updateData = { amount, tag };
             if (logId) {
                 await api.updateLog(logId, updateData);
-                 showMessage({
-                    message: "Log Updated",
-                    description: `Reading changed to ${amount} mg/dL.`,
-                    type: "info",
-                });
+                showMessage({ message: "Log Updated", description: `Reading changed to ${amount} mg/dL.`, type: "info" });
             } else {
                 await api.addLog({ amount, type: 3, date: date.toISOString(), tag });
                 await createNotification(amount, tag);
             }
-        } catch (e) {
-            Alert.alert('Error', 'An unexpected error occurred while saving.');
-        }
+        } catch (e) { Alert.alert('Error', 'An unexpected error occurred while saving.'); }
         loadDependencies();
     };
     
     const handleDelete = async (logId) => {
-        try {
-            await api.deleteLog(logId);
-        } catch (e) {
-            Alert.alert('Error', 'An unexpected error occurred while deleting.');
-        }
+        try { await api.deleteLog(logId); }
+        catch (e) { Alert.alert('Error', 'An unexpected error occurred while deleting.'); }
         loadDependencies();
     };
 
@@ -399,58 +427,34 @@ export default function LogBloodSugarScreen({ navigation }) {
             if (number) {
                 Alert.alert('Scan Successful', `Detected: ${number}`);
                 return String(number);
-            } else {
-                Alert.alert('Scan Failed', result.message || 'Could not find a number.');
-            }
-        } catch (error) {
-            Alert.alert('Scan Error', 'An error occurred while scanning the image.');
-        }
+            } else { Alert.alert('Scan Failed', result.message || 'Could not find a number.'); }
+        } catch (error) { Alert.alert('Scan Error', 'An error occurred while scanning the image.'); }
         return null;
     };
 
-    const handleHistoryPress = (item) => {
-        setSelectedLog(item);
-        setModalVisible(true);
-    };
-
-    const handleAddNew = () => {
-        fabRef.current?.rubberBand(800);
-        setSelectedLog({});
-        setModalVisible(true);
-    };
+    const handleHistoryPress = (item) => { setSelectedLog(item); setModalVisible(true); };
+    const handleAddNew = () => { fabRef.current?.rubberBand(800); setSelectedLog({}); setModalVisible(true); };
     
     const renderLastReadingContent = () => {
-        if (isLoadingLastReading) {
-            return <ActivityIndicator style={{ paddingVertical: 20 }}/>;
-        }
-        
+        if (isLoadingLastReading) return <ActivityIndicator color={colors.primary} style={{ paddingVertical: 20 }}/>;
         if (lastReading) {
             const status = getBloodSugarStatus(lastReading.amount, lastReading.tag, thresholds);
-
             return (
                 <>
-                    {lastReading.tag && (
-                        <Text style={[styles.lastReadingTag, { color: status.color }]}>{lastReading.tag}</Text>
-                    )}
-                    <Text style={styles.lastReadingValue}>
-                        {lastReading.amount}
-                        <Text style={styles.lastReadingUnit}> mg/dL</Text>
-                    </Text>
+                    {lastReading.tag && (<Text style={[styles.lastReadingTag, { color: status.color }]}>{lastReading.tag}</Text>)}
+                    <Text style={styles.lastReadingValue}>{lastReading.amount}<Text style={styles.lastReadingUnit}> mg/dL</Text></Text>
                     <View style={styles.lastReadingStatusContainer}>
                         <View style={[styles.statusDot, { backgroundColor: status.color }]} />
                         <Text style={[styles.statusText, { color: status.color, fontSize: 16, fontWeight: '600' }]}>{status.level}</Text>
                     </View>
                     <Text style={styles.lastReadingDate}>
-                        <Ionicons name="calendar-outline" size={14} color="#6C757D" />
-                        {' '}{new Date(lastReading.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+                        <Ionicons name="calendar-outline" size={14} color={colors.textSecondary} />{' '}{new Date(lastReading.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
                         <Text>{'  ·  '}</Text>
-                        <Ionicons name="time-outline" size={14} color="#6C757D" />
-                        {' '}{new Date(lastReading.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                        <Ionicons name="time-outline" size={14} color={colors.textSecondary} />{' '}{new Date(lastReading.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                     </Text>
                 </>
             );
         }
-
         return <Text style={styles.emptySubtext}>No readings yet. Tap to add one!</Text>;
     };
 
@@ -458,17 +462,14 @@ export default function LogBloodSugarScreen({ navigation }) {
         const currentItemDate = new Date(item.date).toDateString();
         const prevItemDate = index > 0 ? new Date(history[index - 1].date).toDateString() : null;
         const showDateHeader = currentItemDate !== prevItemDate;
-
         return (
             <>
                 {showDateHeader && (
                     <Animatable.View animation="fadeIn" duration={400}>
-                        <Text style={styles.dateHeaderText}>
-                            {new Date(item.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-                        </Text>
+                        <Text style={styles.dateHeaderText}>{new Date(item.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
                     </Animatable.View>
                 )}
-                <LogItem item={item} onPress={() => handleHistoryPress(item)} index={index} thresholds={thresholds} />
+                <LogItem item={item} onPress={() => handleHistoryPress(item)} index={index} thresholds={thresholds} colors={colors} />
             </>
         );
     };
@@ -476,53 +477,24 @@ export default function LogBloodSugarScreen({ navigation }) {
     return (
         <SafeAreaView style={styles.container}>
             <EditLogModal 
-                modalVisible={modalVisible} 
-                setModalVisible={setModalVisible} 
-                log={selectedLog} 
-                onSave={handleSave} 
-                onDelete={handleDelete} 
-                onScan={handleScan} 
-                inputValue={modalInputValue} 
-                setInputValue={setModalInputValue}
+                modalVisible={modalVisible} setModalVisible={setModalVisible} log={selectedLog} onSave={handleSave} 
+                onDelete={handleDelete} onScan={handleScan} inputValue={modalInputValue} setInputValue={setModalInputValue} colors={colors}
             />
-            <CalendarModal 
-                isVisible={isCalendarVisible} 
-                onClose={() => setIsCalendarVisible(false)} 
-                onDayPress={setDisplayDate} 
-                initialDate={displayDate} 
-            />
-            
+            <CalendarModal isVisible={isCalendarVisible} onClose={() => setIsCalendarVisible(false)} onDayPress={setDisplayDate} initialDate={displayDate} colors={colors}/>
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Blood Sugar</Text>
                 <TouchableOpacity style={styles.doneButton} onPress={() => navigation.goBack()}>
-                    <Ionicons name="close-circle" size={32} color="#DDE1E6" />
+                    <Ionicons name="close-circle" size={32} color={colors.textSecondary} />
                 </TouchableOpacity>
             </View>
-            
-            <TouchableOpacity 
-                style={styles.lastReadingCard} 
-                onPress={() => lastReading ? handleHistoryPress(lastReading) : handleAddNew()} 
-                disabled={isLoadingLastReading} 
-                activeOpacity={0.7}
-            >
+            <TouchableOpacity style={styles.lastReadingCard} onPress={() => lastReading ? handleHistoryPress(lastReading) : handleAddNew()} disabled={isLoadingLastReading} activeOpacity={0.7}>
                 <Text style={styles.cardTitle}>Last Reading</Text>
                 {renderLastReadingContent()}
             </TouchableOpacity>
-
             <View style={styles.controlsContainer}>
-                <DateNavigator 
-                    date={displayDate} 
-                    onDateChange={setDisplayDate} 
-                    period={timePeriod} 
-                    onOpenCalendar={() => setIsCalendarVisible(true)}
-                />
-                <SegmentedControl 
-                    options={['day', 'week', 'month']} 
-                    selectedOption={timePeriod} 
-                    onSelect={(p) => { setTimePeriod(p); setDisplayDate(new Date()); }}
-                />
+                <DateNavigator date={displayDate} onDateChange={setDisplayDate} period={timePeriod} onOpenCalendar={() => setIsCalendarVisible(true)} colors={colors} />
+                <SegmentedControl options={['day', 'week', 'month']} selectedOption={timePeriod} onSelect={(p) => { setTimePeriod(p); setDisplayDate(new Date()); }} colors={colors} />
             </View>
-            
             <FlatList
                 data={history}
                 keyExtractor={(item) => item.logID.toString()}
@@ -530,11 +502,8 @@ export default function LogBloodSugarScreen({ navigation }) {
                 ListHeaderComponent={<Text style={styles.listTitle}>History</Text>}
                 ListEmptyComponent={
                     <Animatable.View animation="fadeIn" delay={300} style={styles.emptyContainer}>
-                        {isLoading ? <ActivityIndicator/> : (
-                            <>
-                                <MaterialCommunityIcons name="clipboard-text-off-outline" size={60} color="#CED4DA" />
-                                <Text style={styles.emptyText}>Nothing Logged Yet</Text>
-                            </>
+                        {isLoading ? <ActivityIndicator color={colors.primary} /> : (
+                            <><MaterialCommunityIcons name="clipboard-text-off-outline" size={60} color="#CED4DA" /><Text style={styles.emptyText}>Nothing Logged Yet</Text></>
                         )}
                     </Animatable.View>
                 }
@@ -542,7 +511,6 @@ export default function LogBloodSugarScreen({ navigation }) {
                 onRefresh={loadDependencies}
                 refreshing={isLoading}
             />
-             
             <Animatable.View ref={fabRef} style={styles.fabContainer}>
                 <TouchableOpacity style={styles.fab} onPress={handleAddNew} activeOpacity={0.8}>
                     <Ionicons name="add" size={34} color="white" />
@@ -551,111 +519,3 @@ export default function LogBloodSugarScreen({ navigation }) {
         </SafeAreaView>
     );
 };
-
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F8F9FA' },
-    header: { 
-        flexDirection: 'row', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        paddingHorizontal: 16, 
-        paddingTop: Platform.OS === 'android' ? 20 : 10, 
-        paddingBottom: 5,
-    },
-    headerTitle: { fontSize: 32, fontWeight: 'bold', color: '#1E1E2D' },
-    doneButton: { padding: 5 },
-    lastReadingCard: { 
-        backgroundColor: '#FFFFFF', 
-        paddingVertical: 15,
-        paddingHorizontal: 20,
-        borderRadius: 16, 
-        marginHorizontal: 16, 
-        marginVertical: 8,
-        shadowColor: '#999', 
-        shadowOffset: { width: 0, height: 2 }, 
-        shadowOpacity: 0.1, 
-        shadowRadius: 5, 
-        elevation: 3, 
-        alignItems: 'center'
-    },
-    cardTitle: { fontSize: 16, fontWeight: '600', color: '#6C757D' },
-    lastReadingTag: { textTransform: 'uppercase', fontSize: 13, fontWeight: 'bold', marginBottom: 4 },
-    lastReadingValue: { 
-        fontSize: 42,
-        fontWeight: 'bold', 
-        color: '#1E1E2D',
-    },
-    lastReadingUnit: { fontSize: 22, fontWeight: '500', color: '#6C757D' },
-    lastReadingStatusContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 6, },
-    lastReadingDate: { marginTop: 10, fontSize: 14, color: '#6C757D', alignItems: 'center' },
-    listTitle: { 
-        fontSize: 18, 
-        fontWeight: 'bold', 
-        color: '#343A40', 
-        marginHorizontal: 16, 
-        marginTop: 12,
-        marginBottom: 6,
-    },
-    controlsContainer: { 
-        paddingHorizontal: 16, 
-        paddingBottom: 10,
-        borderBottomWidth: 1, 
-        borderBottomColor: '#E9ECEF' 
-    },
-    segmentedControlContainer: { 
-        flexDirection: 'row', 
-        backgroundColor: '#E9ECEF', 
-        borderRadius: 10, 
-        overflow: 'hidden', 
-        marginTop: 12,
-    },
-    segment: { flex: 1, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
-    segmentActive: { backgroundColor: '#FFFFFF', borderRadius: 8, margin: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 3, },
-    segmentText: { fontWeight: '600', color: '#6C757D', fontSize: 14 },
-    segmentTextActive: { color: '#42A5F5', fontWeight: 'bold' },
-    dateNavigatorContainer: { 
-        flexDirection: 'row', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        paddingHorizontal: 5, 
-        marginBottom: 8
-    },
-    arrowButton: { padding: 8 },
-    dateNavigatorText: { fontSize: 20, fontWeight: 'bold', color: '#343A40' },
-    dateHeaderText: { fontSize: 15, fontWeight: 'bold', color: '#495057', marginHorizontal: 16, marginTop: 16, marginBottom: 4 },
-    emptyContainer: { alignItems: 'center', marginTop: 60, paddingHorizontal: 40, },
-    emptyText: { fontSize: 20, fontWeight: '600', color: '#ADB5BD', marginTop: 16, },
-    emptySubtext: { fontSize: 15, color: '#CED4DA', marginTop: 8, textAlign: 'center' },
-    fabContainer: { position: 'absolute', bottom: 35, right: 25 },
-    fab: { backgroundColor: '#42A5F5', width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#42A5F5', shadowRadius: 8, shadowOpacity: 0.4, shadowOffset: { height: 4, width: 0 } },
-    logItemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16, marginVertical: 6, marginHorizontal: 16, shadowColor: '#999', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 3 },
-    logItemIconContainer: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginRight: 16, },
-    logItemDataContainer: { flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, },
-    logItemValueText: { fontSize: 22, fontWeight: 'bold', color: '#1E1E2D' },
-    logItemUnitText: { fontSize: 14, color: '#666' },
-    tagBadge: { backgroundColor: '#E3F2FD', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, },
-    tagBadgeText: { color: '#1E88E5', fontWeight: '600', fontSize: 12 },
-    logItemTimeText: { fontSize: 14, color: '#888', fontWeight: '500' },
-    statusContainer: { flexDirection: 'row', alignItems: 'center', width: '100%', marginTop: 4 },
-    statusDot: { width: 10, height: 10, borderRadius: 5, marginRight: 6 },
-    statusText: { fontSize: 14, fontWeight: '500' },
-    calendarBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
-    calendarModalContainer: { position: 'absolute', top: '25%', left: '5%', right: '5%', backgroundColor: 'white', borderRadius: 16, elevation: 10, overflow: 'hidden'},
-    modalOverlay: { flex: 1, justifyContent: 'flex-end' },
-    modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-    modalContent: { backgroundColor: '#F8F9FA', paddingHorizontal: 20, paddingTop: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-    modalTitle: { fontSize: 16, fontWeight: '600', color: '#6C757D', textAlign: 'center', marginBottom: 15 },
-    tagSelectorContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-    tagOption: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#E9ECEF', marginHorizontal: 4, alignItems: 'center' },
-    tagOptionSelected: { backgroundColor: '#42A5F5' },
-    tagOptionText: { color: '#495057', fontWeight: '600' },
-    tagOptionTextSelected: { color: 'white' },
-    modalInput: { backgroundColor: '#FFFFFF', borderColor: '#E0E0E0', borderWidth: 1, borderRadius: 12, padding: 15, fontSize: 36, fontWeight: 'bold', textAlign: 'center', marginBottom: 20, color: '#1E1E2D' },
-    datePickerButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, backgroundColor: '#FFFFFF', borderRadius: 12, marginBottom: 20, borderWidth: 1, borderColor: '#D1D1D6' },
-    datePickerText: { marginLeft: 12, fontSize: 17, fontWeight: '600', color: '#42A5F5' },
-    scanButtonsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 25 },
-    scanButton: { flex: 1, flexDirection: 'row', backgroundColor: '#42A5F5', paddingVertical: 14, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginHorizontal: 5 },
-    scanButtonText: { color: '#fff', marginLeft: 8, fontWeight: '600', fontSize: 16 },
-    modalActions: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', marginTop: 10 },
-    modalButtonText: { color: '#42A5F5', fontSize: 17, padding: 10, fontWeight: '500' },
-});
