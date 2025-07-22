@@ -196,10 +196,12 @@ export const api = {
         const response = await authenticatedFetch(`/posts/${postId}`);
         return response.json();
     },
+
     getPostComments: async (postId) => {
         const response = await authenticatedFetch(`/posts/${postId}/comments`);
         return response.json();
     },
+
     addComment: async (postId, commentText) => {
         const response = await authenticatedFetch(`/posts/${postId}/comment`, {
             method: 'POST',

@@ -2,30 +2,17 @@
 import React, { useState, useCallback } from 'react';
 import { 
     View, Text, Image, FlatList, StyleSheet, ActivityIndicator, 
-    TouchableOpacity, RefreshControl, SafeAreaView, Alert
+    TouchableOpacity, RefreshControl, SafeAreaView 
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import { api } from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
 
-dayjs.extend(relativeTime);
-
 const PostItem = ({ item, onToggleLike, navigation, colors }) => {
     const styles = getStyles(colors);
-    const [isFlagged, setIsFlagged] = useState(false);
-
-    const handleFlagPost = () => {
-        setIsFlagged(!isFlagged);
-        Alert.alert(
-            "Post Reported",
-            "Thank you for your feedback. A moderator will review this post shortly."
-        );
-        // In a real application, you would also send an API call here to your server
-        // e.g., api.reportPost(item.id);
-    };
+    const [isBookmarked, setIsBookmarked] = useState(false);
 
     return (
         <View style={styles.card}>
@@ -34,14 +21,11 @@ const PostItem = ({ item, onToggleLike, navigation, colors }) => {
                 <Image source={{ uri: item.pfpUrl || `https://i.pravatar.cc/100?u=${item.userID}` }} style={styles.avatar} />
                 <View style={styles.userInfo}>
                     <Text style={styles.username}>{item.first_name} {item.last_name}</Text>
-                    <Text style={styles.date}>{dayjs(item.createdAt).fromNow()}</Text>
+                    {/* --- THIS IS THE FIX --- */}
+                    <Text style={styles.date}>{dayjs(item.createdAt).format("MMM DD, YYYY · h:mm A")}</Text>
                 </View>
-                <TouchableOpacity onPress={handleFlagPost}>
-                    <Ionicons 
-                        name={isFlagged ? "flag" : "flag-outline"} 
-                        size={22} 
-                        color={isFlagged ? colors.logoutText : colors.textSecondary} 
-                    />
+                <TouchableOpacity onPress={() => setIsBookmarked(!isBookmarked)}>
+                    <Ionicons name={isBookmarked ? "bookmark" : "bookmark-outline"} size={22} color={colors.textSecondary} />
                 </TouchableOpacity>
             </View>
 
@@ -53,7 +37,7 @@ const PostItem = ({ item, onToggleLike, navigation, colors }) => {
                 )}
             </TouchableOpacity>
             
-            {/* --- Action Bar (Likes, Comments, Share) --- */}
+            {/* --- Action Bar (Likes, Comments) --- */}
             <View style={styles.actionBar}>
                 <TouchableOpacity style={styles.actionButton} onPress={() => onToggleLike(item.id, item.likedByUser)}>
                     <Ionicons name={item.likedByUser ? "heart" : "heart-outline"} size={26} color={item.likedByUser ? '#EF4444' : colors.textSecondary} />
@@ -66,10 +50,6 @@ const PostItem = ({ item, onToggleLike, navigation, colors }) => {
                     <Text style={[styles.actionText, { color: colors.textSecondary }]}>
                         {item.commentCount}
                     </Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton}>
-                    <Ionicons name={"arrow-redo-outline"} size={24} color={colors.textSecondary} />
-                    <Text style={[styles.actionText, { color: colors.textSecondary }]}>Share</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -200,7 +180,7 @@ const getStyles = (colors) => StyleSheet.create({
     username: { fontWeight: 'bold', color: colors.text, fontSize: 16 },
     date: { fontSize: 12, color: colors.textSecondary },
     content: { fontSize: 15, color: colors.text, lineHeight: 22, paddingHorizontal: 16, marginVertical: 8 },
-    postImage: { width: '100%', height: 250, backgroundColor: colors.border, marginTop: 4 },
+    postImage: { width: '`100%`', height: 250, backgroundColor: colors.border, marginTop: 4 },
     emptyText: { color: colors.textSecondary, marginTop: 16, fontSize: 16 },
     actionBar: { 
         flexDirection: 'row', 
