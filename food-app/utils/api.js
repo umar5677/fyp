@@ -10,7 +10,6 @@ async function authenticatedFetch(endpoint, options = {}) {
     const isFormData = options.body instanceof FormData;
     const headers = { ...options.headers };
 
-    // Don't set Content-Type for FormData, let the browser/RN do it.
     if (!isFormData && options.body) {
         headers['Content-Type'] = 'application/json';
     }
@@ -26,7 +25,6 @@ async function authenticatedFetch(endpoint, options = {}) {
         const refreshToken = await SecureStore.getItemAsync('refreshToken');
         if (!refreshToken) {
             Alert.alert("Session Expired", "Please log in again.");
-            // Here you might want to navigate the user to the login screen.
             throw new Error("Session Expired");
         }
         try {
@@ -76,7 +74,6 @@ async function authenticatedFetch(endpoint, options = {}) {
 }
 
 export const api = {
-    // --- Core User Functions ---
     getProfile: () => authenticatedFetch('/profile'),
     updateProfileSetup: (profileData) => authenticatedFetch('/profile-setup', { method: 'PUT', body: JSON.stringify(profileData) }),
     updateProfile: (updateData) => authenticatedFetch('/profile', { method: 'PUT', body: JSON.stringify(updateData) }),
@@ -84,7 +81,7 @@ export const api = {
     deleteProfile: () => authenticatedFetch('/profile', { method: 'DELETE' }),
     uploadProfilePhoto: (formData) => authenticatedFetch('/upload/profile-picture', { method: 'POST', body: formData }),
 
-    // --- Data Logging Functions ---
+    //  Data Logging Functions 
     getHistory: (types, period = 'day', targetDate = null, limit = null) => {
         const params = new URLSearchParams({ types: types.join(','), period });
         if (targetDate) params.append('targetDate', targetDate);
@@ -95,13 +92,13 @@ export const api = {
     updateLog: (logId, updateData) => authenticatedFetch(`/logs/${logId}`, { method: 'PUT', body: JSON.stringify(updateData) }),
     deleteLog: (logId) => authenticatedFetch(`/logs/${logId}`, { method: 'DELETE' }),
 
-    // --- AI, OCR, and Prediction Functions ---
+    // AI, OCR, and Prediction Functions 
     getGlucosePrediction: () => authenticatedFetch('/predictions/glucose'),
     scanImage: (base64) => authenticatedFetch('/ocr/aws-parse-image', { method: 'POST', body: JSON.stringify({ image: base64 }) }),
     identifyFoodFromImage: (base64) => authenticatedFetch('/ai/identify-food', { method: 'POST', body: JSON.stringify({ image: base64 }) }),
     getNutritionForFood: (foodName) => authenticatedFetch('/ai/get-nutrition', { method: 'POST', body: JSON.stringify({ foodName }) }),
     
-    // --- Notifications & Reminders ---
+    //  Notifications & Reminders
     getNotifications: () => authenticatedFetch('/notifications'),
     clearNotifications: () => authenticatedFetch('/notifications', { method: 'DELETE' }),
     getReminders: () => authenticatedFetch('/reminders'),
@@ -109,7 +106,7 @@ export const api = {
     updateReminder: (id, data) => authenticatedFetch(`/reminders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     deleteReminder: (id) => authenticatedFetch(`/reminders/${id}`, { method: 'DELETE' }),
 
-    // --- Posts & Community/Social Features ---
+    // Posts & Community/Social Features
     getPosts: () => authenticatedFetch('/posts'),
     getPostDetails: (postId) => authenticatedFetch(`/posts/${postId}`),
     createPost: (formData) => authenticatedFetch('/posts', { method: 'POST', body: formData }),
@@ -120,7 +117,7 @@ export const api = {
     getPostComments: (postId) => authenticatedFetch(`/posts/${postId}/comments`),
     addComment: (postId, commentText) => authenticatedFetch(`/posts/${postId}/comment`, { method: 'POST', body: JSON.stringify({ commentText }) }),
 
-    // --- User Settings, Providers & Reports ---
+    // User Settings, Providers & Reports
     getUserThresholds: () => authenticatedFetch('/user-settings/thresholds'),
     saveUserThresholds: (thresholds) => authenticatedFetch('/user-settings/thresholds', { method: 'POST', body: JSON.stringify(thresholds) }),
     getPreferredProvider: () => authenticatedFetch('/user-settings/provider'),
@@ -129,7 +126,7 @@ export const api = {
     saveReportPreference: (frequency) => authenticatedFetch('/user-settings/report-preference', { method: 'PUT', body: JSON.stringify({ frequency }) }),
     generateReport: (payload) => authenticatedFetch('/generate-report', { method: 'POST', body: JSON.stringify(payload) }),
     
-    // --- Q&A (Ask a Provider) Functions ---
+    // Q&A (Ask a Provider) Functions
     getProviders: () => authenticatedFetch('/providers'),
     getQnaStatus: () => authenticatedFetch('/qna/status'),
     getMyQuestions: () => authenticatedFetch('/qna/my-questions'),

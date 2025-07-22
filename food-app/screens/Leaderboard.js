@@ -63,12 +63,11 @@ export default function LeaderboardScreen() {
       .catch((error) => console.error('Error fetching users:', error));
   }, []);
 
-  /** @param {{ item: User }} param0 */
   const renderItem = ({ item }) => (
     <View
       style={[
         styles.listItem,
-        item.name === 'You' && styles.youRowFull, // Apply special style for 'You'
+        item.name === 'You' && styles.youRowFull, 
       ]}
     >
       <View style={styles.rankCol}>

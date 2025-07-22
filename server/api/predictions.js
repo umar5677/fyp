@@ -12,8 +12,7 @@ module.exports = function createPredictionsRouter(dbPool) {
         const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
         try {
-            // --- PREMIUM CHECK ---
-            // First, check if the user has premium access.
+            // PREMIUM CHECK 
             const [users] = await dbPool.query('SELECT setPremium FROM users WHERE userID = ?', [userId]);
 
             if (users.length === 0) {
@@ -28,18 +27,15 @@ module.exports = function createPredictionsRouter(dbPool) {
                     message: 'AI Glucose Forecast is a premium feature. Please upgrade to get access.' 
                 });
             }
-            // --- END OF PREMIUM CHECK ---
 
             if (!GEMINI_API_KEY) {
                 return res.status(500).json({ success: false, message: 'Server is missing API key for predictions.' });
             }
 
-            // The rest of the prediction logic only runs for premium users
             const [readings] = await dbPool.query('SELECT amount, date FROM dataLogs WHERE userID = ? AND type = 3 ORDER BY date DESC LIMIT 10', [userId]);
             if (readings.length < 2) {
                 return res.json({ success: false, message: 'Not enough data for a prediction. Log at least two readings.' });
             }
-            // ... (The rest of the Gemini API call logic is unchanged)
             const lastReading = readings[0]; 
             const timeAnchor = new Date(lastReading.date); 
             const projectionTime = new Date(timeAnchor.getTime() + 60 * 60 * 1000); 

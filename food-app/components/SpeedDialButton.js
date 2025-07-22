@@ -42,20 +42,19 @@ const SpeedDialButton = ({ navigation, userId }) => {
     ],
   };
 
-  // Animation for the button spreading up and to the left
   const bloodSugarStyle = {
     transform: [
       { scale: animation },
       {
         translateX: animation.interpolate({
           inputRange: [0, 1],
-          outputRange: [0, -50], // Move left
+          outputRange: [0, -50], 
         }),
       },
       {
         translateY: animation.interpolate({
           inputRange: [0, 1],
-          outputRange: [0, -60], // Move up
+          outputRange: [0, -60], 
         }),
       },
     ],
@@ -69,13 +68,13 @@ const SpeedDialButton = ({ navigation, userId }) => {
       {
         translateX: animation.interpolate({
           inputRange: [0, 1],
-          outputRange: [0, 50], // Move right
+          outputRange: [0, 50], 
         }),
       },
       {
         translateY: animation.interpolate({
           inputRange: [0, 1],
-          outputRange: [0, -60], // Move up
+          outputRange: [0, -60], 
         }),
       },
     ],
@@ -107,7 +106,6 @@ const SpeedDialButton = ({ navigation, userId }) => {
 
 const styles = StyleSheet.create({
   container: {
-    // This view now acts as the anchor for all buttons
     position: 'relative',
     alignItems: 'center',
     top: -28,

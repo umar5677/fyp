@@ -16,7 +16,6 @@ const Tab = createBottomTabNavigator();
 const DummyAddScreen = () => null;
 
 const AppTabs = ({ navigation, route }) => {
-  // --- FIX: Safely access params with a fallback to an empty object ---
   const { userId, isProvider } = route.params || {};
 
   const insets = useSafeAreaInsets();

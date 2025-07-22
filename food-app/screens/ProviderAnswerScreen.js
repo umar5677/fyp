@@ -11,14 +11,13 @@ import { api } from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
 
 export default function ProviderAnswerScreen({ route, navigation }) {
-    const { colors } = useTheme(); // Use the theme hook for dynamic colors
-    const styles = getStyles(colors); // Generate styles based on the theme
+    const { colors } = useTheme(); 
+    const styles = getStyles(colors); 
     const { question } = route.params; 
 
     const [answerText, setAnswerText] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // This effect styles the header bar to match the theme
     useEffect(() => {
         navigation.setOptions({
             headerStyle: { backgroundColor: colors.card },
@@ -81,7 +80,7 @@ export default function ProviderAnswerScreen({ route, navigation }) {
                     </Animatable.View>
                 </ScrollView>
                 
-                {/* Submit Button (Sticky at the bottom) */}
+                {/* Submit Button */}
                 <View style={styles.buttonContainer}>
                     <TouchableOpacity 
                         style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]} 
@@ -100,7 +99,6 @@ export default function ProviderAnswerScreen({ route, navigation }) {
     );
 }
 
-// Styles are now generated dynamically based on the theme
 const getStyles = (colors) => StyleSheet.create({
     container: { 
         flex: 1, 
@@ -158,7 +156,7 @@ const getStyles = (colors) => StyleSheet.create({
         borderWidth: 1,
         borderColor: colors.border,
         fontSize: 16,
-        minHeight: 200, // Make the input area larger
+        minHeight: 200, 
         padding: 16,
         textAlignVertical: 'top',
     },
@@ -170,13 +168,13 @@ const getStyles = (colors) => StyleSheet.create({
         borderTopColor: colors.border,
     },
     submitButton: {
-        backgroundColor: colors.primary, // Using theme color
+        backgroundColor: colors.primary, 
         paddingVertical: 16,
         borderRadius: 12,
         alignItems: 'center',
     },
     submitButtonDisabled: { 
-        backgroundColor: colors.border // Using theme color for disabled state
+        backgroundColor: colors.border 
     },
     submitButtonText: { 
         color: '#FFFFFF', 

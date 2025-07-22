@@ -1,5 +1,4 @@
 // This middleware checks if the authenticated user is a provider.
-// It should run AFTER authenticateToken.
 const isProvider = (req, res, next) => {
     // req.user is attached by the authenticateToken middleware
     if (req.user && req.user.isProvider) {

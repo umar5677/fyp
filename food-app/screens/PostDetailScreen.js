@@ -60,6 +60,7 @@ export default function PostDetailScreen() {
     const [isPostingComment, setIsPostingComment] = useState(false);
     const [viewerVisible, setViewerVisible] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
+    const [showOptionsMenu, setShowOptionsMenu] = useState(false); 
     
     const handleDeletePost = () => {
         Alert.alert(
@@ -71,6 +72,7 @@ export default function PostDetailScreen() {
                     text: "Delete",
                     style: "destructive",
                     onPress: async () => {
+                        setShowOptionsMenu(false); // Close menu
                         try {
                             await api.deletePost(postId);
                             Alert.alert("Success", "Post deleted.");
@@ -94,14 +96,9 @@ export default function PostDetailScreen() {
         if (post?.isOwner) {
             navigation.setOptions({
                 headerRight: () => (
-                    <View style={{ flexDirection: 'row', marginRight: 10 }}>
-                        <TouchableOpacity onPress={() => navigation.navigate('EditPost', { post })} style={{ padding: 5 }}>
-                            <Ionicons name="pencil-outline" size={24} color={colors.primary} />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={handleDeletePost} style={{ padding: 5, marginLeft: 10 }}>
-                            <Ionicons name="trash-outline" size={24} color={colors.logoutText} />
-                        </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity onPress={() => setShowOptionsMenu(true)} style={{ padding: 5, marginRight: 10 }}>
+                        <Ionicons name="ellipsis-vertical-outline" size={24} color={colors.textSecondary} />
+                    </TouchableOpacity>
                 ),
             });
         }
@@ -165,6 +162,11 @@ export default function PostDetailScreen() {
         setViewerVisible(true);
     };
 
+    const navigateToEditPost = () => {
+        setShowOptionsMenu(false); // Close the options menu
+        navigation.navigate('EditPost', { post });
+    };
+
     if (isLoading || !post) {
         return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
     }
@@ -225,6 +227,31 @@ export default function PostDetailScreen() {
             </KeyboardAvoidingView>
             
             <ImageViewer visible={viewerVisible} imageUri={selectedImage} onClose={() => setViewerVisible(false)} />
+
+            {/* Options Menu Modal */}
+            <Modal
+                transparent={true}
+                animationType="fade"
+                visible={showOptionsMenu}
+                onRequestClose={() => setShowOptionsMenu(false)}
+            >
+                <TouchableOpacity 
+                    style={styles.modalOverlay} 
+                    activeOpacity={1} 
+                    onPress={() => setShowOptionsMenu(false)}
+                >
+                    <View style={[styles.optionsMenu, { top: Platform.OS === 'ios' ? 70 : 30, right: 20 }]}>
+                        <TouchableOpacity style={styles.menuItem} onPress={navigateToEditPost}>
+                            <Ionicons name="pencil-outline" size={20} color={colors.text} style={styles.menuItemIcon} />
+                            <Text style={styles.menuItemText}>Edit Post</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.menuItem} onPress={handleDeletePost}>
+                            <Ionicons name="trash-outline" size={20} color={colors.logoutText} style={styles.menuItemIcon} />
+                            <Text style={[styles.menuItemText, { color: colors.logoutText }]}>Delete Post</Text>
+                        </TouchableOpacity>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -254,4 +281,35 @@ const getStyles = (colors) => StyleSheet.create({
     commentInputContainer: { flexDirection: 'row', padding: 12, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card },
     commentInput: { flex: 1, backgroundColor: colors.background, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, fontSize: 16, color: colors.text, marginRight: 12 },
     sendButton: { padding: 4, justifyContent: 'center' },
+
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.3)', 
+    },
+    optionsMenu: {
+        position: 'absolute',
+        backgroundColor: colors.card,
+        borderRadius: 8,
+        paddingVertical: 5,
+        right: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 5,
+        elevation: 6,
+        minWidth: 150,
+    },
+    menuItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 15,
+    },
+    menuItemIcon: {
+        marginRight: 10,
+    },
+    menuItemText: {
+        fontSize: 16,
+        color: colors.text,
+    },
 });

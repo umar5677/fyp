@@ -107,7 +107,6 @@ export default function FullGlucoseChart() {
   );
 
   const processData = useCallback((logs, currentPeriod) => {
-    // This function's logic remains entirely the same.
     const allReadings = logs ? [...logs].reverse() : [];
     setReadings(allReadings);
     if (allReadings.length > 0) {
@@ -155,7 +154,6 @@ export default function FullGlucoseChart() {
   }, []);
 
   const changeDate = (amount) => {
-    // This function's logic remains entirely the same.
     const newDate = new Date(displayDate);
     if (period === 'day') newDate.setDate(newDate.getDate() + amount);
     else if (period === 'week') newDate.setDate(newDate.getDate() + (amount * 7));
@@ -164,7 +162,6 @@ export default function FullGlucoseChart() {
   };
 
   const formatDate = () => {
-    // This function's logic remains entirely the same.
     if (period === 'day') return displayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     if (period === 'week') {
         const start = new Date(displayDate); start.setDate(displayDate.getDate() - displayDate.getDay());

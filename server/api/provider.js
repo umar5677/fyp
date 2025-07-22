@@ -1,6 +1,5 @@
 // fyp/server/api/provider.js
 const express = require('express');
-// The path must go up one directory (../) and then into the lib/ directory.
 const authenticateToken = require('../lib/authMiddleware.js');
 const isProvider = require('../lib/isProvider.js');
 

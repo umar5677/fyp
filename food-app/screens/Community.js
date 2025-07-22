@@ -2,7 +2,7 @@
 import React, { useState, useCallback } from 'react';
 import { 
     View, Text, Image, FlatList, StyleSheet, ActivityIndicator, 
-    TouchableOpacity, RefreshControl, SafeAreaView 
+    TouchableOpacity, RefreshControl, SafeAreaView, Alert
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,24 +12,45 @@ import { useTheme } from '../context/ThemeContext';
 
 const PostItem = ({ item, onToggleLike, navigation, colors }) => {
     const styles = getStyles(colors);
-    const [isBookmarked, setIsBookmarked] = useState(false);
+
+    const handleFlagPost = () => {
+        Alert.alert(
+            "Report Post",
+            `Are you sure you want to report this post by ${item.first_name} ${item.last_name}?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                { 
+                    text: "Report", 
+                    style: "destructive", 
+                    onPress: () => {
+                        // In a real application, you would send a report/flag request to your API
+                        console.log(`Reporting post ${item.id} by user ${item.userID}`);
+                        Alert.alert("Report Submitted", "Thank you for reporting this post. Our team will review it.");
+                        // Example API call: api.reportPost(item.id).catch(err => console.error("Failed to report:", err));
+                    }
+                }
+            ]
+        );
+    };
 
     return (
         <View style={styles.card}>
-            {/* --- Card Header --- */}
             <View style={styles.cardHeader}>
                 <Image source={{ uri: item.pfpUrl || `https://i.pravatar.cc/100?u=${item.userID}` }} style={styles.avatar} />
                 <View style={styles.userInfo}>
                     <Text style={styles.username}>{item.first_name} {item.last_name}</Text>
-                    {/* --- THIS IS THE FIX --- */}
                     <Text style={styles.date}>{dayjs(item.createdAt).format("MMM DD, YYYY · h:mm A")}</Text>
                 </View>
-                <TouchableOpacity onPress={() => setIsBookmarked(!isBookmarked)}>
-                    <Ionicons name={isBookmarked ? "bookmark" : "bookmark-outline"} size={22} color={colors.textSecondary} />
-                </TouchableOpacity>
+                
+                {/* Conditional Flagging icon */}
+                {!item.isOwner && ( // Only show flag if NOT the owner's post
+                    <TouchableOpacity onPress={handleFlagPost} style={styles.flagIconButton}>
+                        <Ionicons name="flag-outline" size={22} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                )}
             </View>
 
-            {/* --- Card Content --- */}
+            {/* Card Content */}
             <TouchableOpacity onPress={() => navigation.navigate("PostDetail", { postId: item.id })}>
                 <Text style={styles.content}>{item.content}</Text>
                 {item.images && item.images.length > 0 && (
@@ -37,7 +58,6 @@ const PostItem = ({ item, onToggleLike, navigation, colors }) => {
                 )}
             </TouchableOpacity>
             
-            {/* --- Action Bar (Likes, Comments) --- */}
             <View style={styles.actionBar}>
                 <TouchableOpacity style={styles.actionButton} onPress={() => onToggleLike(item.id, item.likedByUser)}>
                     <Ionicons name={item.likedByUser ? "heart" : "heart-outline"} size={26} color={item.likedByUser ? '#EF4444' : colors.textSecondary} />
@@ -174,13 +194,18 @@ const getStyles = (colors) => StyleSheet.create({
     },
     list: { paddingVertical: 16 },
     card: { backgroundColor: colors.card, marginBottom: 16, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
-    cardHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16 },
+    cardHeader: { 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        paddingHorizontal: 16, 
+        paddingTop: 16,
+    },
     avatar: { width: 44, height: 44, borderRadius: 22, marginRight: 12, backgroundColor: colors.border },
-    userInfo: { flex: 1 },
+    userInfo: { flex: 1 }, 
     username: { fontWeight: 'bold', color: colors.text, fontSize: 16 },
     date: { fontSize: 12, color: colors.textSecondary },
     content: { fontSize: 15, color: colors.text, lineHeight: 22, paddingHorizontal: 16, marginVertical: 8 },
-    postImage: { width: '`100%`', height: 250, backgroundColor: colors.border, marginTop: 4 },
+    postImage: { width: '100%', height: 250, backgroundColor: colors.border, marginTop: 4 }, // Fixed width string
     emptyText: { color: colors.textSecondary, marginTop: 16, fontSize: 16 },
     actionBar: { 
         flexDirection: 'row', 
@@ -197,5 +222,9 @@ const getStyles = (colors) => StyleSheet.create({
         marginLeft: 8, 
         fontSize: 14, 
         fontWeight: '600',
+    },
+    flagIconButton: {
+        padding: 4, 
+        marginLeft: 10, 
     }
 });

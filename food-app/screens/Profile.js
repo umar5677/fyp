@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker'; // Ensure ImagePicker is imported
+import * as ImagePicker from 'expo-image-picker'; 
 import { api } from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
 import HeaderBackground from '../components/HeaderBackground';
@@ -54,7 +54,6 @@ const ProfileScreen = ({ navigation }) => {
     const { theme, colors, toggleTheme } = useTheme();
     const [user, setUser] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
-    // --- FIX #1: Added cacheBuster state back in ---
     const [cacheBuster, setCacheBuster] = useState(Date.now());
     const styles = getStyles(colors);
 
@@ -74,7 +73,6 @@ const ProfileScreen = ({ navigation }) => {
         }, [])
     );
 
-    // --- FIX #2: Restored the FULL, ORIGINAL image upload logic ---
     const pickImageAndUpload = async () => {
         const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (!permissionResult.granted) {

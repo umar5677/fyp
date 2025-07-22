@@ -20,7 +20,6 @@ export default function AddPostScreen() {
     const [images, setImages] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     
-    // Update header styles to match the theme
     useEffect(() => {
         navigation.setOptions({
             headerStyle: { backgroundColor: colors.card },

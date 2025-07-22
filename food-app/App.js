@@ -52,9 +52,8 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// A helper component to access the theme context for the navigator
 const AppNavigator = () => {
-  const { colors } = useTheme(); // Now we can safely use the theme
+  const { colors } = useTheme();
 
   return (
     <NavigationContainer>

@@ -85,7 +85,6 @@ export default function AiFoodScanScreen({ navigation }) {
     }
   };
 
-  // --- UPDATED to use the secure backend API ---
   const analyzeImageWithGemini = async (uri) => {
     setLoadingText('Analyzing your meal...');
     try {
@@ -113,11 +112,10 @@ export default function AiFoodScanScreen({ navigation }) {
 
   const handleFoodConfirm = (foodName) => { setConfirmedFood(foodName); getNutritionFromGemini(foodName); };
 
-  // --- UPDATED to use the secure backend API ---
   const getNutritionFromGemini = async (foodName) => {
     setLoadingText('Estimating nutrition...');
     try {
-      const response = await api.getNutritionForFood(foodName); // Call the new, secure function
+      const response = await api.getNutritionForFood(foodName); 
       if (response.success) {
         setCalories(response.calories || 0);
         setSugar(response.sugar || 0);

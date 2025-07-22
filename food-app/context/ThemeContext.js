@@ -4,7 +4,6 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// --- NEW LIGHT THEME with a clear, accessible blue ---
 export const lightColors = {
   background: '#F9FAFB',     
   card: '#FFFFFF',        

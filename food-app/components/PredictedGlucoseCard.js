@@ -32,7 +32,6 @@ const getStyles = (colors) => StyleSheet.create({
     dataValueProjected: { color: '#3D88F8', },
     divider: { width: 1, height: '70%', backgroundColor: colors.border, },
     disclaimer: { fontSize: 12,  color: colors.textSecondary, textAlign: 'center', paddingHorizontal: 10, fontStyle: 'italic', },
-    // --- Styles for the new "Upgrade" view ---
     upgradeContainer: { justifyContent: 'center', alignItems: 'center', flex: 1, padding: 10, },
     upgradeText: { color: colors.textSecondary, fontSize: 14, textAlign: 'center', lineHeight: 22, marginBottom: 20, },
     upgradeButton: { backgroundColor: '#F97316', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 10, },

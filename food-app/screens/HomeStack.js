@@ -7,7 +7,6 @@ import FullGlucoseChart from './FullGlucoseChart';
 const Stack = createNativeStackNavigator();
 
 export default function HomeStack({ route }) {
-  // --- FIX: Safely access params with a fallback ---
   const { userId, isProvider } = route.params || {};
 
   return (

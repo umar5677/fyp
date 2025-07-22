@@ -193,20 +193,20 @@ function createPostsRouter(dbPool) {
                 return res.status(403).json({ message: 'Forbidden: You do not own this post.' });
             }
             
-            // 1. Get all image URLs to delete from S3 later
+            // Get all image URLs to delete from S3 later
             const [images] = await connection.query('SELECT imageUrl FROM post_images WHERE postID = ?', [postId]);
 
-            // 2. Delete all related records from child tables
+            // Delete all related records from child tables
             await connection.query('DELETE FROM post_likes WHERE postID = ?', [postId]);
             await connection.query('DELETE FROM post_comments WHERE postID = ?', [postId]);
             await connection.query('DELETE FROM post_images WHERE postID = ?', [postId]);
 
-            // 3. Delete the main post record
+            // Delete the main post record
             await connection.query('DELETE FROM posts WHERE id = ?', [postId]);
 
             await connection.commit();
 
-            // 4. After DB transaction is successful, delete files from S3
+            // After DB transaction is successful, delete files from S3
             if (images.length > 0) {
                 const deleteS3Promises = images.map(img => {
                     const key = img.imageUrl.split(process.env.S3_POSTS_BUCKET + '/')[1];
@@ -289,7 +289,6 @@ function createPostsRouter(dbPool) {
             
             const post = posts[0];
             const formattedPost = { ...post, images: post.images ? post.images.split(',') : [], likedByUser: !!post.likedByUser, 
-            // --- NEW ---
             isOwner: post.userID === currentUserID
             };
             res.json(formattedPost);

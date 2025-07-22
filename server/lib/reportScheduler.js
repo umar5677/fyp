@@ -7,13 +7,11 @@ const dbPool = mysql.createPool({ host: process.env.DB_HOST,
     waitForConnections: true, 
     connectionLimit: 10, 
     queueLimit: 0 });
-const { generateAndEmailReport } = require('./reportGenerator'); // We will create this helper function next
+const { generateAndEmailReport } = require('./reportGenerator');
 
-// --- Main Scheduling Function ---
 const startScheduledReports = () => {
     console.log('Automated Report Scheduler has been started.');
 
-    // Schedule 1: Run at 7:00 AM every Sunday for WEEKLY reports.
     // Cron format: 'minute hour day-of-month month day-of-week'
     cron.schedule('0 7 * * 0', async () => {
         console.log('Running weekly report job...');
@@ -47,7 +45,6 @@ const startScheduledReports = () => {
         }
     });
 
-    // Schedule 2: Run at 7:00 AM on the 1st day of every month for MONTHLY reports.
     cron.schedule('0 7 1 * *', async () => {
         console.log('Running monthly report job...');
         try {

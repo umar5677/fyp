@@ -7,7 +7,6 @@ function createRemindersRouter(dbPool) {
     // GET all reminders for the logged-in user
     router.get('/', async (req, res) => {
         try {
-            // Fetch the new notificationIDs column as well
             const [reminders] = await dbPool.query(
                 'SELECT reminderID, label, time, repeatDays, isEnabled, notificationIDs FROM reminders WHERE userID = ?',
                 [req.user.userId]
@@ -42,10 +41,8 @@ function createRemindersRouter(dbPool) {
     // PUT (update) an existing reminder
     router.put('/:id', async (req, res) => {
         const { id } = req.params;
-        // Now accepts notificationIDs to be updated
         const { label, time, repeatDays, isEnabled, notificationIDs } = req.body;
         try {
-            // Update the notificationIDs column along with the other fields
             const [result] = await dbPool.query(
                 'UPDATE reminders SET label = ?, time = ?, repeatDays = ?, isEnabled = ?, notificationIDs = ? WHERE reminderID = ? AND userID = ?',
                 [label, time, JSON.stringify(repeatDays), isEnabled, JSON.stringify(notificationIDs), id, req.user.userId]

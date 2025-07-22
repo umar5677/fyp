@@ -4,12 +4,12 @@ import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
-import { api } from '../utils/api'; // Use the central api utility
-import { useTheme } from '../context/ThemeContext'; // Import theme hook for dark mode
+import { api } from '../utils/api'; 
+import { useTheme } from '../context/ThemeContext';
 
 export default function NotificationsScreen({ navigation }) {
-    const { colors } = useTheme(); // Get theme colors
-    const styles = getStyles(colors); // Generate theme-aware styles
+    const { colors } = useTheme(); 
+    const styles = getStyles(colors);
 
     const [notifications, setNotifications] = useState([]);
 
@@ -107,7 +107,6 @@ export default function NotificationsScreen({ navigation }) {
     );
 };
 
-// Styles are now a function that returns theme-aware styles
 const getStyles = (colors) => StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: colors.background },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.card },

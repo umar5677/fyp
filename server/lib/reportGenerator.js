@@ -4,11 +4,10 @@ const PDFDocument = require('pdfkit');
 const moment = require('moment');
 const { SESClient, SendRawEmailCommand } = require('@aws-sdk/client-ses');
 
-// --- PDF Layout Constants ---
 const MARGIN = 50;
 const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
-const CONTENT_BOTTOM_MARGIN = PAGE_HEIGHT - MARGIN - 20; // Extra space for footer
+const CONTENT_BOTTOM_MARGIN = PAGE_HEIGHT - MARGIN - 20;
 
 // Initialize SES client
 const ses = new SESClient({
@@ -19,12 +18,7 @@ const ses = new SESClient({
   },
 });
 
-/**
- * The most robust table-drawing function. It measures text height before drawing
- * to ensure perfect page breaks without extra pages.
- */
 function drawTable(doc, title, headers, colPositions, colWidths, data, thresholds = {}) {
-    // Check if there is enough space for the title, header, and at least one row
     if (doc.y + 80 > CONTENT_BOTTOM_MARGIN) {
         doc.addPage();
     }
@@ -41,7 +35,7 @@ function drawTable(doc, title, headers, colPositions, colWidths, data, threshold
     drawTableHeader();
 
     for (const row of data) {
-        // --- Measure the required height for the current row ---
+        // Measure the required height for the current row
         let maxHeight = 0;
         doc.font('Roboto-Regular').fontSize(10);
         row.values.forEach((cellText, i) => {
@@ -51,7 +45,6 @@ function drawTable(doc, title, headers, colPositions, colWidths, data, threshold
             }
         });
         
-        // --- "Look Before You Leap" using the calculated height ---
         if (doc.y + maxHeight > CONTENT_BOTTOM_MARGIN) {
             doc.addPage();
             doc.font('Roboto-Bold').fontSize(12).text(`${title} (continued)`, MARGIN, doc.y, { underline: true });
@@ -77,10 +70,9 @@ function drawTable(doc, title, headers, colPositions, colWidths, data, threshold
         // Manually set the cursor after the tallest cell in the row
         doc.y = yBefore + maxHeight + 5;
     }
-    doc.moveDown(2); // Space after the entire table
+    doc.moveDown(2); 
 }
 
-// --- Main function for generating the PDF buffer ---
 async function generatePdfBuffer(user, startDate, endDate, dbPool, isAutomated = false) {
     try {
         const userId = user.userID;
@@ -115,7 +107,7 @@ async function generatePdfBuffer(user, startDate, endDate, dbPool, isAutomated =
             doc.on('data', buffer => buffers.push(buffer));
             doc.on('end', () => resolve(Buffer.concat(buffers)));
 
-            // --- Build PDF Content ---
+            //  Build PDF Content
             doc.font('Roboto-Bold').text(`Patient: ${patientName}`);
             doc.text(`Period: ${moment(startDate).format('LL')} - ${moment(endDate).format('LL')}`).moveDown(2);
             doc.font('Roboto-Bold').fontSize(12).text('Patient Information', { underline: true }).moveDown();
@@ -130,7 +122,6 @@ async function generatePdfBuffer(user, startDate, endDate, dbPool, isAutomated =
             if (calorieData.length > 0) drawTable(doc, 'Calorie Logs', tableLayout.headers, tableLayout.colPositions, tableLayout.colWidths, calorieData);
             if (sugarData.length > 0) drawTable(doc, 'Sugar Logs', tableLayout.headers, tableLayout.colPositions, tableLayout.colWidths, sugarData);
             
-            // --- Final Step: Stamp Headers and Footers on All Pages ---
             const pageCount = doc.bufferedPageRange().count;
             for (let i = 0; i < pageCount; i++) {
                 doc.switchToPage(i);
@@ -149,7 +140,6 @@ async function generatePdfBuffer(user, startDate, endDate, dbPool, isAutomated =
     }
 }
     
-// --- Reusable Function for Emailing (No changes here) ---
 async function generateAndEmailReport(user, startDate, endDate, dbPool, isAutomated = false) {
     try {
         const { pdfBuffer, patientName, reportTypeString, filename } = await generatePdfBuffer(user, startDate, endDate, dbPool, isAutomated);

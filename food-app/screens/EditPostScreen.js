@@ -122,7 +122,6 @@ export default function EditPostScreen({ route }) {
     );
 }
 
-// (You can copy the getStyles function from AddPostScreen.js as it's identical)
 const getStyles = (colors) => StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     scrollView: { padding: 16 },
