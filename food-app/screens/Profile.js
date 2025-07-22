@@ -167,7 +167,7 @@ const ProfileScreen = ({ navigation }) => {
                     <ProfileMenuButton iconName="alarm-outline" text="Reminders" onPress={() => navigation.navigate('Reminders')} colors={colors} />
                     <ProfileMenuButton iconName="shield-checkmark-outline" text="Alerts and Sharing" onPress={() => navigation.navigate('Alerts')} colors={colors} />
                     <ProfileMenuButton iconName="settings-outline" text="Dark Mode" isSwitch={true} switchValue={theme === 'dark'} onSwitchChange={toggleTheme} colors={colors} />
-                     <ProfileMenuButton iconName="chatbubble-ellipses-outline" text="Feedback & Suggestions" onPress={() => Linking.openURL('mailto:glucobites.org@gmail.com')} colors={colors} />
+                     <ProfileMenuButton iconName="chatbubble-ellipses-outline" text="Contact Us" onPress={() => Linking.openURL('mailto:glucobites.org@gmail.com')} colors={colors} />
                 </View>
 
                 <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>

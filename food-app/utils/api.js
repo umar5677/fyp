@@ -2,7 +2,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
 
-const BASE_URL = 'http://192.168.0.120:3000/api';
+const BASE_URL = 'http://192.168.10.120:3000/api';
 
 async function authenticatedFetch(endpoint, options = {}) {
     let accessToken = await SecureStore.getItemAsync('accessToken');
@@ -130,6 +130,83 @@ export const api = {
         });
         return response.json();
     },
+
+    //Notifications & Reminders
+    getNotifications: async () => {
+        const response = await authenticatedFetch('/notifications');
+        return response.json();
+    },
+
+    clearNotifications: async () => {
+        const response = await authenticatedFetch('/notifications', { method: 'DELETE' });
+        return response.json();
+    },
+
+    getReminders: async () => {
+        const response = await authenticatedFetch('/reminders');
+        return response.json();
+    },
+    addReminder: async (reminderData) => {
+        const response = await authenticatedFetch('/reminders', {
+            method: 'POST',
+            body: JSON.stringify(reminderData)
+        });
+        return response.json();
+    },
+    updateReminder: async (id, reminderData) => {
+        const response = await authenticatedFetch(`/reminders/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(reminderData)
+        });
+        return response.json();
+    },
+    deleteReminder: async (id) => {
+        const response = await authenticatedFetch(`/reminders/${id}`, { method: 'DELETE' });
+        return response.json();
+    },
+
+    // Posts & Social Features
+    likePost: async (postId) => {
+        const response = await authenticatedFetch(`/posts/${postId}/like`, { method: 'POST' });
+        return response.json();
+    },
+
+    unlikePost: async (postId) => {
+        const response = await authenticatedFetch(`/posts/${postId}/like`, { method: 'DELETE' });
+        return response.json();
+    },
+
+    getPosts: async () => {
+        const response = await authenticatedFetch('/posts');
+        return response.json();
+    },
+    createPost: async (formData) => {
+        return authenticatedUploadFetch('/posts', formData);
+    },
+    likePost: async (postId) => {
+        const response = await authenticatedFetch(`/posts/${postId}/like`, { method: 'POST' });
+        return response.json();
+    },
+    unlikePost: async (postId) => {
+        const response = await authenticatedFetch(`/posts/${postId}/like`, { method: 'DELETE' });
+        return response.json();
+    },
+
+    getPostDetails: async (postId) => {
+        const response = await authenticatedFetch(`/posts/${postId}`);
+        return response.json();
+    },
+    getPostComments: async (postId) => {
+        const response = await authenticatedFetch(`/posts/${postId}/comments`);
+        return response.json();
+    },
+    addComment: async (postId, commentText) => {
+        const response = await authenticatedFetch(`/posts/${postId}/comment`, {
+            method: 'POST',
+            body: JSON.stringify({ commentText })
+        });
+        return response.json();
+    },
     
     // User Settings & Reports
     getUserThresholds: async () => {
@@ -143,6 +220,8 @@ export const api = {
         });
         return response.json();
     },
+
+    //Profile Settings
     getPreferredProvider: async () => {
         const response = await authenticatedFetch('/user-settings/provider');
         return response.json();
@@ -173,6 +252,23 @@ export const api = {
         if (response.headers.get('content-type')?.includes('application/pdf')) {
             return response;
         }
+        return response.json();
+    },
+
+    //AI Functions
+    identifyFoodFromImage: async (base64) => {
+        const response = await authenticatedFetch('/ai/identify-food', {
+            method: 'POST',
+            body: JSON.stringify({ image: base64 }),
+        });
+        return response.json();
+    },
+
+    getNutritionForFood: async (foodName) => {
+        const response = await authenticatedFetch('/ai/get-nutrition', {
+            method: 'POST',
+            body: JSON.stringify({ foodName }),
+        });
         return response.json();
     },
     

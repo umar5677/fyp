@@ -1,3 +1,5 @@
+// fyp/food-app/screens/LogCalorieSugarScreen.js
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Alert,
@@ -64,10 +66,10 @@ const getStyles = (colors) => StyleSheet.create({
     nutritionRow: { flexDirection: 'row', alignItems: 'center' },
     fabContainer: { position: 'absolute', bottom: 35, right: 25, alignItems: 'center' },
     fab: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', elevation: 6, shadowColor: '#000', shadowRadius: 4, shadowOpacity: 0.3, shadowOffset: { height: 3, width: 0 } },
-    mainFab: { backgroundColor: '#F57C00', width: 60, height: 60, borderRadius: 30, },
+    mainFab: { backgroundColor: colors.primary, width: 60, height: 60, borderRadius: 30, },
     secondaryFab: { position: 'absolute', },
     aiFab: { backgroundColor: '#E67E22' },
-    manualFab: { backgroundColor: '#0096FF' },
+    manualFab: { backgroundColor: '#3498DB' },
 });
 
 const FoodLogItem = ({ item, onEdit, index, colors }) => {
@@ -87,23 +89,11 @@ const FoodLogItem = ({ item, onEdit, index, colors }) => {
                 <View style={styles.logItemDetails}>
                     {foodName && (<Text style={styles.foodNameText} numberOfLines={1}>{foodName}</Text>)}
                     <View style={styles.nutritionRow}>
-                        {calorieLog && (
-                            <View style={styles.logDetailRow}>
-                                <Ionicons name="flame" size={18} color="#F57C00" />
-                                <Text style={styles.logValueText}>{parseInt(calorieLog.amount, 10)}</Text>
-                                <Text style={styles.logUnitText}>kcal</Text>
-                            </View>
-                        )}
-                        {sugarLog && (
-                            <View style={[styles.logDetailRow, {marginLeft: calorieLog ? 15 : 0}]}>
-                                <MaterialCommunityIcons name="candy" size={18} color="#D32F2F" />
-                                <Text style={styles.logValueText}>{parseFloat(sugarLog.amount).toFixed(1)}</Text>
-                                <Text style={styles.logUnitText}>g</Text>
-                            </View>
-                        )}
+                        {calorieLog && ( <View style={styles.logDetailRow}> <Ionicons name="flame" size={18} color="#F57C00" /> <Text style={styles.logValueText}>{parseInt(calorieLog.amount, 10)}</Text> <Text style={styles.logUnitText}>kcal</Text> </View> )}
+                        {sugarLog && ( <View style={[styles.logDetailRow, {marginLeft: calorieLog ? 15 : 0}]}> <MaterialCommunityIcons name="candy" size={18} color="#D32F2F" /> <Text style={styles.logValueText}>{parseFloat(sugarLog.amount).toFixed(1)}</Text> <Text style={styles.logUnitText}>g</Text> </View> )}
                     </View>
                 </View>
-                <Ionicons name="chevron-forward" size={22} color="#D1D5DB" />
+                <Ionicons name="chevron-forward" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
         </Animatable.View>
     );
@@ -205,18 +195,7 @@ const DateNavigator = ({ date, onDateChange, period, onOpenCalendar, colors }) =
 const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate, colors }) => {
     const styles = getStyles(colors);
     const today = new Date().toISOString().split('T')[0];
-    const calendarTheme = {
-        calendarBackground: colors.card,
-        textSectionTitleColor: colors.textSecondary,
-        dayTextColor: colors.text,
-        todayTextColor: colors.primary,
-        selectedDayBackgroundColor: colors.primary,
-        selectedDayTextColor: '#FFFFFF',
-        monthTextColor: colors.text,
-        indicatorColor: colors.primary,
-        arrowColor: colors.primary,
-        'stylesheet.calendar.header': { week: { marginTop: 5, flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.border } }
-    };
+    const calendarTheme = { calendarBackground: colors.card, textSectionTitleColor: colors.textSecondary, dayTextColor: colors.text, todayTextColor: colors.primary, selectedDayBackgroundColor: colors.primary, selectedDayTextColor: '#FFFFFF', monthTextColor: colors.text, indicatorColor: colors.primary, arrowColor: colors.primary, 'stylesheet.calendar.header': { week: { marginTop: 5, flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.border } } };
     return ( <Modal visible={isVisible} transparent={true} animationType="fade"><TouchableOpacity style={styles.calendarBackdrop} onPress={onClose} /><View style={[styles.calendarModalContainer, { backgroundColor: colors.card }]}><Calendar current={initialDate.toISOString().split('T')[0]} maxDate={today} onDayPress={(day) => { const newDate = new Date(day.timestamp); newDate.setMinutes(newDate.getMinutes() + newDate.getTimezoneOffset()); onDayPress(newDate); onClose(); }} theme={calendarTheme} /></View></Modal> );
 };
 
@@ -228,32 +207,44 @@ export default function LogCalorieSugarScreen({ navigation }) {
     const [groupedHistory, setGroupedHistory] = useState([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [editingLogs, setEditingLogs] = useState(null);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const [timePeriod, setTimePeriod] = useState('day');
     const [displayDate, setDisplayDate] = useState(new Date());
     const [isCalendarVisible, setIsCalendarVisible] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const menuAnimation = useRef(new Animated.Value(0)).current;
+    const [isPremiumUser, setIsPremiumUser] = useState(false);
 
     const loadData = async (period, date) => {
-        if (isLoading) return;
         setIsLoading(true);
         try {
-            const data = await api.getHistory([1, 2], period, date.toISOString());
+            const [data, qnaStatus] = await Promise.all([
+                api.getHistory([1, 2], period, date.toISOString()),
+                api.getQnaStatus()
+            ]);
+
+            setIsPremiumUser(qnaStatus.is_premium || false);
+            
             setHistory(data);
             const tempGroups = {};
             const timeThreshold = 300000;
             data.forEach(log => {
                 const logTime = new Date(log.date).getTime();
                 const foundGroupKey = Object.keys(tempGroups).find(key => Math.abs(logTime - Number(key)) < timeThreshold);
-                if (foundGroupKey) tempGroups[foundGroupKey].push(log);
-                else tempGroups[logTime] = [log];
+                if (foundGroupKey) {
+                    tempGroups[foundGroupKey].push(log);
+                } else {
+                    tempGroups[logTime] = [log];
+                }
             });
             const finalGrouped = Object.values(tempGroups).map(logs => ({
                 timestamp: logs[0].date, logs: logs.sort((a, b) => a.type - b.type),
             })).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
             setGroupedHistory(finalGrouped);
-        } catch (err) { Alert.alert('Error', 'Failed to load history.'); } 
+        } catch (err) { 
+            Alert.alert('Error', 'Failed to load screen data.'); 
+            setIsPremiumUser(false);
+        } 
         finally { setIsLoading(false); }
     };
 
@@ -280,7 +271,14 @@ export default function LogCalorieSugarScreen({ navigation }) {
     
     const handleAiScan = () => {
         toggleMenu();
-        navigation.navigate('AiFoodScan');
+        if (isPremiumUser) {
+            navigation.navigate('AiFoodScan');
+        } else {
+            Alert.alert(
+                "Premium Feature",
+                "AI-powered food scanning is a premium feature. Please upgrade to use it."
+            );
+        }
     };
 
     const handleSave = async (logsToEdit, newValues, logDate, foodName) => {

@@ -1,272 +1,221 @@
-// screens/Community.js
-import { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  FlatList,
-  Image,
-  Dimensions,
+// fyp/food-app/screens/Community.js
+import React, { useState, useCallback } from 'react';
+import { 
+    View, Text, Image, FlatList, StyleSheet, ActivityIndicator, 
+    TouchableOpacity, RefreshControl, SafeAreaView, Alert
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+import { api } from '../utils/api';
+import { useTheme } from '../context/ThemeContext';
 
-// Adjust these if you change your tab bar or FAB sizes
-const TAB_BAR_HEIGHT = 85;
-const FAB_SIZE = 56;
+dayjs.extend(relativeTime);
 
-// Sample data as plain JavaScript array
-const sampleData = [
-  {
-    id: '1',
-    user: { name: 'Jane Doe', avatar: 'https://i.pravatar.cc/100?img=12' },
-    time: '2h ago',
-    content:
-      'Just tried this avocado-chia pudding for breakfast—only 8g net carbs and full of healthy fats! 🥑✨',
-    image:
-      'https://www.australianavocados.com.au/wp-content/uploads/2021/12/Avocado-Chia-Pudding-1.png',
-    likes: 24,
-    comments: 5,
-  },
-  {
-    id: '2',
-    user: { name: 'Coach Mia Tan', avatar: 'https://i.pravatar.cc/100?img=47', isProvider: true },
-    time: '4h ago',
-    content:
-      '💪 Just wrapped up a morning “Move with Mia” fitness session focused on improving insulin sensitivity for Type 2 diabetics! Exercise is medicine—stay active, stay empowered. 🏃‍♀️💙',
-    image:
-      'https://www.fitnessgymyoga.com/wp-content/uploads/2018/01/group-fitness-outside-11301699txjzd-new-mother-nature-s-gym-of-group-fitness-outside-286596r-16991130.jpg',
-    likes: 118,
-    comments: 40,
-  },
-];
+const PostItem = ({ item, onToggleLike, navigation, colors }) => {
+    const styles = getStyles(colors);
+    const [isFlagged, setIsFlagged] = useState(false);
 
-const { width } = Dimensions.get('window');
+    const handleFlagPost = () => {
+        setIsFlagged(!isFlagged);
+        Alert.alert(
+            "Post Reported",
+            "Thank you for your feedback. A moderator will review this post shortly."
+        );
+        // In a real application, you would also send an API call here to your server
+        // e.g., api.reportPost(item.id);
+    };
+
+    return (
+        <View style={styles.card}>
+            {/* --- Card Header --- */}
+            <View style={styles.cardHeader}>
+                <Image source={{ uri: item.pfpUrl || `https://i.pravatar.cc/100?u=${item.userID}` }} style={styles.avatar} />
+                <View style={styles.userInfo}>
+                    <Text style={styles.username}>{item.first_name} {item.last_name}</Text>
+                    <Text style={styles.date}>{dayjs(item.createdAt).fromNow()}</Text>
+                </View>
+                <TouchableOpacity onPress={handleFlagPost}>
+                    <Ionicons 
+                        name={isFlagged ? "flag" : "flag-outline"} 
+                        size={22} 
+                        color={isFlagged ? colors.logoutText : colors.textSecondary} 
+                    />
+                </TouchableOpacity>
+            </View>
+
+            {/* --- Card Content --- */}
+            <TouchableOpacity onPress={() => navigation.navigate("PostDetail", { postId: item.id })}>
+                <Text style={styles.content}>{item.content}</Text>
+                {item.images && item.images.length > 0 && (
+                    <Image source={{ uri: item.images[0] }} style={styles.postImage} />
+                )}
+            </TouchableOpacity>
+            
+            {/* --- Action Bar (Likes, Comments, Share) --- */}
+            <View style={styles.actionBar}>
+                <TouchableOpacity style={styles.actionButton} onPress={() => onToggleLike(item.id, item.likedByUser)}>
+                    <Ionicons name={item.likedByUser ? "heart" : "heart-outline"} size={26} color={item.likedByUser ? '#EF4444' : colors.textSecondary} />
+                    <Text style={[styles.actionText, { color: item.likedByUser ? '#EF4444' : colors.textSecondary }]}>
+                        {item.likeCount}
+                    </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate("PostDetail", { postId: item.id })}>
+                    <Ionicons name={"chatbubble-outline"} size={24} color={colors.textSecondary} />
+                    <Text style={[styles.actionText, { color: colors.textSecondary }]}>
+                        {item.commentCount}
+                    </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionButton}>
+                    <Ionicons name={"arrow-redo-outline"} size={24} color={colors.textSecondary} />
+                    <Text style={[styles.actionText, { color: colors.textSecondary }]}>Share</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+};
 
 export default function CommunityScreen() {
-  const [posts] = useState(sampleData);
-  const insets = useSafeAreaInsets();
-  const [liked, setLiked] = useState({});
-  const [flagged, setFlagged] = useState({});
-  const navigation = useNavigation();
+    const navigation = useNavigation();
+    const { colors } = useTheme();
+    const styles = getStyles(colors);
 
-  const toggleLike = (postId) => {
-    setLiked(prev => ({ ...prev, [postId]: !prev[postId] }));
-  };
+    const [posts, setPosts] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-  const toggleFlag = (postId) => {
-    setFlagged(prev => ({ ...prev, [postId]: !prev[postId] }));
-  };
+    const fetchPosts = async () => {
+        try {
+            const data = await api.getPosts();
+            setPosts(data);
+        } catch (err) {
+            console.error("Failed to fetch posts", err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-  /** @param {{ item: CommunityPost }} param0 */
-  const renderPost = ({ item }) => {
-    const isLiked = liked[item.id];
-    const isFlagged = flagged[item.id];
-    return(
-    <View style={styles.card}>
-      {/* Header with user info and flag icon */}
-      <View style={styles.communityHeader}>
-        <View style={styles.userInfo}>
-          <Image source={{ uri: item.user.avatar }} style={styles.avatar} />
-          <View>
-            <View style={styles.nameRow}>
-              <Text style={styles.username}>{item.user.name}</Text>
-              {item.user.isProvider && (
-                <MaterialCommunityIcons
-                  name="check-decagram"
-                  size={16}
-                  color="#007AFF"
-                  style={{ marginLeft: 4 }}
-                />
-              )}
+    useFocusEffect(useCallback(() => {
+        setIsLoading(true);
+        fetchPosts();
+    }, []));
+    
+    const onRefresh = useCallback(() => {
+        fetchPosts();
+    }, []);
+
+    const handleToggleLike = (postId, wasLiked) => {
+        setPosts(currentPosts => 
+            currentPosts.map(post => {
+                if (post.id === postId) {
+                    return { ...post, likedByUser: !wasLiked, likeCount: wasLiked ? post.likeCount - 1 : post.likeCount + 1, };
+                }
+                return post;
+            })
+        );
+        if (wasLiked) {
+            api.unlikePost(postId).catch(() => fetchPosts());
+        } else {
+            api.likePost(postId).catch(() => fetchPosts());
+        }
+    };
+
+    if (isLoading) {
+        return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
+    }
+
+    return (
+        <SafeAreaView style={styles.container}>
+            <View style={styles.header}>
+                <View style={styles.logoContainer}>
+                    <View style={styles.logoIcon} />
+                    <Text style={styles.headerTitle}>GlucoBites</Text>
+                </View>
+                <TouchableOpacity style={styles.createButton} onPress={() => navigation.navigate('AddPost')}>
+                    <Ionicons name="add" size={16} color="#FFFFFF"/>
+                    <Text style={styles.createButtonText}>Create Post</Text>
+                </TouchableOpacity>
             </View>
-            <Text style={styles.time}>{item.time}</Text>
-          </View>
-        </View>
-        <TouchableOpacity onPress={() => toggleFlag(item.id)}>
-          <Ionicons name={isFlagged ? "flag" : "flag-outline"} size={20} color={isFlagged ? "red" : "grey"}/>
-        </TouchableOpacity>
-      </View>
-
-      {/* Post content */}
-      <Text style={styles.content}>{item.content}</Text>
-
-      {/* Post image if available */}
-      {item.image && (
-        <Image source={{ uri: item.image }} style={styles.postImage} resizeMode="cover" />
-      )}
-
-      {/* Action buttons */}
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => toggleLike(item.id)}
-        >
-          <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={20} color={isLiked ? 'red' : 'gray'} />
-          <Text style={styles.actionTxt}>{item.likes}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => alert('Comments on post ' + item.id)}
-        >
-          <Ionicons name="chatbubble-outline" size={20} color="#555" />
-          <Text style={styles.actionTxt}>{item.comments}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => alert('Share post ' + item.id)}
-        >
-          <Ionicons name="share-social-outline" size={20} color="#555" />
-          <Text style={styles.actionTxt}>Share</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+            <FlatList
+                data={posts}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={({ item }) => <PostItem item={item} onToggleLike={handleToggleLike} navigation={navigation} colors={colors} />}
+                contentContainerStyle={styles.list}
+                refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor={colors.primary}/>}
+                ListEmptyComponent={
+                    <View style={styles.centerEmpty}>
+                        <Ionicons name="people-outline" size={60} color={colors.textSecondary} />
+                        <Text style={styles.emptyText}>No posts yet. Be the first to share!</Text>
+                    </View>
+                }
+            />
+        </SafeAreaView>
     );
-  };
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>GlucoBites</Text>
-      </View>
-      <View style={styles.screen}><Text>Community</Text></View>
-      <FlatList
-        data={posts}
-        keyExtractor={(item) => item.id}
-        renderItem={renderPost}
-        contentContainerStyle={{
-          padding: 16,
-          paddingBottom: insets.bottom + 16,
-        }}
-      />
-
-      {/* Floating action button */}
-      <TouchableOpacity
-        style={[
-          { bottom: insets.bottom + 90, left:250 },
-        ]}
-        onPress={() => navigation.navigate('AddPost')}
-      >
-        <View style={{backgroundColor:'#f78161',
-          width:120,
-          height:45,
-          borderRadius:30,
-          alignItems:'center',
-          justifyContent:'center',
-          flexDirection:'row',
-          }}>
-        <MaterialCommunityIcons name="square-edit-outline" 
-          size={35} 
-          color="white" 
-          
-          />
-          <Text style={styles.fabText}> Add Post</Text>
-        </View>
-      </TouchableOpacity>
-    </View>
-  );
 }
 
-const styles = StyleSheet.create({
-    header: {
-        height: 100,
-        backgroundColor: '#fff',
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        zIndex: 100,
+const getStyles = (colors) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    centerEmpty: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 150 },
+    header: { 
+        paddingVertical: 12, 
+        paddingHorizontal: 16, 
+        borderBottomWidth: 1, 
+        borderBottomColor: colors.border, 
+        backgroundColor: colors.card,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center'
     },
-    headerTitle: {
-        fontSize: 20,
+    logoContainer: {
+        flexDirection: 'row',
+        alignItems: 'center'
+    },
+    logoIcon: {
+        width: 12,
+        height: 12,
+        borderRadius: 3,
+        backgroundColor: colors.primary,
+        marginRight: 8,
+    },
+    headerTitle: { fontSize: 22, fontWeight: 'bold', color: colors.text },
+    createButton: {
+        backgroundColor: colors.primary,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 8,
+        flexDirection: 'row',
+        alignItems: 'center'
+    },
+    createButtonText: {
+        color: '#FFFFFF',
         fontWeight: 'bold',
-        color: '#313F43',
-        marginTop:50,
+        marginLeft: 4,
     },
-    screen: {
-        flex: 1,
+    list: { paddingVertical: 16 },
+    card: { backgroundColor: colors.card, marginBottom: 16, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+    cardHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16 },
+    avatar: { width: 44, height: 44, borderRadius: 22, marginRight: 12, backgroundColor: colors.border },
+    userInfo: { flex: 1 },
+    username: { fontWeight: 'bold', color: colors.text, fontSize: 16 },
+    date: { fontSize: 12, color: colors.textSecondary },
+    content: { fontSize: 15, color: colors.text, lineHeight: 22, paddingHorizontal: 16, marginVertical: 8 },
+    postImage: { width: '100%', height: 250, backgroundColor: colors.border, marginTop: 4 },
+    emptyText: { color: colors.textSecondary, marginTop: 16, fontSize: 16 },
+    actionBar: { 
+        flexDirection: 'row', 
+        justifyContent: 'space-around',
+        paddingVertical: 12, 
+        borderTopWidth: 1, 
+        borderTopColor: colors.border,
+    },
+    actionButton: { 
+        flexDirection: 'row', 
         alignItems: 'center',
-        justifyContent: 'center',
     },
-    container: { 
-        flex: 1, 
-        backgroundColor: '#f2f2f7' 
-    },
-    card: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        marginBottom: 16,
-        shadowColor: '#000',
-        shadowOpacity: 0.05,
-        shadowOffset: { width: 0, height: 1 },
-        elevation: 2,
-        overflow: 'hidden',
-    },
-    communityHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 12,
-    },
-    userInfo: { 
-        flexDirection: 'row', 
-        alignItems: 'center' 
-    },
-    nameRow: { 
-        flexDirection: 'row', 
-        alignItems: 'center' 
-    },
-    avatar: { width: 36, 
-        height: 36, 
-        borderRadius: 18, 
-        marginRight: 8 
-    },
-    username: { 
-        fontWeight: '600', 
-        fontSize: 14 
-    },
-    time: { 
-        color: '#666', 
-        fontSize: 12 
-    },
-    content: { 
-        paddingHorizontal: 12, 
-        paddingBottom: 8, 
-        fontSize: 15, 
-        lineHeight: 22 
-    },
-    postImage: {
-        width: '100%',
-        aspectRatio: 16 / 9,
-        borderTopLeftRadius: 12,
-        borderTopRightRadius: 12,
-    },
-    actions: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        borderTopWidth: 1,
-        borderTopColor: '#eee',
-        padding: 12,
-    },
-    actionBtn: { 
-        flexDirection: 'row', 
-        alignItems: 'center' 
-    },
-    actionTxt: { 
-        marginLeft: 6, 
+    actionText: { 
+        marginLeft: 8, 
         fontSize: 14, 
-        color: '#555' 
-    },
-    fabText: {
-        marginLeft: 0,  // Space between icon and text
-        color: 'white',  // Text color inside the FAB
-        fontSize: 14,  // Font size for the text
-        fontWeight: 'bold',  // Make the text bold
-    },
+        fontWeight: '600',
+    }
 });

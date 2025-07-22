@@ -17,15 +17,19 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/GlucoBites.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
-        "android.permission.RECORD_AUDIO",
         "android.permission.RECORD_AUDIO"
       ],
-      "package": "com.dope9402.GlucoBites"
+      "package": "com.dope9402.GlucoBites",
+      "useNextNotificationsApi": true,
+      "notification": {
+        "icon": "./assets/GlucoBites.png",
+        "color": "#F97316"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"

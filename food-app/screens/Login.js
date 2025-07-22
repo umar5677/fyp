@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, Alert, ActivityIndicator, TouchableOpacity, Image, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
-const YOUR_AWS_LOGIN_API_URL = 'http://192.168.0.120:3000/api/login';
+const YOUR_AWS_LOGIN_API_URL = 'http://192.168.10.120:3000/api/login';
 
 const Login = ({ navigation }) => {
     const [email, setEmail] = useState('');

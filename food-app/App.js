@@ -33,6 +33,8 @@ import RemindersScreen from './screens/Reminders';
 import ProfileSetupScreen from './screens/ProfileSetup';
 import EditProfileScreen from './screens/EditProfile'; 
 import ChangePasswordScreen from './screens/ChangePassword';
+import AddPostScreen from './screens/AddPostScreen';
+import PostDetailScreen from './screens/PostDetailScreen';
 
 // Import Q&A feature screens and components
 import ProviderTabs from './components/ProviderTabs';
@@ -106,6 +108,27 @@ const AppNavigator = () => {
                 headerTintColor: colors.text,
             }} 
         />
+
+        <Stack.Screen
+                    name="AddPost"
+                    component={AddPostScreen}
+                    options={{
+                        headerShown: true,
+                        title: 'Create New Post',
+                        headerStyle: { backgroundColor: colors.card },
+                        headerTintColor: colors.text,
+                    }}
+                />
+                <Stack.Screen
+                    name="PostDetail"
+                    component={PostDetailScreen}
+                    options={{
+                        headerShown: true,
+                        title: 'Post',
+                        headerStyle: { backgroundColor: colors.card },
+                        headerTintColor: colors.text,
+                    }}
+                />
         <Stack.Screen 
             name="ProviderAnswerScreen" 
             component={ProviderAnswerScreen} 
