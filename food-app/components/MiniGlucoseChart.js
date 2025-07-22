@@ -150,15 +150,15 @@ export default function MiniGlucoseChart() {
                     backgroundGradientFrom: colors.card,
                     backgroundGradientTo: colors.card,
                     decimalPlaces: 0,
-                    color: (opacity = 1) => `rgba(61, 136, 248, ${opacity})`,
+                    color: (opacity = 1) => `rgba(249, 115, 22, ${opacity})`,
                     labelColor: (opacity = 1) => colors.textSecondary,
                     style: { borderRadius: 16 },
-                    propsForDots: { r: '4', strokeWidth: '2', stroke: '#3D88F8' },
+                    propsForDots: { r: '4', strokeWidth: '2', stroke: '#F97316' },
                     propsForBackgroundLines: {
                         strokeDasharray: '4',
                         stroke: colors.border,
                     },
-                    fillShadowGradientFrom: '#3D88F8',
+                    fillShadowGradientFrom: '#F97316',
                     fillShadowGradientFromOpacity: 0.1,
                     fillShadowGradientTo: colors.card,
                     fillShadowGradientToOpacity: 0

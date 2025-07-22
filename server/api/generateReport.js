@@ -1,7 +1,7 @@
 // api/GenerateReport.js
 
 const moment = require('moment');
-const { generateAndEmailReport, generatePdfBuffer } = require('../utils/reportGenerator');
+const { generateAndEmailReport, generatePdfBuffer } = require('../lib/reportGenerator');
 
 module.exports = function createGenerateReportRoute(dbPool) {
   return async (req, res) => {

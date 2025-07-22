@@ -10,7 +10,7 @@ import { api } from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
 
 const screenWidth = Dimensions.get('window').width;
-const CHART_BLUE = '#3D88F8';
+const CHART_ORANGE = '#F97316';
 
 const getBloodSugarStatus = (amount, thresholds) => {
     const numAmount = parseFloat(amount);
@@ -37,7 +37,7 @@ const getStyles = (colors) => StyleSheet.create({
     dateText: { fontSize: 18, fontWeight: '600', color: colors.text },
     rangeSelector: { flexDirection: 'row', backgroundColor: colors.background, borderRadius: 10, overflow: 'hidden' },
     rangeButton: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-    rangeButtonActive: { backgroundColor: CHART_BLUE, borderRadius: 8, margin: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 3 },
+    rangeButtonActive: { backgroundColor: CHART_ORANGE, borderRadius: 8, margin: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 3 },
     rangeButtonText: { color: colors.text, fontSize: 14, fontWeight: '600' },
     rangeButtonTextActive: { color: '#FFF' },
     container: { paddingBottom: 40 },
@@ -199,9 +199,9 @@ export default function FullGlucoseChart() {
             color: (opacity = 1) => `rgba(61, 136, 248, ${opacity})`,
             labelColor: (opacity = 1) => colors.textSecondary,
             style: { borderRadius: 16 },
-            propsForDots: { r: '4', strokeWidth: '2', stroke: CHART_BLUE },
+            propsForDots: { r: '4', strokeWidth: '2', stroke: CHART_ORANGE },
             propsForBackgroundLines: { strokeDasharray: '4', stroke: colors.border },
-            fillShadowGradientFrom: CHART_BLUE,
+            fillShadowGradientFrom: CHART_ORANGE,
             fillShadowGradientFromOpacity: 0.1,
             fillShadowGradientTo: colors.card,
             fillShadowGradientToOpacity: 0,

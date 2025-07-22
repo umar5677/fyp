@@ -14,8 +14,8 @@ async function comparePassword(plainPassword, hashedPassword) {
 
 async function authenticateUser(email, password, dbPool) {
     try {
-        // Fetches hasProfileSetup along with other user data
-        const [users] = await dbPool.query('SELECT userID, email, password, is_verified, hasProfileSetup FROM users WHERE email = ?', [email]);
+        // Fetches the setProvider flag in addition to existing user data
+        const [users] = await dbPool.query('SELECT userID, email, password, is_verified, hasProfileSetup, setProvider FROM users WHERE email = ?', [email]);
         
         if (users.length === 0) {
             return { success: false, code: 'INVALID_CREDENTIALS', message: 'User not found.' };
@@ -32,8 +32,13 @@ async function authenticateUser(email, password, dbPool) {
             return { success: false, code: 'EMAIL_NOT_VERIFIED', message: 'Please verify your email address before logging in.' };
         }
         
-        // Returns the hasProfileSetup status
-        return { success: true, user: { userId: user.userID, email: user.email, hasProfileSetup: user.hasProfileSetup } };
+        // Returns the user's role (isProvider) and setup status
+        return { success: true, user: { 
+            userId: user.userID, 
+            email: user.email, 
+            hasProfileSetup: user.hasProfileSetup,
+            isProvider: user.setProvider === 1 // Convert DB value to a boolean
+        } };
 
     } catch (error) {
         console.error('Authentication service error (within login.js):', error);
@@ -60,7 +65,11 @@ function createLoginRouter(dbPool) {
                 return res.status(401).json({ code: 'INVALID_CREDENTIALS', message: 'Invalid email or password.' });
             }
 
-            const userPayload = { userId: authResult.user.userId };
+            const userPayload = { 
+                userId: authResult.user.userId,
+                // Include isProvider in the JWT payload for backend authorization checks
+                isProvider: authResult.user.isProvider 
+            };
             const accessTokenSecret = process.env.JWT_SECRET;
             const refreshTokenSecret = process.env.JWT_REFRESH_SECRET;
 
@@ -72,8 +81,8 @@ function createLoginRouter(dbPool) {
                 userId: authResult.user.userId,
                 accessToken: accessToken,
                 refreshToken: refreshToken,
-                // Sends the hasProfileSetup flag to the mobile app
-                hasProfileSetup: authResult.user.hasProfileSetup, 
+                hasProfileSetup: authResult.user.hasProfileSetup,
+                isProvider: authResult.user.isProvider, // Sends the provider flag to the mobile app
             });
 
         } catch (error) {

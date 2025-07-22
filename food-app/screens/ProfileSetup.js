@@ -9,7 +9,7 @@ import * as Animatable from 'react-native-animatable';
 import * as Haptics from 'expo-haptics';
 import { api } from '../utils/api';
 
-const PRIMARY_COLOR = '#007AFF';
+const PRIMARY_COLOR = '#F97316';
 
 const RadioButton = ({ label, selected, onSelect }) => (
     <TouchableOpacity style={styles.radioButtonContainer} onPress={() => {

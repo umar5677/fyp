@@ -78,7 +78,7 @@ const getStyles = (colors) => StyleSheet.create({
         backgroundColor: colors.background,
     },
     activeTab: {
-        backgroundColor: '#3D88F8',
+        backgroundColor: colors.primary,
     },
     tabText: {
         color: colors.text,

@@ -243,7 +243,7 @@ export default function AlertsScreen({ navigation }) {
                     <TouchableOpacity style={styles.changeButton} onPress={() => setCurrentStep('categories')}><Text style={styles.changeButtonText}>Change Provider</Text></TouchableOpacity>
                 </View>
                 <Text style={styles.subSectionTitle}>4. Generate Report</Text>
-                <TouchableOpacity onPress={() => handleReportAction('email')} style={[styles.actionButton, { backgroundColor: '#10B981', marginTop: 15 }]} disabled={isProcessing}>
+                <TouchableOpacity onPress={() => handleReportAction('email')} style={[styles.actionButton, { backgroundColor: '#F97316', marginTop: 15 }]} disabled={isProcessing}>
                     {isProcessing ? <ActivityIndicator color="#fff" /> : <Text style={styles.actionButtonText}>📧 Share via Email</Text>}
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => handleReportAction('export')} style={[styles.actionButton, { backgroundColor: '#6366F1' }]} disabled={isProcessing}>

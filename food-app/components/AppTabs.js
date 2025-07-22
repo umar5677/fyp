@@ -1,5 +1,4 @@
 // fyp/food-app/components/AppTabs.js
-
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Platform, StyleSheet } from 'react-native';
@@ -17,11 +16,12 @@ const Tab = createBottomTabNavigator();
 const DummyAddScreen = () => null;
 
 const AppTabs = ({ navigation, route }) => {
-  const userId = route.params?.userId;
+  // --- FIX: Safely access params with a fallback to an empty object ---
+  const { userId, isProvider } = route.params || {};
+
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
 
-  // Define active and inactive colors from our theme context
   const ACTIVE_COLOR = colors.primary;
   const INACTIVE_COLOR = colors.textSecondary;
 
@@ -43,6 +43,8 @@ const AppTabs = ({ navigation, route }) => {
       <Tab.Screen
         name="HomeTab"
         component={HomeStack}
+        // Pass the safe params down to the next navigator
+        initialParams={{ userId, isProvider }} 
         options={{
           tabBarLabel: 'Home',
           tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? "home" : "home-outline"} size={size} color={color} />,

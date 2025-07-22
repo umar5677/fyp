@@ -10,8 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Text, StyleSheet } from 'react-native';
 import FlashMessage from "react-native-flash-message";
 import * as Notifications from 'expo-notifications';
-import { UserProvider, useUser } from './context/UserContext';
-import { ThemeProvider } from './context/ThemeContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 
 // Font Imports
 import {
@@ -35,6 +34,11 @@ import ProfileSetupScreen from './screens/ProfileSetup';
 import EditProfileScreen from './screens/EditProfile'; 
 import ChangePasswordScreen from './screens/ChangePassword';
 
+// Import Q&A feature screens and components
+import ProviderTabs from './components/ProviderTabs';
+import AskQuestionScreen from './screens/AskQuestionScreen';
+import ProviderAnswerScreen from './screens/ProviderAnswerScreen';
+
 const Stack = createStackNavigator();
 
 Notifications.setNotificationHandler({
@@ -45,50 +49,107 @@ Notifications.setNotificationHandler({
   }),
 });
 
+// A helper component to access the theme context for the navigator
+const AppNavigator = () => {
+  const { colors } = useTheme(); // Now we can safely use the theme
+
+  return (
+    <NavigationContainer>
+      <Stack.Navigator
+        initialRouteName="Login"
+        id="RootStack"
+        screenOptions={{ headerShown: false }}
+      >
+        {/* Core Auth and User Screens */}
+        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
+        <Stack.Screen name="MainApp" component={AppTabs} />
+        <Stack.Screen name="ProviderApp" component={ProviderTabs} />
+        <Stack.Screen 
+          name="EditProfile" 
+          component={EditProfileScreen} 
+          options={{
+              headerShown: true,
+              headerTitle: 'Edit Profile',
+              headerStyle: { backgroundColor: colors.card },
+              headerTintColor: colors.text,
+          }} 
+        />
+      
+        {/* General Modal Screens */}
+        <Stack.Screen name="LogBloodSugarModal" component={LogBloodSugarScreen} options={{ presentation: 'transparentModal' }} />
+        <Stack.Screen name="LogCalorieSugarModal" component={LogCalorieSugarScreen} options={{ presentation: 'transparentModal' }} />
+        <Stack.Screen name="AiFoodScan" component={AiFoodScanScreen} options={{ presentation: 'modal' }} />
+        <Stack.Screen name="Notifications" component={NotificationScreen} options={{ presentation: 'modal' }} />
+        <Stack.Screen name="Alerts" component={AlertsScreen} options={{ presentation: 'modal' }} />
+        <Stack.Screen 
+            name="ChangePassword" 
+            component={ChangePasswordScreen} 
+            options={{ 
+                headerShown: true, 
+                headerTitle: 'Change Password',
+                headerStyle: { backgroundColor: colors.card },
+                headerTintColor: colors.text,
+            }} 
+        />
+        <Stack.Screen name="Reminders" component={RemindersScreen} options={{ presentation: 'modal' }} />
+        
+        {/* Q&A Feature Screens with styled headers */}
+        <Stack.Screen 
+            name="AskQuestion" 
+            component={AskQuestionScreen} 
+            options={{ 
+                presentation: 'modal',
+                headerShown: true,
+                headerTitle: 'Ask a Question',
+                headerStyle: { backgroundColor: colors.card },
+                headerTintColor: colors.text,
+            }} 
+        />
+        <Stack.Screen 
+            name="ProviderAnswerScreen" 
+            component={ProviderAnswerScreen} 
+            options={{ 
+                headerShown: true,
+                headerTitle: 'Answer Question',
+                headerStyle: { backgroundColor: colors.card },
+                headerTintColor: colors.text,
+            }} 
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+};
+
+
 // A flag to ensure the font override only happens once
 let fontOverrideApplied = false;
 
 export default function App() {
-  // Load custom fonts
   let [fontsLoaded, fontError] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
+    Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
   });
 
-  //  GLOBAL FONT OVERRIDE LOGIC 
   if (fontsLoaded && !fontError && !fontOverrideApplied) {
     const oldRender = Text.render;
     Text.render = function (...args) {
       const origin = oldRender.call(this, ...args);
       const style = StyleSheet.flatten(origin.props.style);
-
-      if (style && style.fontFamily) {
-        return origin;
-      }
-
-      let fontFamily = 'Inter_400Regular'; // Default
+      if (style && style.fontFamily) { return origin; }
+      let fontFamily = 'Inter_400Regular';
       if (style?.fontWeight === '500') fontFamily = 'Inter_500Medium';
       if (style?.fontWeight === '600' || style?.fontWeight === 'semibold') fontFamily = 'Inter_600SemiBold';
       if (style?.fontWeight === 'bold' || style?.fontWeight === '700') fontFamily = 'Inter_700Bold';
-      
-      const newStyle = { ...style, fontFamily };
-
-      return React.cloneElement(origin, { style: newStyle });
+      return React.cloneElement(origin, { style: { ...style, fontFamily } });
     };
-    fontOverrideApplied = true; // Set the flag to prevent re-applying
+    fontOverrideApplied = true;
   }
 
   useEffect(() => {
     const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
       console.log('Notification tapped!', response.notification.request.content.data);
-      // Here you could add navigation logic based on the notification data
     });
-
-    return () => {
-      responseSubscription.remove();
-    };
+    return () => responseSubscription.remove();
   }, []);
 
   if (!fontsLoaded && !fontError) {
@@ -97,38 +158,10 @@ export default function App() {
 
   return (
     <ThemeProvider>
-    <SafeAreaProvider>
-        <NavigationContainer>
-          <Stack.Navigator
-            initialRouteName="Login"
-            id="RootStack"
-            screenOptions={{ headerShown: false }}
-          >
-          <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
-          <Stack.Screen name="MainApp" component={AppTabs} />
-          <Stack.Screen 
-          name="EditProfile" 
-          component={EditProfileScreen} 
-          options={{
-              headerShown: true,
-              headerTitle: 'Edit Profile',
-          }} 
-      />
-          
-          {/* Modal Screens */}
-          <Stack.Screen name="LogBloodSugarModal" component={LogBloodSugarScreen} options={{ presentation: 'transparentModal' }} />
-          <Stack.Screen name="LogCalorieSugarModal" component={LogCalorieSugarScreen} options={{ presentation: 'transparentModal' }} />
-          <Stack.Screen name="AiFoodScan" component={AiFoodScanScreen} options={{ presentation: 'modal' }} />
-          <Stack.Screen name="Notifications" component={NotificationScreen} options={{ presentation: 'modal' }} />
-          <Stack.Screen name="Alerts" component={AlertsScreen} options={{ presentation: 'modal' }} />
-          <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ headerShown: true, headerTitle: 'Change Password' }} />
-          <Stack.Screen name="Reminders" component={RemindersScreen} options={{ presentation: 'modal' }} />
-        </Stack.Navigator>
-      </NavigationContainer>
-      
-      <FlashMessage position="top" />
-    </SafeAreaProvider>
+      <SafeAreaProvider>
+        <AppNavigator />
+        <FlashMessage position="top" />
+      </SafeAreaProvider>
     </ThemeProvider>
   );
 }

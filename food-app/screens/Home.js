@@ -1,8 +1,8 @@
-// food-app/screens/Home.js
+// fyp/food-app/screens/Home.js
 import React, { useRef, useState, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, ScrollView,
-  FlatList, Dimensions, Animated, SafeAreaView, Platform, StatusBar,
+  View, Text, StyleSheet, ScrollView,
+  FlatList, Dimensions, Animated, SafeAreaView, Platform, StatusBar, TouchableOpacity,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,20 +14,26 @@ import SummaryCard from '../components/SummaryCard';
 import PredictedGlucoseCard from '../components/PredictedGlucoseCard';
 import MiniGlucoseChart from '../components/MiniGlucoseChart'; 
 import CalorieBurnt from '../components/CalorieBurnt';
+import ProviderAnswerCard from '../components/ProviderAnswerCard';
+import AskProviderCard from '../components/AskProviderCard';
 
 const { width } = Dimensions.get('window');
 
-export default function Home() {
+export default function Home({ route }) {
     const { colors } = useTheme();
     const styles = getStyles(colors);
+    const navigation = useNavigation();
+    
+    const { isProvider, userId } = route.params || {};
 
     const today = new Date();
     const todayString = today.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
-    const navigation = useNavigation();
-
+    
     const [userName, setUserName] = useState('User');
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [hasUnread, setHasUnread] = useState(false);
+    const [qnaCount, setQnaCount] = useState(0);
+    const [isPremiumUser, setIsPremiumUser] = useState(false);
 
     const scrollX = useRef(new Animated.Value(0)).current;
     const slidesCount = 2;
@@ -45,26 +51,35 @@ export default function Home() {
             }
 
             if (notificationsData) {
-                const notifications = JSON.parse(notificationsData);
-                setHasUnread(notifications.length > 0);
+                setHasUnread(JSON.parse(notificationsData).length > 0);
             } else {
                 setHasUnread(false);
             }
 
+            if (isProvider) {
+                const providerQuestions = await api.getProviderQuestions();
+                setQnaCount(providerQuestions.length);
+            } else {
+                const userQnaStatus = await api.getQnaStatus();
+                setQnaCount(userQnaStatus.questions_remaining || 0);
+                setIsPremiumUser(userQnaStatus.is_premium || false);
+            }
+
         } catch (error) {
             console.error("Failed to load home screen data:", error);
+            setIsPremiumUser(false);
         }
     };
     
     useFocusEffect(useCallback(() => {
         loadData();
-    }, []));
+    }, [isProvider]));
 
     const onRefresh = useCallback(async () => {
         setIsRefreshing(true);
         await loadData();
         setIsRefreshing(false);
-    }, []);
+    }, [isProvider]);
 
     const getGreeting = () => {
         const hour = today.getHours();
@@ -105,7 +120,9 @@ export default function Home() {
                                 scrollEventThrottle={16}
                             >
                                 <View style={styles.slide}><SummaryCard /></View>
-                                <View style={styles.slide}><PredictedGlucoseCard /></View>
+                                <View style={styles.slide}>
+                                    <PredictedGlucoseCard isPremium={isPremiumUser} />
+                                </View>
                             </ScrollView>
 
                             <View style={styles.dotsContainer}>
@@ -119,6 +136,20 @@ export default function Home() {
                         </View>
                         
                         <MiniGlucoseChart />
+                        
+                        {isProvider ? (
+                            <ProviderAnswerCard 
+                                pendingCount={qnaCount}
+                                onNavigate={() => navigation.navigate('ProviderQuestionListScreen')}
+                            />
+                        ) : (
+                            <AskProviderCard 
+                                questionsRemaining={qnaCount}
+                                isPremium={isPremiumUser}
+                                onNavigate={() => navigation.navigate('AskQuestion')}
+                            />
+                        )}
+
                         <CalorieBurnt />
                     </View>
                 }

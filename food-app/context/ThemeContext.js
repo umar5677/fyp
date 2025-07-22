@@ -15,7 +15,7 @@ export const lightColors = {
   logoutBackground: '#FFE4E6', 
   logoutText: '#BE123C',     
   logoutBorder: '#FECDD3',
-  primary: '#007AFF',     
+  primary: '#F97316',   
 };
 
 
@@ -29,7 +29,7 @@ export const darkColors = {
   logoutBackground: '#491C1C',  
   logoutText: '#FFAFAF',      
   logoutBorder: '#642121',   
-  primary: '#58A6FF',
+  primary: '#FB923C',
 };
 
 

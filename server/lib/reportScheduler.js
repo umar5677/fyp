@@ -7,7 +7,7 @@ const dbPool = mysql.createPool({ host: process.env.DB_HOST,
     waitForConnections: true, 
     connectionLimit: 10, 
     queueLimit: 0 });
-const { generateAndEmailReport } = require('../utils/reportGenerator'); // We will create this helper function next
+const { generateAndEmailReport } = require('./reportGenerator'); // We will create this helper function next
 
 // --- Main Scheduling Function ---
 const startScheduledReports = () => {

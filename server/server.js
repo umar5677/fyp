@@ -3,12 +3,12 @@ require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
 const jwt = require('jsonwebtoken'); 
-const authenticateToken = require('./authMiddleware.js');
+const authenticateToken = require('./lib/authMiddleware.js');
 const multer = require('multer');
 const { S3Client } = require('@aws-sdk/client-s3');
 const multerS3 = require('multer-s3');
 const axios = require('axios');
-const { startScheduledReports } = require('./schedulers/reportScheduler');
+const { startScheduledReports } = require('./lib/reportScheduler.js');
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -74,13 +74,16 @@ const createUserSettingsRoutes = require('./api/userSettings.js');
 const createProvidersRouter = require('./api/providers.js');
 const createOcrRouter = require('./api/ocr.js');
 const createPredictionsRouter = require('./api/predictions.js');
-
+const createQnaRouter = require('./api/qna.js');
+const createProviderRouter = require('./api/provider.js');
 
 app.use('/api/user-settings', createUserSettingsRoutes(dbPool));
 app.post('/api/generate-report', createGenerateReportRoute(dbPool));
 app.use('/api/providers', createProvidersRouter(dbPool));
 app.use('/api/ocr', createOcrRouter(dbPool));
 app.use('/api/predictions', createPredictionsRouter(dbPool));
+app.use('/api/qna', createQnaRouter(dbPool));
+app.use('/api/provider', createProviderRouter(dbPool));
 
 
 app.put('/api/profile-setup', async (req, res) => {

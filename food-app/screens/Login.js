@@ -38,10 +38,16 @@ const Login = ({ navigation }) => {
                     return;
                 }
                 
-                if (responseData.hasProfileSetup) {
-                    navigation.replace('MainApp');
-                } else {
+                // Navigation logic that handles both regular users and providers
+                if (responseData.isProvider) {
+                    navigation.replace('ProviderApp');
+                } else if (!responseData.hasProfileSetup) {
                     navigation.replace('ProfileSetup');
+                } else {
+                    navigation.replace('MainApp', { 
+                        isProvider: responseData.isProvider,
+                        userId: responseData.userId 
+                    });
                 }
                 
             } else {
@@ -84,7 +90,7 @@ const Login = ({ navigation }) => {
                         secureTextEntry
                     />
                     {isLoading ? (
-                        <ActivityIndicator size="large" color="#00AEEF" style={{ marginVertical: 18 }} />
+                        <ActivityIndicator size="large" color="#F97316" style={{ marginVertical: 18 }} />
                     ) : (
                         <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
                             <Text style={styles.loginText}>Login</Text>
@@ -147,7 +153,7 @@ const styles = StyleSheet.create({
     },
     loginButton: {
         width: '100%',
-        backgroundColor: '#00AEEF',
+        backgroundColor: '#F97316',
         paddingVertical: 14,
         borderRadius: 8,
         alignItems: 'center',
@@ -164,7 +170,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     signupLink: {
-        color: '#007AFF',
+        color: '#F97316',
         fontWeight: 'bold' 
     },
 });
