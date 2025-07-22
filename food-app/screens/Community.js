@@ -2,7 +2,9 @@
 import React, { useState, useCallback } from 'react';
 import { 
     View, Text, Image, FlatList, StyleSheet, ActivityIndicator, 
-    TouchableOpacity, RefreshControl, SafeAreaView, Alert
+    TouchableOpacity, RefreshControl, SafeAreaView, Alert,
+    Platform, // <--- ADDED: Import Platform
+    StatusBar // <--- ADDED: Import StatusBar
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -154,7 +156,12 @@ export default function CommunityScreen() {
 }
 
 const getStyles = (colors) => StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
+    container: { 
+        flex: 1, 
+        backgroundColor: colors.background,
+        // <--- MODIFIED: Add paddingTop for Android status bar
+        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     centerEmpty: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 150 },
     header: { 

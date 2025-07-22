@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, Switch, TouchableOpacity,
-  Modal, TextInput, Platform, StyleSheet, SafeAreaView, Alert
+  Modal, TextInput, Platform, StyleSheet, SafeAreaView, Alert,
+  StatusBar // <--- ADDED: Import StatusBar here
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -243,7 +244,7 @@ export default function RemindersScreen({ navigation }) {
 }
 
 const getStyles = (colors) => StyleSheet.create({
-    safeArea: { flex: 1, backgroundColor: colors.background, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0, },
+    safeArea: { flex: 1, backgroundColor: colors.background, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0, }, // <--- MODIFIED HERE
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.card },
     headerButton: { padding: 5 },
     title: { color: colors.text, fontSize: 20, fontWeight: 'bold' },

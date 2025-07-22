@@ -1,7 +1,9 @@
 // fyp/food-app/screens/AiFoodScanScreen.js
 import React, { useState } from 'react';
 import {
-  View, Text, Image, ActivityIndicator, ScrollView, StyleSheet, Alert, TouchableOpacity, SafeAreaView, Modal
+  View, Text, Image, ActivityIndicator, ScrollView, StyleSheet, Alert, TouchableOpacity, SafeAreaView, Modal,
+  Platform, // <--- ADDED: Import Platform
+  StatusBar // <--- ADDED: Import StatusBar
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
@@ -11,7 +13,12 @@ import { api } from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
 
 const getStyles = (colors) => StyleSheet.create({
-    safeArea: { flex: 1, backgroundColor: colors.background },
+    safeArea: { 
+        flex: 1, 
+        backgroundColor: colors.background,
+        // <--- MODIFIED: Add paddingTop for Android status bar
+        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.background },
     title: { fontSize: 22, fontWeight: 'bold', color: colors.text },
     container: { alignItems: 'center', flexGrow: 1, padding: 16 },
@@ -148,70 +155,73 @@ export default function AiFoodScanScreen({ navigation }) {
   };
   
   const renderContent = () => {
-    if (imageUri) {
+    // Moved the whole initial "Scan Your Meal" view inside `renderContent` to handle states cleanly
+    // The previous structure returned it early, preventing `SafeAreaView` from always being the top parent.
+    // The outer return is now fixed to ALWAYS render `SafeAreaView` and the modal first.
+    if (!imageUri) {
         return (
-            <Animatable.View animation="fadeIn" style={styles.contentContainer}>
-                <Image source={{ uri: imageUri }} style={styles.image} />
-                {suggestions.length > 0 && !confirmedFood && (
-                    <Animatable.View animation="fadeInUp" style={styles.section}>
-                        <Text style={styles.subtitle}>Is it one of these?</Text>
-                        {suggestions.map((food, idx) => (
-                            <TouchableOpacity key={idx} style={styles.choiceButton} onPress={() => handleFoodConfirm(food)}>
-                                <Text style={styles.choiceText}>{food}</Text>
-                            </TouchableOpacity>
-                        ))}
-                        <TouchableOpacity
-                            style={[styles.choiceButton, { backgroundColor: '#7f8c8d', borderColor: '#7f8c8d' }]}
-                            onPress={() => Alert.prompt('Manual Input', 'Enter food name:', (text) => { if (text) handleFoodConfirm(text.trim()); })}>
-                            <Text style={[styles.choiceText, { color: '#fff' }]}>None of these</Text>
-                        </TouchableOpacity>
-                    </Animatable.View>
-                )}
-                {confirmedFood && (
-                    <Animatable.View animation="fadeInUp" style={styles.section}>
-                        <View style={styles.resultsCard}>
-                            <Text style={styles.resultsTitle}>{confirmedFood}</Text>
-                            <View style={styles.resultsGrid}>
-                                <View style={styles.resultItem}>
-                                    <Ionicons name="flame" size={24} color="#F57C00" />
-                                    <Text style={styles.resultValue}>{calories !== null ? Math.round(calories) : '...'}</Text>
-                                    <Text style={styles.resultLabel}>Calories</Text>
-                                </View>
-                                <View style={styles.resultItem}>
-                                    <MaterialCommunityIcons name="candy" size={24} color="#D32F2F" />
-                                    <Text style={styles.resultValue}>{sugar !== null ? `${Math.round(sugar)}g` : '...'}</Text>
-                                    <Text style={styles.resultLabel}>Sugar</Text>
-                                </View>
-                            </View>
-                        </View>
-                        <TouchableOpacity 
-                            style={[styles.actionButton, styles.saveButton, (calories === null || isSaving) && styles.disabledButton]} 
-                            onPress={handleSaveLog} disabled={calories === null || isSaving}
-                        >
-                            {isSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.actionButtonText}>Save Log</Text>}
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                            style={[styles.actionButton, styles.retakeButton]} onPress={takePhoto}>
-                            <Text style={[styles.actionButtonText, {color: colors.text}]}>Retake Photo</Text>
-                        </TouchableOpacity>
-                    </Animatable.View>
-                )}
-            </Animatable.View>
-        )
+            <View style={styles.emptyStateContainer}>
+                <MaterialCommunityIcons name="camera-iris" size={80} color={colors.border} />
+                <Text style={styles.emptyStateTitle}>Scan Your Meal</Text>
+                <Text style={styles.emptyStateSubtitle}>
+                    (Premium Feature) Use your camera to get instant calorie and sugar estimates for your food.
+                </Text>
+                <TouchableOpacity style={styles.mainCameraButton} onPress={takePhoto}>
+                    <Ionicons name="camera" size={28} color="#fff" />
+                    <Text style={styles.mainCameraButtonText}>Start Scanning</Text>
+                </TouchableOpacity>
+            </View>
+        );
     }
 
     return (
-        <View style={styles.emptyStateContainer}>
-            <MaterialCommunityIcons name="camera-iris" size={80} color={colors.border} />
-            <Text style={styles.emptyStateTitle}>Scan Your Meal</Text>
-            <Text style={styles.emptyStateSubtitle}>
-                (Premium Feature) Use your camera to get instant calorie and sugar estimates for your food.
-            </Text>
-            <TouchableOpacity style={styles.mainCameraButton} onPress={takePhoto}>
-                <Ionicons name="camera" size={28} color="#fff" />
-                <Text style={styles.mainCameraButtonText}>Start Scanning</Text>
-            </TouchableOpacity>
-        </View>
+        <Animatable.View animation="fadeIn" style={styles.contentContainer}>
+            <Image source={{ uri: imageUri }} style={styles.image} />
+            {suggestions.length > 0 && !confirmedFood && (
+                <Animatable.View animation="fadeInUp" style={styles.section}>
+                    <Text style={styles.subtitle}>Is it one of these?</Text>
+                    {suggestions.map((food, idx) => (
+                        <TouchableOpacity key={idx} style={styles.choiceButton} onPress={() => handleFoodConfirm(food)}>
+                            <Text style={styles.choiceText}>{food}</Text>
+                        </TouchableOpacity>
+                    ))}
+                    <TouchableOpacity
+                        style={[styles.choiceButton, { backgroundColor: '#7f8c8d', borderColor: '#7f8c8d' }]}
+                        onPress={() => Alert.prompt('Manual Input', 'Enter food name:', (text) => { if (text) handleFoodConfirm(text.trim()); })}>
+                        <Text style={[styles.choiceText, { color: '#fff' }]}>None of these</Text>
+                    </TouchableOpacity>
+                </Animatable.View>
+            )}
+            {confirmedFood && (
+                <Animatable.View animation="fadeInUp" style={styles.section}>
+                    <View style={styles.resultsCard}>
+                        <Text style={styles.resultsTitle}>{confirmedFood}</Text>
+                        <View style={styles.resultsGrid}>
+                            <View style={styles.resultItem}>
+                                <Ionicons name="flame" size={24} color="#F57C00" />
+                                <Text style={styles.resultValue}>{calories !== null ? Math.round(calories) : '...'}</Text>
+                                <Text style={styles.resultLabel}>Calories</Text>
+                            </View>
+                            <View style={styles.resultItem}>
+                                <MaterialCommunityIcons name="candy" size={24} color="#D32F2F" />
+                                <Text style={styles.resultValue}>{sugar !== null ? `${Math.round(sugar)}g` : '...'}</Text>
+                                <Text style={styles.resultLabel}>Sugar</Text>
+                            </View>
+                        </View>
+                    </View>
+                    <TouchableOpacity 
+                        style={[styles.actionButton, styles.saveButton, (calories === null || isSaving) && styles.disabledButton]} 
+                        onPress={handleSaveLog} disabled={calories === null || isSaving}
+                    >
+                        {isSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.actionButtonText}>Save Log</Text>}
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                        style={[styles.actionButton, styles.retakeButton]} onPress={takePhoto}>
+                        <Text style={[styles.actionButtonText, {color: colors.text}]}>Retake Photo</Text>
+                    </TouchableOpacity>
+                </Animatable.View>
+            )}
+        </Animatable.View>
     );
   }
 

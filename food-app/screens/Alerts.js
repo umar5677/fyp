@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, SafeAreaView, Platform, ActivityIndicator, Modal
+  View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, SafeAreaView, Platform, ActivityIndicator, Modal,
+  StatusBar 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
@@ -12,7 +13,11 @@ import { useTheme } from '../context/ThemeContext';
 import { api } from '../utils/api';
 
 const getStyles = (colors) => StyleSheet.create({
-    safeArea: { flex: 1, backgroundColor: colors.background },
+    safeArea: { 
+        flex: 1, 
+        backgroundColor: colors.background,
+        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0, 
+    },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.card },
     title: { color: colors.text, fontSize: 20, fontWeight: 'bold' },
     container: { padding: 16, paddingBottom: 50 },
