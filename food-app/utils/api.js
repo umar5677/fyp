@@ -6,18 +6,28 @@ const BASE_URL = 'http://192.168.10.120:3000/api';
 
 async function authenticatedFetch(endpoint, options = {}) {
     let accessToken = await SecureStore.getItemAsync('accessToken');
-    const headers = { 'Content-Type': 'application/json', ...options.headers };
+    
+    const isFormData = options.body instanceof FormData;
+    const headers = { ...options.headers };
+
+    // Don't set Content-Type for FormData, let the browser/RN do it.
+    if (!isFormData && options.body) {
+        headers['Content-Type'] = 'application/json';
+    }
+
     if (accessToken) {
         headers['Authorization'] = `Bearer ${accessToken}`;
     }
     
     let response = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
 
+    // If token is expired, try to refresh it
     if (response.status === 403) {
         const refreshToken = await SecureStore.getItemAsync('refreshToken');
         if (!refreshToken) {
             Alert.alert("Session Expired", "Please log in again.");
-            return response;
+            // Here you might want to navigate the user to the login screen.
+            throw new Error("Session Expired");
         }
         try {
             const refreshResponse = await fetch(`${BASE_URL}/token`, {
@@ -32,272 +42,98 @@ async function authenticatedFetch(endpoint, options = {}) {
             await SecureStore.setItemAsync('accessToken', newTokens.accessToken);
             headers['Authorization'] = `Bearer ${newTokens.accessToken}`;
             
+            // Retry the original request with the new token
             response = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
+
         } catch (e) {
             await SecureStore.deleteItemAsync('accessToken');
             await SecureStore.deleteItemAsync('refreshToken');
             Alert.alert("Session Expired", "Please log in again.");
-            return response;
+            // Navigate to login screen would be ideal here.
+            throw new Error("Session Expired");
         }
     }
     
+    // Handle other non-successful responses
     if (!response.ok) {
         const contentType = response.headers.get('content-type');
+        let errorData;
         if (contentType && contentType.includes('application/json')) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'An API error occurred');
+            errorData = await response.json();
         } else {
-            const errorText = await response.text();
-            console.error("Received non-JSON server response:", errorText);
-            throw new Error(`Server returned a non-JSON error (Status: ${response.status})`);
+            errorData = { message: `Server error: ${response.status}` };
         }
+        throw new Error(errorData.message || 'An API error occurred');
+    }
+    
+    // For PDF responses, return the raw response to be handled by the caller
+    if (response.headers.get('content-type')?.includes('application/pdf')) {
+        return response;
     }
 
-    return response;
-}
-
-async function authenticatedUploadFetch(endpoint, formData) {
-    let accessToken = await SecureStore.getItemAsync('accessToken');
-    const headers = { 'Authorization': `Bearer ${accessToken}` };
-    let response = await fetch(`${BASE_URL}${endpoint}`, { method: 'POST', headers: headers, body: formData });
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'File upload failed');
-    }
+    // For other successful responses, parse as JSON
     return response.json();
 }
 
 export const api = {
-    // Core User Functions
-    getProfile: async () => {
-        const response = await authenticatedFetch('/profile');
-        return response.json();
-    },
-    updateProfileSetup: async (profileData) => {
-        const response = await authenticatedFetch('/profile-setup', { method: 'PUT', body: JSON.stringify(profileData) });
-        return response.json();
-    },
-    updateProfile: async (updateData) => {
-        const response = await authenticatedFetch('/profile', { method: 'PUT', body: JSON.stringify(updateData) });
-        return response.json();
-    },
-    changePassword: async (passwordData) => {
-        const response = await authenticatedFetch('/profile/change-password', { method: 'POST', body: JSON.stringify(passwordData) });
-        return response.json();
-    },
-    deleteProfile: async () => {
-        const response = await authenticatedFetch('/profile', { method: 'DELETE' });
-        return response.json();
-    },
-    uploadProfilePhoto: async (formData) => {
-        return authenticatedUploadFetch('/upload/profile-picture', formData);
-    },
+    // --- Core User Functions ---
+    getProfile: () => authenticatedFetch('/profile'),
+    updateProfileSetup: (profileData) => authenticatedFetch('/profile-setup', { method: 'PUT', body: JSON.stringify(profileData) }),
+    updateProfile: (updateData) => authenticatedFetch('/profile', { method: 'PUT', body: JSON.stringify(updateData) }),
+    changePassword: (passwordData) => authenticatedFetch('/profile/change-password', { method: 'POST', body: JSON.stringify(passwordData) }),
+    deleteProfile: () => authenticatedFetch('/profile', { method: 'DELETE' }),
+    uploadProfilePhoto: (formData) => authenticatedFetch('/upload/profile-picture', { method: 'POST', body: formData }),
 
-    // Logging Functions
-    getHistory: async (types, period = 'day', targetDate = null, limit = null) => {
-        const params = new URLSearchParams({ types: types.join(','), period: period });
-        if (targetDate) {
-            params.append('targetDate', targetDate);
-        }
-        if (limit) {
-            params.append('limit', limit);
-        }
-        const response = await authenticatedFetch(`/logs/history?${params.toString()}`);
-        return response.json();
+    // --- Data Logging Functions ---
+    getHistory: (types, period = 'day', targetDate = null, limit = null) => {
+        const params = new URLSearchParams({ types: types.join(','), period });
+        if (targetDate) params.append('targetDate', targetDate);
+        if (limit) params.append('limit', limit.toString());
+        return authenticatedFetch(`/logs/history?${params.toString()}`);
     },
-    addLog: async (logData) => {
-        const response = await authenticatedFetch('/logs', { method: 'POST', body: JSON.stringify(logData) });
-        return response.json();
-    },
-    updateLog: async (logId, updateData) => {
-        const response = await authenticatedFetch(`/logs/${logId}`, { method: 'PUT', body: JSON.stringify(updateData) });
-        return response.json();
-    },
-    deleteLog: async (logId) => {
-        const response = await authenticatedFetch(`/logs/${logId}`, { method: 'DELETE' });
-        return response.json();
-    },
+    addLog: (logData) => authenticatedFetch('/logs', { method: 'POST', body: JSON.stringify(logData) }),
+    updateLog: (logId, updateData) => authenticatedFetch(`/logs/${logId}`, { method: 'PUT', body: JSON.stringify(updateData) }),
+    deleteLog: (logId) => authenticatedFetch(`/logs/${logId}`, { method: 'DELETE' }),
 
-    // AI & OCR Functions
-    getGlucosePrediction: async () => {
-        const response = await authenticatedFetch('/predictions/glucose');
-        return response.json();
-    },
-    scanImage: async (base64) => {
-        const response = await authenticatedFetch('/ocr/aws-parse-image', {
-            method: 'POST',
-            body: JSON.stringify({ image: base64 }),
-        });
-        return response.json();
-    },
-
-    //Notifications & Reminders
-    getNotifications: async () => {
-        const response = await authenticatedFetch('/notifications');
-        return response.json();
-    },
-
-    clearNotifications: async () => {
-        const response = await authenticatedFetch('/notifications', { method: 'DELETE' });
-        return response.json();
-    },
-
-    getReminders: async () => {
-        const response = await authenticatedFetch('/reminders');
-        return response.json();
-    },
-    addReminder: async (reminderData) => {
-        const response = await authenticatedFetch('/reminders', {
-            method: 'POST',
-            body: JSON.stringify(reminderData)
-        });
-        return response.json();
-    },
-    updateReminder: async (id, reminderData) => {
-        const response = await authenticatedFetch(`/reminders/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(reminderData)
-        });
-        return response.json();
-    },
-    deleteReminder: async (id) => {
-        const response = await authenticatedFetch(`/reminders/${id}`, { method: 'DELETE' });
-        return response.json();
-    },
-
-    // Posts & Social Features
-    likePost: async (postId) => {
-        const response = await authenticatedFetch(`/posts/${postId}/like`, { method: 'POST' });
-        return response.json();
-    },
-
-    unlikePost: async (postId) => {
-        const response = await authenticatedFetch(`/posts/${postId}/like`, { method: 'DELETE' });
-        return response.json();
-    },
-
-    getPosts: async () => {
-        const response = await authenticatedFetch('/posts');
-        return response.json();
-    },
-    createPost: async (formData) => {
-        return authenticatedUploadFetch('/posts', formData);
-    },
-    likePost: async (postId) => {
-        const response = await authenticatedFetch(`/posts/${postId}/like`, { method: 'POST' });
-        return response.json();
-    },
-    unlikePost: async (postId) => {
-        const response = await authenticatedFetch(`/posts/${postId}/like`, { method: 'DELETE' });
-        return response.json();
-    },
-
-    getPostDetails: async (postId) => {
-        const response = await authenticatedFetch(`/posts/${postId}`);
-        return response.json();
-    },
-
-    getPostComments: async (postId) => {
-        const response = await authenticatedFetch(`/posts/${postId}/comments`);
-        return response.json();
-    },
-
-    addComment: async (postId, commentText) => {
-        const response = await authenticatedFetch(`/posts/${postId}/comment`, {
-            method: 'POST',
-            body: JSON.stringify({ commentText })
-        });
-        return response.json();
-    },
+    // --- AI, OCR, and Prediction Functions ---
+    getGlucosePrediction: () => authenticatedFetch('/predictions/glucose'),
+    scanImage: (base64) => authenticatedFetch('/ocr/aws-parse-image', { method: 'POST', body: JSON.stringify({ image: base64 }) }),
+    identifyFoodFromImage: (base64) => authenticatedFetch('/ai/identify-food', { method: 'POST', body: JSON.stringify({ image: base64 }) }),
+    getNutritionForFood: (foodName) => authenticatedFetch('/ai/get-nutrition', { method: 'POST', body: JSON.stringify({ foodName }) }),
     
-    // User Settings & Reports
-    getUserThresholds: async () => {
-        const response = await authenticatedFetch('/user-settings/thresholds');
-        return response.json();
-    },
-    saveUserThresholds: async (thresholds) => {
-        const response = await authenticatedFetch('/user-settings/thresholds', {
-            method: 'POST',
-            body: JSON.stringify(thresholds),
-        });
-        return response.json();
-    },
+    // --- Notifications & Reminders ---
+    getNotifications: () => authenticatedFetch('/notifications'),
+    clearNotifications: () => authenticatedFetch('/notifications', { method: 'DELETE' }),
+    getReminders: () => authenticatedFetch('/reminders'),
+    addReminder: (data) => authenticatedFetch('/reminders', { method: 'POST', body: JSON.stringify(data) }),
+    updateReminder: (id, data) => authenticatedFetch(`/reminders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteReminder: (id) => authenticatedFetch(`/reminders/${id}`, { method: 'DELETE' }),
 
-    //Profile Settings
-    getPreferredProvider: async () => {
-        const response = await authenticatedFetch('/user-settings/provider');
-        return response.json();
-    },
-    savePreferredProvider: async (provider) => {
-        const response = await authenticatedFetch('/user-settings/provider', {
-            method: 'POST',
-            body: JSON.stringify({ providerUserID: provider.userID }),
-        });
-        return response.json();
-    },
-    getReportPreference: async () => {
-        const response = await authenticatedFetch('/user-settings/report-preference');
-        return response.json();
-    },
-    saveReportPreference: async (frequency) => {
-        const response = await authenticatedFetch('/user-settings/report-preference', {
-            method: 'PUT',
-            body: JSON.stringify({ frequency }),
-        });
-        return response.json();
-    },
-    generateReport: async (payload) => {
-        const response = await authenticatedFetch('/generate-report', {
-            method: 'POST',
-            body: JSON.stringify(payload),
-        });
-        if (response.headers.get('content-type')?.includes('application/pdf')) {
-            return response;
-        }
-        return response.json();
-    },
+    // --- Posts & Community/Social Features ---
+    getPosts: () => authenticatedFetch('/posts'),
+    getPostDetails: (postId) => authenticatedFetch(`/posts/${postId}`),
+    createPost: (formData) => authenticatedFetch('/posts', { method: 'POST', body: formData }),
+    updatePost: (postId, formData) => authenticatedFetch(`/posts/${postId}`, { method: 'PUT', body: formData }),
+    deletePost: (postId) => authenticatedFetch(`/posts/${postId}`, { method: 'DELETE' }),
+    likePost: (postId) => authenticatedFetch(`/posts/${postId}/like`, { method: 'POST' }),
+    unlikePost: (postId) => authenticatedFetch(`/posts/${postId}/like`, { method: 'DELETE' }),
+    getPostComments: (postId) => authenticatedFetch(`/posts/${postId}/comments`),
+    addComment: (postId, commentText) => authenticatedFetch(`/posts/${postId}/comment`, { method: 'POST', body: JSON.stringify({ commentText }) }),
 
-    //AI Functions
-    identifyFoodFromImage: async (base64) => {
-        const response = await authenticatedFetch('/ai/identify-food', {
-            method: 'POST',
-            body: JSON.stringify({ image: base64 }),
-        });
-        return response.json();
-    },
-
-    getNutritionForFood: async (foodName) => {
-        const response = await authenticatedFetch('/ai/get-nutrition', {
-            method: 'POST',
-            body: JSON.stringify({ foodName }),
-        });
-        return response.json();
-    },
+    // --- User Settings, Providers & Reports ---
+    getUserThresholds: () => authenticatedFetch('/user-settings/thresholds'),
+    saveUserThresholds: (thresholds) => authenticatedFetch('/user-settings/thresholds', { method: 'POST', body: JSON.stringify(thresholds) }),
+    getPreferredProvider: () => authenticatedFetch('/user-settings/provider'),
+    savePreferredProvider: (provider) => authenticatedFetch('/user-settings/provider', { method: 'POST', body: JSON.stringify({ providerUserID: provider.userID }) }),
+    getReportPreference: () => authenticatedFetch('/user-settings/report-preference'),
+    saveReportPreference: (frequency) => authenticatedFetch('/user-settings/report-preference', { method: 'PUT', body: JSON.stringify({ frequency }) }),
+    generateReport: (payload) => authenticatedFetch('/generate-report', { method: 'POST', body: JSON.stringify(payload) }),
     
-    // Q&A FEATURE FUNCTIONS
-    getProviders: async () => {
-        const response = await authenticatedFetch('/providers');
-        return response.json();
-    },
-    
-    getQnaStatus: async () => {
-        const response = await authenticatedFetch('/qna/status');
-        return response.json();
-    },
-    getMyQuestions: async () => {
-        const response = await authenticatedFetch('/qna/my-questions');
-        return response.json();
-    },
-    submitQuestion: async (questionData) => {
-        const response = await authenticatedFetch('/qna/ask', { method: 'POST', body: JSON.stringify(questionData) });
-        return response.json();
-    },
-    getProviderQuestions: async () => {
-        const response = await authenticatedFetch('/provider/questions');
-        return response.json();
-    },
-    submitProviderAnswer: async (questionId, answerText) => {
-        const response = await authenticatedFetch(`/provider/answer/${questionId}`, { method: 'POST', body: JSON.stringify({ answerText }) });
-        return response.json();
-    },
+    // --- Q&A (Ask a Provider) Functions ---
+    getProviders: () => authenticatedFetch('/providers'),
+    getQnaStatus: () => authenticatedFetch('/qna/status'),
+    getMyQuestions: () => authenticatedFetch('/qna/my-questions'),
+    submitQuestion: (data) => authenticatedFetch('/qna/ask', { method: 'POST', body: JSON.stringify(data) }),
+    getProviderQuestions: () => authenticatedFetch('/provider/questions'),
+    submitProviderAnswer: (questionId, answerText) => authenticatedFetch(`/provider/answer/${questionId}`, { method: 'POST', body: JSON.stringify({ answerText }) }),
 };

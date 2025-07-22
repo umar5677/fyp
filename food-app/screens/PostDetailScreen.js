@@ -5,7 +5,7 @@ import {
     ActivityIndicator, TextInput, TouchableOpacity, FlatList,
     KeyboardAvoidingView, Platform, Alert, Modal
 } from "react-native";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import dayjs from "dayjs";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "../utils/api";
@@ -25,13 +25,20 @@ const CommentItem = ({ item, colors }) => {
     );
 };
 
+// --- CORRECTED: Styles for the ImageViewer are now self-contained ---
+const imageViewerStyles = StyleSheet.create({
+    viewerContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
+    fullscreenImage: { width: '100%', height: '100%' },
+    closeButton: { position: 'absolute', top: 50, right: 20, padding: 10, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 20 }
+});
+
 const ImageViewer = ({ visible, imageUri, onClose }) => {
     if (!imageUri) return null;
     return (
         <Modal visible={visible} transparent={true} animationType="fade" onRequestClose={onClose}>
-            <SafeAreaView style={styles.viewerContainer}>
-                <Image source={{ uri: imageUri }} style={styles.fullscreenImage} resizeMode="contain" />
-                <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <SafeAreaView style={imageViewerStyles.viewerContainer}>
+                <Image source={{ uri: imageUri }} style={imageViewerStyles.fullscreenImage} resizeMode="contain" />
+                <TouchableOpacity style={imageViewerStyles.closeButton} onPress={onClose}>
                     <Ionicons name="close" size={32} color="#FFFFFF" />
                 </TouchableOpacity>
             </SafeAreaView>
@@ -39,8 +46,8 @@ const ImageViewer = ({ visible, imageUri, onClose }) => {
     );
 };
 
-
-export default function PostDetailScreen({ route }) {
+export default function PostDetailScreen() {
+    const route = useRoute();
     const { postId } = route.params;
     const { colors } = useTheme();
     const styles = getStyles(colors);
@@ -53,6 +60,29 @@ export default function PostDetailScreen({ route }) {
     const [isPostingComment, setIsPostingComment] = useState(false);
     const [viewerVisible, setViewerVisible] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
+    
+    const handleDeletePost = () => {
+        Alert.alert(
+            "Delete Post",
+            "Are you sure you want to permanently delete this post?",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            await api.deletePost(postId);
+                            Alert.alert("Success", "Post deleted.");
+                            navigation.goBack();
+                        } catch (error) {
+                            Alert.alert("Error", error.message || "Failed to delete post.");
+                        }
+                    },
+                },
+            ]
+        );
+    };
 
     useEffect(() => {
         navigation.setOptions({
@@ -60,7 +90,23 @@ export default function PostDetailScreen({ route }) {
             headerTintColor: colors.text,
             title: 'Post',
         });
-    }, [colors, navigation]);
+
+        if (post?.isOwner) {
+            navigation.setOptions({
+                headerRight: () => (
+                    <View style={{ flexDirection: 'row', marginRight: 10 }}>
+                        <TouchableOpacity onPress={() => navigation.navigate('EditPost', { post })} style={{ padding: 5 }}>
+                            <Ionicons name="pencil-outline" size={24} color={colors.primary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={handleDeletePost} style={{ padding: 5, marginLeft: 10 }}>
+                            <Ionicons name="trash-outline" size={24} color={colors.logoutText} />
+                        </TouchableOpacity>
+                    </View>
+                ),
+            });
+        }
+    }, [post, navigation, colors]);
+
 
     const fetchData = async () => {
         try {
@@ -82,7 +128,7 @@ export default function PostDetailScreen({ route }) {
         setIsLoading(true);
         fetchData();
     }, [postId]));
-
+    
     const handleToggleLike = () => {
         if (!post) return;
         const wasLiked = post.likedByUser;
@@ -106,7 +152,6 @@ export default function PostDetailScreen({ route }) {
             setNewComment('');
             const updatedComments = await api.getPostComments(postId);
             setComments(updatedComments);
-            // Also update the comment count on the post object
             setPost(p => ({...p, commentCount: (p.commentCount || 0) + 1}));
         } catch (error) {
             Alert.alert("Error", "Could not post your comment.");
@@ -123,7 +168,7 @@ export default function PostDetailScreen({ route }) {
     if (isLoading || !post) {
         return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
     }
-
+    
     return (
         <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex: 1}}>
@@ -174,7 +219,7 @@ export default function PostDetailScreen({ route }) {
                         onChangeText={setNewComment}
                     />
                     <TouchableOpacity onPress={handleAddComment} disabled={isPostingComment} style={styles.sendButton}>
-                        {isPostingComment ? <ActivityIndicator size="small" /> : <Ionicons name="send" size={24} color={colors.primary} />}
+                        {isPostingComment ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name="send" size={24} color={colors.primary} />}
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
@@ -209,9 +254,4 @@ const getStyles = (colors) => StyleSheet.create({
     commentInputContainer: { flexDirection: 'row', padding: 12, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card },
     commentInput: { flex: 1, backgroundColor: colors.background, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, fontSize: 16, color: colors.text, marginRight: 12 },
     sendButton: { padding: 4, justifyContent: 'center' },
-    viewerContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
-    fullscreenImage: { width: '100%', height: '100%' },
-    closeButton: { position: 'absolute', top: 50, right: 20, padding: 10, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 20 }
 });
-
-const styles = getStyles({}); 

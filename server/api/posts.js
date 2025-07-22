@@ -1,7 +1,7 @@
 // fyp/server/api/posts.js
 const express = require('express');
 const multer = require('multer');
-const { S3Client } = require('@aws-sdk/client-s3');
+const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3'); // Import DeleteObjectCommand
 const multerS3 = require('multer-s3');
 
 function createPostsRouter(dbPool) {
@@ -16,7 +16,7 @@ function createPostsRouter(dbPool) {
     });
     
     const upload = multer({
-        storage: multerS3({ s3, bucket: process.env.S3_POSTS_BUCKET, acl: 'public-read', metadata: (req, file, cb) => cb(null, { fieldName: file.fieldname }), key: (req, file, cb) => { const userId = req.user.userId; const fullPath = `community-posts/${userId}/${Date.now()}_${file.originalname}`; cb(null, fullPath); } })
+        storage: multerS3({ s3, bucket: process.env.S3_POSTS_BUCKET, metadata: (req, file, cb) => cb(null, { fieldName: file.fieldname }), key: (req, file, cb) => { const userId = req.user.userId; const fullPath = `community-posts/${userId}/${Date.now()}_${file.originalname}`; cb(null, fullPath); } })
     });
 
     // GET / - Fetch the main community feed
@@ -40,7 +40,9 @@ function createPostsRouter(dbPool) {
             const formattedPosts = posts.map(post => ({
                 ...post,
                 images: post.images ? post.images.split(',') : [],
-                likedByUser: !!post.likedByUser
+                likedByUser: !!post.likedByUser,
+                // --- NEW ---
+                isOwner: post.userID === currentUserID // Add isOwner flag
             }));
             res.json(formattedPosts);
         } catch (error) {
@@ -58,11 +60,7 @@ function createPostsRouter(dbPool) {
         const connection = await dbPool.getConnection();
         try {
             await connection.beginTransaction();
-            // Explicitly set the createdAt timestamp in the application
-            const [postResult] = await connection.query(
-                'INSERT INTO posts (userID, title, content, createdAt) VALUES (?, ?, ?, ?)', 
-                [userId, title, content, new Date()]
-            );
+            const [postResult] = await connection.query('INSERT INTO posts (userID, title, content, createdAt) VALUES (?, ?, ?, ?)', [userId, title, content, new Date()]);
             const postId = postResult.insertId;
 
             if (req.files && req.files.length > 0) {
@@ -81,6 +79,153 @@ function createPostsRouter(dbPool) {
             connection.release();
         }
     });
+
+    router.put('/:postId', upload.array('newImages', 5), async (req, res) => {
+        const { postId } = req.params;
+        const { title, content, imagesToDelete } = req.body;
+        const userId = req.user.userId;
+        const connection = await dbPool.getConnection();
+
+        try {
+            await connection.beginTransaction();
+
+            const [ownerCheck] = await connection.query('SELECT userID FROM posts WHERE id = ?', [postId]);
+            if (ownerCheck.length === 0 || ownerCheck[0].userID !== userId) {
+                await connection.rollback();
+                return res.status(403).json({ message: 'Forbidden: You do not own this post.' });
+            }
+
+            await connection.query('UPDATE posts SET title = ?, content = ? WHERE id = ?', [title, content, postId]);
+
+            if (imagesToDelete && imagesToDelete.length > 0) {
+                const urlsToDelete = JSON.parse(imagesToDelete);
+                if (Array.isArray(urlsToDelete) && urlsToDelete.length > 0) {
+                    await connection.query('DELETE FROM post_images WHERE postID = ? AND imageUrl IN (?)', [postId, urlsToDelete]);
+                    
+                    const deleteS3Promises = urlsToDelete.map(url => {
+                        // --- CORRECTED LOGIC ---
+                        // Use the URL object to reliably parse the S3 key from the full URL.
+                        const { pathname } = new URL(url);
+                        const key = decodeURIComponent(pathname.substring(1)); // Remove leading '/' and decode
+                        return s3.send(new DeleteObjectCommand({ Bucket: process.env.S3_POSTS_BUCKET, Key: key }));
+                    });
+                    await Promise.all(deleteS3Promises);
+                }
+            }
+
+            if (req.files && req.files.length > 0) {
+                const imagePromises = req.files.map(file => 
+                    connection.query('INSERT INTO post_images (postID, imageUrl) VALUES (?, ?)', [postId, file.location])
+                );
+                await Promise.all(imagePromises);
+            }
+
+            await connection.commit();
+            res.status(200).json({ message: 'Post updated successfully' });
+
+        } catch (error) {
+            await connection.rollback();
+            console.error("Error updating post:", error);
+            res.status(500).json({ message: 'Failed to update post' });
+        } finally {
+            connection.release();
+        }
+    });
+
+    // --- DELETE A POST (Contains a fix) ---
+    router.delete('/:postId', async (req, res) => {
+        const { postId } = req.params;
+        const userId = req.user.userId;
+        const connection = await dbPool.getConnection();
+
+        try {
+            await connection.beginTransaction();
+            
+            const [ownerCheck] = await connection.query('SELECT userID FROM posts WHERE id = ?', [postId]);
+            if (ownerCheck.length === 0 || ownerCheck[0].userID !== userId) {
+                await connection.rollback();
+                return res.status(403).json({ message: 'Forbidden: You do not own this post.' });
+            }
+            
+            const [images] = await connection.query('SELECT imageUrl FROM post_images WHERE postID = ?', [postId]);
+
+            await connection.query('DELETE FROM post_likes WHERE postID = ?', [postId]);
+            await connection.query('DELETE FROM post_comments WHERE postID = ?', [postId]);
+            await connection.query('DELETE FROM post_images WHERE postID = ?', [postId]);
+            await connection.query('DELETE FROM posts WHERE id = ?', [postId]);
+
+            await connection.commit();
+
+            if (images.length > 0) {
+                const deleteS3Promises = images.map(img => {
+                    // --- CORRECTED LOGIC ---
+                    // Use the URL object here as well for consistency and reliability.
+                    const { pathname } = new URL(img.imageUrl);
+                    const key = decodeURIComponent(pathname.substring(1)); // Remove leading '/' and decode
+                    return s3.send(new DeleteObjectCommand({ Bucket: process.env.S3_POSTS_BUCKET, Key: key }));
+                });
+                await Promise.all(deleteS3Promises);
+            }
+
+            res.status(200).json({ success: true, message: 'Post deleted successfully.' });
+
+        } catch (error) {
+            await connection.rollback();
+            console.error("Error deleting post:", error);
+            res.status(500).json({ message: 'Failed to delete post.' });
+        } finally {
+            connection.release();
+        }
+    });
+
+    // --- NEW: DELETE A POST ---
+    router.delete('/:postId', async (req, res) => {
+        const { postId } = req.params;
+        const userId = req.user.userId;
+        const connection = await dbPool.getConnection();
+
+        try {
+            await connection.beginTransaction();
+            
+            const [ownerCheck] = await connection.query('SELECT userID FROM posts WHERE id = ?', [postId]);
+            if (ownerCheck.length === 0 || ownerCheck[0].userID !== userId) {
+                await connection.rollback();
+                return res.status(403).json({ message: 'Forbidden: You do not own this post.' });
+            }
+            
+            // 1. Get all image URLs to delete from S3 later
+            const [images] = await connection.query('SELECT imageUrl FROM post_images WHERE postID = ?', [postId]);
+
+            // 2. Delete all related records from child tables
+            await connection.query('DELETE FROM post_likes WHERE postID = ?', [postId]);
+            await connection.query('DELETE FROM post_comments WHERE postID = ?', [postId]);
+            await connection.query('DELETE FROM post_images WHERE postID = ?', [postId]);
+
+            // 3. Delete the main post record
+            await connection.query('DELETE FROM posts WHERE id = ?', [postId]);
+
+            await connection.commit();
+
+            // 4. After DB transaction is successful, delete files from S3
+            if (images.length > 0) {
+                const deleteS3Promises = images.map(img => {
+                    const key = img.imageUrl.split(process.env.S3_POSTS_BUCKET + '/')[1];
+                    return s3.send(new DeleteObjectCommand({ Bucket: process.env.S3_POSTS_BUCKET, Key: key }));
+                });
+                await Promise.all(deleteS3Promises);
+            }
+
+            res.status(200).json({ success: true, message: 'Post deleted successfully.' });
+
+        } catch (error) {
+            await connection.rollback();
+            console.error("Error deleting post:", error);
+            res.status(500).json({ message: 'Failed to delete post.' });
+        } finally {
+            connection.release();
+        }
+    });
+
 
     router.post('/:postId/like', async (req, res) => {
         const { postId } = req.params;
@@ -143,7 +288,10 @@ function createPostsRouter(dbPool) {
             }
             
             const post = posts[0];
-            const formattedPost = { ...post, images: post.images ? post.images.split(',') : [], likedByUser: !!post.likedByUser };
+            const formattedPost = { ...post, images: post.images ? post.images.split(',') : [], likedByUser: !!post.likedByUser, 
+            // --- NEW ---
+            isOwner: post.userID === currentUserID
+            };
             res.json(formattedPost);
         } catch (error) {
             console.error('Error fetching post details:', error);
@@ -176,15 +324,8 @@ function createPostsRouter(dbPool) {
         const connection = await dbPool.getConnection();
         try {
             await connection.beginTransaction();
-            // Explicitly set the createdAt timestamp in the application
-            await connection.query(
-                'INSERT INTO post_comments (postID, userID, commentText, createdAt) VALUES (?, ?, ?, ?)',
-                [postId, userId, commentText, new Date()]
-            );
-            await connection.query(
-                'UPDATE posts SET commentCount = (SELECT COUNT(*) FROM post_comments WHERE postID = ?) WHERE id = ?',
-                [postId, postId]
-            );
+            await connection.query('INSERT INTO post_comments (postID, userID, commentText, createdAt) VALUES (?, ?, ?, ?)', [postId, userId, commentText, new Date()]);
+            await connection.query('UPDATE posts SET commentCount = (SELECT COUNT(*) FROM post_comments WHERE postID = ?) WHERE id = ?', [postId, postId]);
             await connection.commit();
             res.status(201).json({ success: true, message: "Comment added." });
         } catch (error) {

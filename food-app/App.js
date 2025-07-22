@@ -35,6 +35,7 @@ import EditProfileScreen from './screens/EditProfile';
 import ChangePasswordScreen from './screens/ChangePassword';
 import AddPostScreen from './screens/AddPostScreen';
 import PostDetailScreen from './screens/PostDetailScreen';
+import EditPostScreen from './screens/EditPostScreen';
 
 // Import Q&A feature screens and components
 import ProviderTabs from './components/ProviderTabs';
@@ -95,7 +96,7 @@ const AppNavigator = () => {
             }} 
         />
         <Stack.Screen name="Reminders" component={RemindersScreen} options={{ presentation: 'modal' }} />
-        
+
         {/* Q&A Feature Screens with styled headers */}
         <Stack.Screen 
             name="AskQuestion" 
@@ -107,6 +108,16 @@ const AppNavigator = () => {
                 headerStyle: { backgroundColor: colors.card },
                 headerTintColor: colors.text,
             }} 
+        />
+
+        <Stack.Screen
+            name="EditPost"
+            component={EditPostScreen}
+            options={{
+                headerShown: true,
+                headerStyle: { backgroundColor: colors.card },
+                headerTintColor: colors.text,
+            }}
         />
 
         <Stack.Screen
