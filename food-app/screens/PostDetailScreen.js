@@ -3,9 +3,10 @@ import React, { useState, useCallback, useEffect } from "react";
 import { 
     View, Text, Image, StyleSheet, ScrollView, SafeAreaView,
     ActivityIndicator, TextInput, TouchableOpacity, FlatList,
-    KeyboardAvoidingView, Platform, Alert, Modal
+    KeyboardAvoidingView, Platform, Alert, Modal, Pressable
 } from "react-native";
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import dayjs from "dayjs";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "../utils/api";
@@ -25,7 +26,6 @@ const CommentItem = ({ item, colors }) => {
     );
 };
 
-// --- CORRECTED: Styles for the ImageViewer are now self-contained ---
 const imageViewerStyles = StyleSheet.create({
     viewerContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
     fullscreenImage: { width: '100%', height: '100%' },
@@ -52,6 +52,7 @@ export default function PostDetailScreen() {
     const { colors } = useTheme();
     const styles = getStyles(colors);
     const navigation = useNavigation();
+    const insets = useSafeAreaInsets(); // Get safe area dimensions
 
     const [post, setPost] = useState(null);
     const [comments, setComments] = useState([]);
@@ -172,8 +173,11 @@ export default function PostDetailScreen() {
     }
     
     return (
-        <SafeAreaView style={styles.container}>
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex: 1}}>
+        <View style={styles.container}>
+            <KeyboardAvoidingView 
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+                style={{flex: 1}}
+            >
                 <FlatList
                     data={comments}
                     keyExtractor={(item) => item.id.toString()}
@@ -190,7 +194,7 @@ export default function PostDetailScreen() {
                             <Text style={styles.title}>{post.title}</Text>
                             <Text style={styles.content}>{post.content}</Text>
                             
-                            {post.images && post.images.length > 0 && (
+                            {post.images && post.images.length > 0 ? (
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScrollContainer}>
                                     {post.images.map((img, idx) => (
                                         <TouchableOpacity key={idx} onPress={() => openImageViewer(img)}>
@@ -198,7 +202,7 @@ export default function PostDetailScreen() {
                                         </TouchableOpacity>
                                     ))}
                                 </ScrollView>
-                            )}
+                            ) : null}
 
                             <View style={styles.actionBar}>
                                 <TouchableOpacity style={styles.actionButton} onPress={handleToggleLike}>
@@ -212,7 +216,7 @@ export default function PostDetailScreen() {
                     ListEmptyComponent={<Text style={styles.emptyCommentText}>No comments yet. Be the first to comment!</Text>}
                     contentContainerStyle={{ paddingHorizontal: 16 }}
                 />
-                <View style={styles.commentInputContainer}>
+                <View style={[styles.commentInputContainer, { paddingBottom: insets.bottom || 12 }]}>
                     <TextInput
                         style={styles.commentInput}
                         placeholder="Add a comment..."
@@ -235,9 +239,8 @@ export default function PostDetailScreen() {
                 visible={showOptionsMenu}
                 onRequestClose={() => setShowOptionsMenu(false)}
             >
-                <TouchableOpacity 
+                <Pressable 
                     style={styles.modalOverlay} 
-                    activeOpacity={1} 
                     onPress={() => setShowOptionsMenu(false)}
                 >
                     <View style={[styles.optionsMenu, { top: Platform.OS === 'ios' ? 70 : 30, right: 20 }]}>
@@ -250,9 +253,9 @@ export default function PostDetailScreen() {
                             <Text style={[styles.menuItemText, { color: colors.logoutText }]}>Delete Post</Text>
                         </TouchableOpacity>
                     </View>
-                </TouchableOpacity>
+                </Pressable>
             </Modal>
-        </SafeAreaView>
+        </View>
     );
 }
 
@@ -278,7 +281,7 @@ const getStyles = (colors) => StyleSheet.create({
     commentUsername: { fontWeight: 'bold', color: colors.text, fontSize: 13, marginBottom: 2 },
     commentText: { color: colors.text, lineHeight: 18 },
     commentDate: { fontSize: 11, color: colors.textSecondary, marginTop: 4, textAlign: 'right' },
-    commentInputContainer: { flexDirection: 'row', padding: 12, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card },
+    commentInputContainer: { flexDirection: 'row', paddingHorizontal: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card },
     commentInput: { flex: 1, backgroundColor: colors.background, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, fontSize: 16, color: colors.text, marginRight: 12 },
     sendButton: { padding: 4, justifyContent: 'center' },
 

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Alert,
   KeyboardAvoidingView, Platform, FlatList, Modal, ActivityIndicator, SafeAreaView,
-  Animated
+  Animated, Pressable
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -47,7 +47,7 @@ const getStyles = (colors) => StyleSheet.create({
     logValueText: { fontSize: 16, fontWeight: '600', color: colors.text, marginLeft: 5 },
     logUnitText: { fontSize: 13, color: colors.textSecondary, marginLeft: 3 },
     modalOverlay: { flex: 1, justifyContent: 'flex-end' },
-    modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+    modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
     modalContent: { backgroundColor: colors.background, paddingHorizontal: 20, paddingTop: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
     modalTitle: { fontSize: 16, fontWeight: '600', color: colors.textSecondary, textAlign: 'center', marginBottom: 20 },
     foodNameInput: { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 12, padding: 15, fontSize: 18, fontWeight: '500', color: colors.text, marginBottom: 15 },
@@ -87,10 +87,24 @@ const FoodLogItem = ({ item, onEdit, index, colors }) => {
                     <Text style={styles.logItemTimeText}>{formattedTime}</Text>
                 </View>
                 <View style={styles.logItemDetails}>
-                    {foodName && (<Text style={styles.foodNameText} numberOfLines={1}>{foodName}</Text>)}
+                    {foodName ? (
+                        <Text style={styles.foodNameText} numberOfLines={1}>{foodName}</Text>
+                    ) : null}
                     <View style={styles.nutritionRow}>
-                        {calorieLog && ( <View style={styles.logDetailRow}> <Ionicons name="flame" size={18} color="#F57C00" /> <Text style={styles.logValueText}>{parseInt(calorieLog.amount, 10)}</Text> <Text style={styles.logUnitText}>kcal</Text> </View> )}
-                        {sugarLog && ( <View style={[styles.logDetailRow, {marginLeft: calorieLog ? 15 : 0}]}> <MaterialCommunityIcons name="candy" size={18} color="#D32F2F" /> <Text style={styles.logValueText}>{parseFloat(sugarLog.amount).toFixed(1)}</Text> <Text style={styles.logUnitText}>g</Text> </View> )}
+                        {calorieLog ? (
+                            <View style={styles.logDetailRow}>
+                                <Ionicons name="flame" size={18} color="#F57C00" />
+                                <Text style={styles.logValueText}>{parseInt(calorieLog.amount, 10)}</Text>
+                                <Text style={styles.logUnitText}>kcal</Text>
+                            </View>
+                        ) : null}
+                        {sugarLog ? (
+                            <View style={[styles.logDetailRow, {marginLeft: calorieLog ? 15 : 0}]}>
+                                <MaterialCommunityIcons name="candy" size={18} color="#D32F2F" />
+                                <Text style={styles.logValueText}>{parseFloat(sugarLog.amount).toFixed(1)}</Text>
+                                <Text style={styles.logUnitText}>g</Text>
+                            </View>
+                        ) : null}
                     </View>
                 </View>
                 <Ionicons name="chevron-forward" size={22} color={colors.textSecondary} />
@@ -149,32 +163,37 @@ const EditModal = ({ modalVisible, setModalVisible, logs, onSave, onDelete, onSc
 
     return (
         <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
-                <TouchableOpacity style={styles.modalBackdrop} onPress={() => setModalVisible(false)} />
-                <View style={styles.modalContent}>
-                    <Text style={styles.modalTitle}>{isEditing ? "Edit Log" : "Log Calories & Sugar"}</Text>
-                    <TouchableOpacity onPress={() => setDatePickerVisibility(true)} style={styles.datePickerButton} disabled={isEditing}>
-                        <Ionicons name="calendar-outline" size={22} color={colors.primary} />
-                        <Text style={styles.datePickerText}>{logDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</Text>
-                    </TouchableOpacity>
-                    <DateTimePickerModal isVisible={isDatePickerVisible} mode="datetime" date={logDate} onConfirm={(d) => { setDatePickerVisibility(false); setLogDate(d); }} onCancel={() => setDatePickerVisibility(false)} display={Platform.OS === 'ios' ? 'inline' : 'default'} isDarkModeEnabled={theme === 'dark'} maximumDate={today} />
-                    <TextInput style={styles.foodNameInput} placeholder="Food Name (e.g., Apple)" placeholderTextColor={colors.textSecondary} value={foodName} onChangeText={setFoodName} />
-                    <View style={styles.inputRow}>
-                        <TextInput style={[styles.modalInput, {flex: 1}]} keyboardType="decimal-pad" value={calories} onChangeText={setCalories} placeholder="Calories" placeholderTextColor={colors.textSecondary} />
-                        <TextInput style={[styles.modalInput, {flex: 1, marginLeft: 10}]} keyboardType="decimal-pad" value={sugar} onChangeText={setSugar} placeholder="Sugar (g)" placeholderTextColor={colors.textSecondary} />
-                    </View>
-                    {isScanning ? <ActivityIndicator color={colors.primary} /> : (
-                        <View style={styles.scanButtonsContainer}>
-                            <TouchableOpacity style={styles.scanButton} onPress={() => handlePickImage('camera')}><Ionicons name="camera-outline" size={20} color="#fff" /><Text style={styles.scanButtonText}>Scan Label</Text></TouchableOpacity>
-                            <TouchableOpacity style={styles.scanButton} onPress={() => handlePickImage('gallery')}><Ionicons name="image-outline" size={20} color="#fff" /><Text style={styles.scanButtonText}>Upload</Text></TouchableOpacity>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+                <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
+                    <Pressable>
+                        <View style={styles.modalContent}>
+                            <Text style={styles.modalTitle}>{isEditing ? "Edit Log" : "Log Calories & Sugar"}</Text>
+                            <TouchableOpacity onPress={() => setDatePickerVisibility(true)} style={styles.datePickerButton} disabled={isEditing}>
+                                <Ionicons name="calendar-outline" size={22} color={colors.primary} />
+                                <Text style={styles.datePickerText}>{logDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</Text>
+                            </TouchableOpacity>
+                            <DateTimePickerModal isVisible={isDatePickerVisible} mode="datetime" date={logDate} onConfirm={(d) => { setDatePickerVisibility(false); setLogDate(d); }} onCancel={() => setDatePickerVisibility(false)} display={Platform.OS === 'ios' ? 'inline' : 'default'} isDarkModeEnabled={theme === 'dark'} maximumDate={today} />
+                            <TextInput style={styles.foodNameInput} placeholder="Food Name (e.g., Apple)" placeholderTextColor={colors.textSecondary} value={foodName} onChangeText={setFoodName} />
+                            <View style={styles.inputRow}>
+                                <TextInput style={[styles.modalInput, {flex: 1}]} keyboardType="decimal-pad" value={calories} onChangeText={setCalories} placeholder="Calories" placeholderTextColor={colors.textSecondary} />
+                                <TextInput style={[styles.modalInput, {flex: 1, marginLeft: 10}]} keyboardType="decimal-pad" value={sugar} onChangeText={setSugar} placeholder="Sugar (g)" placeholderTextColor={colors.textSecondary} />
+                            </View>
+                            {isScanning ? <ActivityIndicator color={colors.primary} /> : (
+                                <View style={styles.scanButtonsContainer}>
+                                    <TouchableOpacity style={styles.scanButton} onPress={() => handlePickImage('camera')}><Ionicons name="camera-outline" size={20} color="#fff" /><Text style={styles.scanButtonText}>Scan Label</Text></TouchableOpacity>
+                                    <TouchableOpacity style={styles.scanButton} onPress={() => handlePickImage('gallery')}><Ionicons name="image-outline" size={20} color="#fff" /><Text style={styles.scanButtonText}>Upload</Text></TouchableOpacity>
+                                </View>
+                            )}
+                            <View style={styles.modalActions}>
+                                <TouchableOpacity onPress={() => setModalVisible(false)}><Text style={styles.modalButtonText}>Cancel</Text></TouchableOpacity>
+                                {isEditing ? (
+                                    <TouchableOpacity onPress={handleDeletePress}><Text style={[styles.modalButtonText, { color: colors.logoutText }]}>Delete</Text></TouchableOpacity>
+                                ) : null}
+                                <TouchableOpacity onPress={handleSave} disabled={isSaving}><Text style={[styles.modalButtonText, { fontWeight: 'bold' }]}>Save</Text></TouchableOpacity>
+                            </View>
                         </View>
-                    )}
-                    <View style={styles.modalActions}>
-                        <TouchableOpacity onPress={() => setModalVisible(false)}><Text style={styles.modalButtonText}>Cancel</Text></TouchableOpacity>
-                        {isEditing && (<TouchableOpacity onPress={handleDeletePress}><Text style={[styles.modalButtonText, { color: colors.logoutText }]}>Delete</Text></TouchableOpacity>)}
-                        <TouchableOpacity onPress={handleSave} disabled={isSaving}><Text style={[styles.modalButtonText, { fontWeight: 'bold' }]}>Save</Text></TouchableOpacity>
-                    </View>
-                </View>
+                    </Pressable>
+                </Pressable>
             </KeyboardAvoidingView>
         </Modal>
     );
@@ -196,7 +215,7 @@ const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate, colors }) 
     const styles = getStyles(colors);
     const today = new Date().toISOString().split('T')[0];
     const calendarTheme = { calendarBackground: colors.card, textSectionTitleColor: colors.textSecondary, dayTextColor: colors.text, todayTextColor: colors.primary, selectedDayBackgroundColor: colors.primary, selectedDayTextColor: '#FFFFFF', monthTextColor: colors.text, indicatorColor: colors.primary, arrowColor: colors.primary, 'stylesheet.calendar.header': { week: { marginTop: 5, flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.border } } };
-    return ( <Modal visible={isVisible} transparent={true} animationType="fade"><TouchableOpacity style={styles.calendarBackdrop} onPress={onClose} /><View style={[styles.calendarModalContainer, { backgroundColor: colors.card }]}><Calendar current={initialDate.toISOString().split('T')[0]} maxDate={today} onDayPress={(day) => { const newDate = new Date(day.timestamp); newDate.setMinutes(newDate.getMinutes() + newDate.getTimezoneOffset()); onDayPress(newDate); onClose(); }} theme={calendarTheme} /></View></Modal> );
+    return ( <Modal visible={isVisible} transparent={true} animationType="fade"><Pressable style={styles.calendarBackdrop} onPress={onClose}><View style={[styles.calendarModalContainer, { backgroundColor: colors.card }]}><Calendar current={initialDate.toISOString().split('T')[0]} maxDate={today} onDayPress={(day) => { const newDate = new Date(day.timestamp); newDate.setMinutes(newDate.getMinutes() + newDate.getTimezoneOffset()); onDayPress(newDate); onClose(); }} theme={calendarTheme} /></View></Pressable></Modal> );
 };
 
 export default function LogCalorieSugarScreen({ navigation }) {
@@ -332,8 +351,14 @@ export default function LogCalorieSugarScreen({ navigation }) {
                 <View style={styles.summaryCard}>
                     <Text style={styles.summaryTitle}>{timePeriod.charAt(0).toUpperCase() + timePeriod.slice(1)}'s Intake</Text>
                     <View style={styles.summaryDetails}>
-                        <View style={styles.summaryItem}><Text style={[styles.summaryValue, {color: '#F57C00'}]}>🔥 {totalCalories.toFixed(0)}</Text><Text style={styles.summaryLabel}>kcal</Text></View>
-                        <View style={styles.summaryItem}><Text style={[styles.summaryValue, {color: '#D32F2F'}]}>🍬 {totalSugar.toFixed(1)}</Text><Text style={styles.summaryLabel}>grams</Text></View>
+                        <View style={styles.summaryItem}>
+                            <Text style={[styles.summaryValue, {color: '#F57C00'}]}>🔥 {totalCalories.toFixed(0)}</Text>
+                            <Text style={styles.summaryLabel}>kcal</Text>
+                        </View>
+                        <View style={styles.summaryItem}>
+                            <Text style={[styles.summaryValue, {color: '#D32F2F'}]}>🍬 {totalSugar.toFixed(1)}</Text>
+                            <Text style={styles.summaryLabel}>grams</Text>
+                        </View>
                     </View>
                 </View>
                 <View style={styles.controlsContainer}>

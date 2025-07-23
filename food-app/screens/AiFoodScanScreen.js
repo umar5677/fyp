@@ -155,9 +155,6 @@ export default function AiFoodScanScreen({ navigation }) {
   };
   
   const renderContent = () => {
-    // Moved the whole initial "Scan Your Meal" view inside `renderContent` to handle states cleanly
-    // The previous structure returned it early, preventing `SafeAreaView` from always being the top parent.
-    // The outer return is now fixed to ALWAYS render `SafeAreaView` and the modal first.
     if (!imageUri) {
         return (
             <View style={styles.emptyStateContainer}>
