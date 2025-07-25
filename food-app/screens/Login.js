@@ -1,15 +1,27 @@
 // food-app/screens/Login.js
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Alert, ActivityIndicator, TouchableOpacity, Image, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  TouchableOpacity,
+  Image,
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform
+} from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-
-const YOUR_AWS_LOGIN_API_URL = 'http://192.168.10.120:3000/api/login';
+import { api } from '../utils/api'; // Correctly import the centralized api utility
 
 const Login = ({ navigation }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
+    // This function is now refactored to use the api.js utility
     const handleLogin = async () => {
         if (!email.trim() || !password.trim()) {
             Alert.alert('Validation Error', 'Please enter both email and password.');
@@ -18,44 +30,44 @@ const Login = ({ navigation }) => {
 
         setIsLoading(true);
         try {
-            const response = await fetch(YOUR_AWS_LOGIN_API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: email.trim(), password }),
+            // Use the new api.login function which points to the correct BASE_URL
+            const responseData = await api.login({
+                email: email.trim(),
+                password
             });
 
-            const responseData = await response.json();
-
-            if (responseData.code === 'EMAIL_NOT_VERIFIED') {
-                Alert.alert('Email Not Verified', responseData.message);
-            } else if (response.ok) {
-                if (responseData.accessToken && responseData.refreshToken) {
-                    await SecureStore.setItemAsync('accessToken', responseData.accessToken);
-                    await SecureStore.setItemAsync('refreshToken', responseData.refreshToken);
-                } else {
-                    Alert.alert('Login Error', 'No tokens were received from the server.');
-                    setIsLoading(false);
-                    return;
-                }
-                
-                // Navigation logic that handles both regular users and providers
-                if (responseData.isProvider) {
-                    navigation.replace('ProviderApp');
-                } else if (!responseData.hasProfileSetup) {
-                    navigation.replace('ProfileSetup');
-                } else {
-                    navigation.replace('MainApp', { 
-                        isProvider: responseData.isProvider,
-                        userId: responseData.userId 
-                    });
-                }
-                
+            if (responseData.accessToken && responseData.refreshToken) {
+                await SecureStore.setItemAsync('accessToken', responseData.accessToken);
+                await SecureStore.setItemAsync('refreshToken', responseData.refreshToken);
             } else {
-                Alert.alert('Login Failed', responseData.message || 'Invalid email or password.');
+                Alert.alert('Login Error', 'No tokens were received from the server.');
+                setIsLoading(false);
+                return;
             }
+
+            // Navigation logic that handles both regular users and providers
+            if (responseData.isProvider) {
+                navigation.replace('ProviderApp');
+            } else if (!responseData.hasProfileSetup) {
+                navigation.replace('ProfileSetup');
+            } else {
+                navigation.replace('MainApp', {
+                    isProvider: responseData.isProvider,
+                    userId: responseData.userId
+                });
+            }
+
         } catch (error) {
-            console.error(error);
-            Alert.alert('Network Error', 'Unable to connect to the server. Please check your network connection.');
+            console.error('Login screen error:', error);
+            // The api utility now throws specific errors, making the catch block cleaner.
+            // The `error.message` will contain whatever the server responded with.
+             if (error.message.includes('verify your email')) {
+                 Alert.alert('Email Not Verified', 'Please verify your email address before logging in.');
+            } else if (error.message.toLowerCase().includes('invalid')) {
+                Alert.alert('Login Failed', 'Invalid email or password.');
+            } else {
+                Alert.alert('Network Error', 'Unable to connect to the server. Please check your network connection.');
+            }
         } finally {
             setIsLoading(false);
         }
@@ -72,7 +84,7 @@ const Login = ({ navigation }) => {
             >
                 <Image source={require('../assets/GlucoBites.png')} style={styles.logo} />
                 <Text style={styles.welcome}>Welcome to <Text style={styles.appName}>GlucoBites</Text></Text>
-                
+
                 <View style={styles.formContainer}>
                     <TextInput
                         style={styles.input}
@@ -81,6 +93,7 @@ const Login = ({ navigation }) => {
                         onChangeText={setEmail}
                         keyboardType="email-address"
                         autoCapitalize="none"
+                        placeholderTextColor="#888"
                     />
                     <TextInput
                         style={styles.input}
@@ -88,6 +101,7 @@ const Login = ({ navigation }) => {
                         value={password}
                         onChangeText={setPassword}
                         secureTextEntry
+                        placeholderTextColor="#888"
                     />
                     {isLoading ? (
                         <ActivityIndicator size="large" color="#F97316" style={{ marginVertical: 18 }} />
@@ -114,14 +128,14 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     container: {
-        flexGrow: 1, 
+        flexGrow: 1,
         backgroundColor: '#F8F8F8',
         alignItems: 'center',
-        justifyContent: 'center', 
+        justifyContent: 'center',
         padding: 20,
     },
     logo: {
-        width: 250, 
+        width: 250,
         height: 250,
         resizeMode: 'contain',
         marginBottom: 10,
@@ -150,6 +164,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 15,
         backgroundColor: '#fff',
         marginBottom: 15,
+        color: '#000',
     },
     loginButton: {
         width: '100%',
@@ -157,7 +172,7 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         borderRadius: 8,
         alignItems: 'center',
-        marginTop: 5, 
+        marginTop: 5,
         marginBottom: 20,
     },
     loginText: {
@@ -171,7 +186,7 @@ const styles = StyleSheet.create({
     },
     signupLink: {
         color: '#F97316',
-        fontWeight: 'bold' 
+        fontWeight: 'bold'
     },
 });
 

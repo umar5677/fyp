@@ -2,13 +2,12 @@
   "expo": {
     "name": "GlucoBites",
     "slug": "GlucoBites",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
-    "icon": "./assets/GlucoBites.png",
+    "icon": "./assets/GlucoBitesLogo.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/GlucoBitesLogo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -17,19 +16,22 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/GlucoBites.png",
+        "foregroundImage": "./assets/GlucoBitesLogo.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ],
+      "permissions": [],
       "package": "com.dope9402.GlucoBites",
-      "useNextNotificationsApi": true,
-      "notification": {
-        "icon": "./assets/GlucoBites.png",
-        "color": "#F97316"
+      
+      "networkSecurityConfig": {
+      "domainConfigurations": {
+        "api.glucobites.org": {
+          "domains": ["13.214.71.4", "api.glucobites.org"],
+          "includeSubdomains": false,
+          "cleartextTrafficPermitted": true
+        }
       }
+}
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -43,6 +45,11 @@
         }
       ],
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "4ea78716-6ca7-47a9-8638-34b6f273b00f"
+      }
+    }
   }
 }

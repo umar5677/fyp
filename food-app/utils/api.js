@@ -25,6 +25,7 @@ async function authenticatedFetch(endpoint, options = {}) {
         const refreshToken = await SecureStore.getItemAsync('refreshToken');
         if (!refreshToken) {
             Alert.alert("Session Expired", "Please log in again.");
+            // Ideally, you would have a navigation utility here to force a logout
             throw new Error("Session Expired");
         }
         try {
@@ -47,7 +48,6 @@ async function authenticatedFetch(endpoint, options = {}) {
             await SecureStore.deleteItemAsync('accessToken');
             await SecureStore.deleteItemAsync('refreshToken');
             Alert.alert("Session Expired", "Please log in again.");
-            // Navigate to login screen would be ideal here.
             throw new Error("Session Expired");
         }
     }
@@ -74,6 +74,26 @@ async function authenticatedFetch(endpoint, options = {}) {
 }
 
 export const api = {
+    // This is a new public function for handling login. It does not use
+    // authenticatedFetch because no token exists yet.
+    login: async (credentials) => {
+        const response = await fetch(`${BASE_URL}/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(credentials),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            // If the server returns an error, throw an error with the server's message
+            throw new Error(data.message || 'Login failed.');
+        }
+
+        return data;
+    },
+    
+    // Existing protected API methods
     getProfile: () => authenticatedFetch('/profile'),
     updateProfileSetup: (profileData) => authenticatedFetch('/profile-setup', { method: 'PUT', body: JSON.stringify(profileData) }),
     updateProfile: (updateData) => authenticatedFetch('/profile', { method: 'PUT', body: JSON.stringify(updateData) }),
@@ -81,7 +101,7 @@ export const api = {
     deleteProfile: () => authenticatedFetch('/profile', { method: 'DELETE' }),
     uploadProfilePhoto: (formData) => authenticatedFetch('/upload/profile-picture', { method: 'POST', body: formData }),
 
-    //  Data Logging Functions 
+    // Data Logging Functions
     getHistory: (types, period = 'day', targetDate = null, limit = null) => {
         const params = new URLSearchParams({ types: types.join(','), period });
         if (targetDate) params.append('targetDate', targetDate);
@@ -92,13 +112,13 @@ export const api = {
     updateLog: (logId, updateData) => authenticatedFetch(`/logs/${logId}`, { method: 'PUT', body: JSON.stringify(updateData) }),
     deleteLog: (logId) => authenticatedFetch(`/logs/${logId}`, { method: 'DELETE' }),
 
-    // AI, OCR, and Prediction Functions 
+    // AI, OCR, and Prediction Functions
     getGlucosePrediction: () => authenticatedFetch('/predictions/glucose'),
     scanImage: (base64) => authenticatedFetch('/ocr/aws-parse-image', { method: 'POST', body: JSON.stringify({ image: base64 }) }),
     identifyFoodFromImage: (base64) => authenticatedFetch('/ai/identify-food', { method: 'POST', body: JSON.stringify({ image: base64 }) }),
     getNutritionForFood: (foodName) => authenticatedFetch('/ai/get-nutrition', { method: 'POST', body: JSON.stringify({ foodName }) }),
     
-    //  Notifications & Reminders
+    // Notifications & Reminders
     getNotifications: () => authenticatedFetch('/notifications'),
     clearNotifications: () => authenticatedFetch('/notifications', { method: 'DELETE' }),
     getReminders: () => authenticatedFetch('/reminders'),
