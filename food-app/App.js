@@ -11,6 +11,8 @@ import { Text, StyleSheet } from 'react-native';
 import FlashMessage from "react-native-flash-message";
 import * as Notifications from 'expo-notifications';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
+import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
+import ProviderHistoryScreen from './screens/ProviderHistoryScreen';
 
 // Font Imports
 import {
@@ -36,6 +38,7 @@ import ChangePasswordScreen from './screens/ChangePassword';
 import AddPostScreen from './screens/AddPostScreen';
 import PostDetailScreen from './screens/PostDetailScreen';
 import EditPostScreen from './screens/EditPostScreen';
+import AuthLoadingScreen from './screens/AuthLoadingScreen';
 
 // Import Q&A feature screens and components
 import ProviderTabs from './components/ProviderTabs';
@@ -58,12 +61,24 @@ const AppNavigator = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="Login"
+        initialRouteName="AuthLoading"
         id="RootStack"
         screenOptions={{ headerShown: false }}
+        
       >
+        <Stack.Screen name="AuthLoading" component={AuthLoadingScreen} />
         {/* Core Auth and User Screens */}
         <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen 
+                    name="ForgotPassword" 
+                    component={ForgotPasswordScreen}
+                    options={{ 
+                        headerShown: true,
+                        title: 'Forgot Password',
+                        headerStyle: { backgroundColor: colors.card }, // Ensure it's themable
+                        headerTintColor: colors.text,
+                     }} 
+                />
         <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
         <Stack.Screen name="MainApp" component={AppTabs} />
         <Stack.Screen name="ProviderApp" component={ProviderTabs} />
@@ -145,6 +160,17 @@ const AppNavigator = () => {
             options={{ 
                 headerShown: true,
                 headerTitle: 'Answer Question',
+                headerStyle: { backgroundColor: colors.card },
+                headerTintColor: colors.text,
+            }} 
+        />
+
+        <Stack.Screen 
+            name="ProviderHistory" 
+            component={ProviderHistoryScreen} 
+            options={{ 
+                headerShown: true,
+                headerTitle: 'Answer History',
                 headerStyle: { backgroundColor: colors.card },
                 headerTintColor: colors.text,
             }} 

@@ -1,15 +1,12 @@
-// fyp/food-app/components/AskProviderCard.js
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../context/ThemeContext'; 
+import { useTheme } from '../context/ThemeContext';
 
-// The component now accepts an `isPremium` prop
 const AskProviderCard = ({ questionsRemaining, isPremium, onNavigate }) => {
     const { colors } = useTheme(); 
     const styles = getStyles(colors); 
 
-    // Determine the card's state based on premium status and questions left
     let descriptionText;
     let buttonText;
     let isButtonDisabled;
@@ -24,15 +21,13 @@ const AskProviderCard = ({ questionsRemaining, isPremium, onNavigate }) => {
         isButtonDisabled = true;
     }
 
-    const handlePress = () => {
+    const handleMainButtonPress = () => {
         if (isPremium && questionsRemaining > 0) {
             onNavigate(); 
-        } else if (isPremium && questionsRemaining <= 0) {
-
-        } else {
+        } else if (!isPremium) {
             Alert.alert(
                 "Premium Feature",
-                "This feature is available for Premium users. Please consider upgrading for access to expert advice."
+                "Please consider upgrading to access expert advice from verified providers."
             );
         }
     };
@@ -46,18 +41,26 @@ const AskProviderCard = ({ questionsRemaining, isPremium, onNavigate }) => {
             <Text style={styles.description}>
                 {descriptionText}
             </Text>
+
             <TouchableOpacity 
                 style={[styles.button, isButtonDisabled && styles.buttonDisabled]} 
-                onPress={handlePress}
-                disabled={isButtonDisabled && isPremium} 
+                onPress={handleMainButtonPress}
+                disabled={isButtonDisabled && isPremium}
             >
                 <Text style={styles.buttonText}>{buttonText}</Text>
             </TouchableOpacity>
+
+            {isPremium && (
+                <View style={styles.historyContainer}>
+                    <TouchableOpacity style={styles.historyButton} onPress={onNavigate}>
+                        <Text style={styles.historyButtonText}>View Question History →</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
         </View>
     );
 };
 
-// The styles are now created by a function that accepts the theme's colors object
 const getStyles = (colors) => StyleSheet.create({
     card: {
         backgroundColor: colors.card, 
@@ -101,6 +104,20 @@ const getStyles = (colors) => StyleSheet.create({
         color: '#FFF', 
         fontSize: 16, 
         fontWeight: '600' 
+    },
+
+    historyContainer: {
+        alignItems: 'flex-end', 
+        marginTop: 12,
+    },
+    historyButton: {
+        paddingVertical: 4, 
+        paddingHorizontal: 8,
+    },
+    historyButtonText: {
+        color: colors.primary,
+        fontSize: 14,
+        fontWeight: '600',
     },
 });
 

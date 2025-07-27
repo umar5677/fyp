@@ -1,4 +1,3 @@
-// food-app/screens/Login.js
 import React, { useState } from 'react';
 import {
   View,
@@ -21,7 +20,6 @@ const Login = ({ navigation }) => {
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    // This function is now refactored to use the api.js utility
     const handleLogin = async () => {
         if (!email.trim() || !password.trim()) {
             Alert.alert('Validation Error', 'Please enter both email and password.');
@@ -30,7 +28,6 @@ const Login = ({ navigation }) => {
 
         setIsLoading(true);
         try {
-            // Use the new api.login function which points to the correct BASE_URL
             const responseData = await api.login({
                 email: email.trim(),
                 password
@@ -59,7 +56,6 @@ const Login = ({ navigation }) => {
 
         } catch (error) {
             console.error('Login screen error:', error);
-            // The api utility now throws specific errors, making the catch block cleaner.
             // The `error.message` will contain whatever the server responded with.
              if (error.message.includes('verify your email')) {
                  Alert.alert('Email Not Verified', 'Please verify your email address before logging in.');
@@ -112,12 +108,12 @@ const Login = ({ navigation }) => {
                     )}
                 </View>
 
-                <Text style={styles.signupText}>
-                    Don’t have an account?{' '}
-                    <Text style={styles.signupLink} onPress={() => navigation.navigate('Signup')}>
-                        Sign up
+                {/* The "Sign Up" text is replaced with a single "Forgot Password?" touchable */}
+                <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
+                    <Text style={styles.signupLink}>
+                        Forgot Password?
                     </Text>
-                </Text>
+                </TouchableOpacity>
             </ScrollView>
         </KeyboardAvoidingView>
     );
@@ -173,20 +169,19 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         alignItems: 'center',
         marginTop: 5,
-        marginBottom: 20,
+        // Adjusted marginBottom to create space for the forgot password link
+        marginBottom: 25,
     },
     loginText: {
         color: '#fff',
         fontWeight: '600',
         fontSize: 16,
     },
-    signupText: {
-        color: '#333',
-        fontSize: 14,
-    },
+    // This style is now used by the new TouchableOpacity
     signupLink: {
         color: '#F97316',
-        fontWeight: 'bold'
+        fontWeight: 'bold',
+        fontSize: 14,
     },
 });
 

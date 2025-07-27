@@ -1,8 +1,16 @@
-// fyp/food-app/utils/api.js
 import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
 
 const BASE_URL = 'http://192.168.10.120:3000/api';
+
+const handlePublicFetch = async (response) => {
+    const data = await response.json();
+    if (!response.ok) {
+        // Throws an error with the message from the server's JSON response
+        throw new Error(data.message || 'An unknown error occurred.');
+    }
+    return data;
+};
 
 async function authenticatedFetch(endpoint, options = {}) {
     let accessToken = await SecureStore.getItemAsync('accessToken');
@@ -20,12 +28,12 @@ async function authenticatedFetch(endpoint, options = {}) {
     
     let response = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
 
-    // If token is expired, try to refresh it
+    // If the access token is expired (403), try to refresh it
     if (response.status === 403) {
         const refreshToken = await SecureStore.getItemAsync('refreshToken');
         if (!refreshToken) {
             Alert.alert("Session Expired", "Please log in again.");
-            // Ideally, you would have a navigation utility here to force a logout
+            // Ideally, you would navigate to the login screen here
             throw new Error("Session Expired");
         }
         try {
@@ -41,10 +49,11 @@ async function authenticatedFetch(endpoint, options = {}) {
             await SecureStore.setItemAsync('accessToken', newTokens.accessToken);
             headers['Authorization'] = `Bearer ${newTokens.accessToken}`;
             
-            // Retry the original request with the new token
+            // Retry the original request with the new, valid token
             response = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
 
         } catch (e) {
+            // If the refresh token is also invalid, clear session and throw
             await SecureStore.deleteItemAsync('accessToken');
             await SecureStore.deleteItemAsync('refreshToken');
             Alert.alert("Session Expired", "Please log in again.");
@@ -64,36 +73,38 @@ async function authenticatedFetch(endpoint, options = {}) {
         throw new Error(errorData.message || 'An API error occurred');
     }
     
-    // For PDF responses, return the raw response to be handled by the caller
+    // Handle PDF responses for report downloads
     if (response.headers.get('content-type')?.includes('application/pdf')) {
         return response;
     }
 
-    // For other successful responses, parse as JSON
+    // For all other successful responses, parse the JSON
     return response.json();
 }
 
 export const api = {
-    // This is a new public function for handling login. It does not use
-    // authenticatedFetch because no token exists yet.
-    login: async (credentials) => {
-        const response = await fetch(`${BASE_URL}/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(credentials),
-        });
+    // --- Public Routes (No Token Required) ---
+    login: (credentials) => fetch(`${BASE_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials),
+    }).then(handlePublicFetch),
 
-        const data = await response.json();
+    requestPasswordReset: (email) => fetch(`${BASE_URL}/password-reset/request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+    }).then(handlePublicFetch),
 
-        if (!response.ok) {
-            // If the server returns an error, throw an error with the server's message
-            throw new Error(data.message || 'Login failed.');
-        }
+    confirmPasswordReset: (data) => fetch(`${BASE_URL}/password-reset/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    }).then(handlePublicFetch),
 
-        return data;
-    },
+    // Authenticated Routes (Token Required)
     
-    // Existing protected API methods
+    // Profile & User
     getProfile: () => authenticatedFetch('/profile'),
     updateProfileSetup: (profileData) => authenticatedFetch('/profile-setup', { method: 'PUT', body: JSON.stringify(profileData) }),
     updateProfile: (updateData) => authenticatedFetch('/profile', { method: 'PUT', body: JSON.stringify(updateData) }),
@@ -101,7 +112,7 @@ export const api = {
     deleteProfile: () => authenticatedFetch('/profile', { method: 'DELETE' }),
     uploadProfilePhoto: (formData) => authenticatedFetch('/upload/profile-picture', { method: 'POST', body: formData }),
 
-    // Data Logging Functions
+    // Data Logging
     getHistory: (types, period = 'day', targetDate = null, limit = null) => {
         const params = new URLSearchParams({ types: types.join(','), period });
         if (targetDate) params.append('targetDate', targetDate);
@@ -112,7 +123,7 @@ export const api = {
     updateLog: (logId, updateData) => authenticatedFetch(`/logs/${logId}`, { method: 'PUT', body: JSON.stringify(updateData) }),
     deleteLog: (logId) => authenticatedFetch(`/logs/${logId}`, { method: 'DELETE' }),
 
-    // AI, OCR, and Prediction Functions
+    // AI, OCR, & Predictions
     getGlucosePrediction: () => authenticatedFetch('/predictions/glucose'),
     scanImage: (base64) => authenticatedFetch('/ocr/aws-parse-image', { method: 'POST', body: JSON.stringify({ image: base64 }) }),
     identifyFoodFromImage: (base64) => authenticatedFetch('/ai/identify-food', { method: 'POST', body: JSON.stringify({ image: base64 }) }),
@@ -126,7 +137,7 @@ export const api = {
     updateReminder: (id, data) => authenticatedFetch(`/reminders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     deleteReminder: (id) => authenticatedFetch(`/reminders/${id}`, { method: 'DELETE' }),
 
-    // Posts & Community/Social Features
+    // Community & Posts
     getPosts: () => authenticatedFetch('/posts'),
     getPostDetails: (postId) => authenticatedFetch(`/posts/${postId}`),
     createPost: (formData) => authenticatedFetch('/posts', { method: 'POST', body: formData }),
@@ -137,7 +148,7 @@ export const api = {
     getPostComments: (postId) => authenticatedFetch(`/posts/${postId}/comments`),
     addComment: (postId, commentText) => authenticatedFetch(`/posts/${postId}/comment`, { method: 'POST', body: JSON.stringify({ commentText }) }),
 
-    // User Settings, Providers & Reports
+    // Settings, Providers & Reports
     getUserThresholds: () => authenticatedFetch('/user-settings/thresholds'),
     saveUserThresholds: (thresholds) => authenticatedFetch('/user-settings/thresholds', { method: 'POST', body: JSON.stringify(thresholds) }),
     getPreferredProvider: () => authenticatedFetch('/user-settings/provider'),
@@ -146,11 +157,18 @@ export const api = {
     saveReportPreference: (frequency) => authenticatedFetch('/user-settings/report-preference', { method: 'PUT', body: JSON.stringify({ frequency }) }),
     generateReport: (payload) => authenticatedFetch('/generate-report', { method: 'POST', body: JSON.stringify(payload) }),
     
-    // Q&A (Ask a Provider) Functions
+    // Q&A with Providers
     getProviders: () => authenticatedFetch('/providers'),
     getQnaStatus: () => authenticatedFetch('/qna/status'),
     getMyQuestions: () => authenticatedFetch('/qna/my-questions'),
+    deleteQuestion: (questionId) => authenticatedFetch(`/qna/my-questions/${questionId}`, { method: 'DELETE' }),
+    deleteProviderQuestion: (questionId) => authenticatedFetch(`/provider/questions/${questionId}`, { method: 'DELETE' }),
     submitQuestion: (data) => authenticatedFetch('/qna/ask', { method: 'POST', body: JSON.stringify(data) }),
     getProviderQuestions: () => authenticatedFetch('/provider/questions'),
+    getProviderAnsweredQuestions: () => authenticatedFetch('/provider/questions/answered'),
     submitProviderAnswer: (questionId, answerText) => authenticatedFetch(`/provider/answer/${questionId}`, { method: 'POST', body: JSON.stringify({ answerText }) }),
+
+    // Reviews
+    submitReview: (reviewData) => authenticatedFetch('/reviews',{ method: 'POST', body: JSON.stringify(reviewData) }
+    ),
 };

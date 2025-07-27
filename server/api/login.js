@@ -94,8 +94,10 @@ function createLoginRouter(dbPool) {
     return router;
 }
 
-module.exports = {
+const loginApi = {
     createLoginRouter,
     hashPassword,
     comparePassword,
 };
+
+module.exports = loginApi;

@@ -1,5 +1,3 @@
-// screens/ProviderQuestionListScreen.js
-
 import React, { useState, useCallback } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, SafeAreaView, RefreshControl } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -34,14 +32,13 @@ const QuestionItem = ({ item, onPress, index, colors }) => {
 
 export default function ProviderQuestionListScreen() {
     const navigation = useNavigation();
-    const { colors, theme } = useTheme(); 
+    const { colors } = useTheme(); 
     const styles = getStyles(colors); 
 
     const [questions, setQuestions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
-    // This logic remains the same
     const fetchQuestions = async () => {
         try {
             const data = await api.getProviderQuestions();
@@ -64,21 +61,25 @@ export default function ProviderQuestionListScreen() {
         fetchQuestions();
     }, []);
 
-    // Add haptic feedback for a better user experience
     const handleSelectQuestion = (question) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         navigation.navigate('ProviderAnswerScreen', { question });
     };
 
-    // Main loading state
     if (isLoading) {
         return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
     }
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.headerContainer}>
-                <Text style={styles.header}>Pending Questions</Text>
+            <View style={styles.header}>
+                <View>
+                    <Text style={styles.headerTitle}>Dashboard</Text>
+                    <Text style={styles.headerSubtitle}>Pending Questions</Text>
+                </View>
+                <TouchableOpacity style={styles.historyButton} onPress={() => navigation.navigate('ProviderHistory')}>
+                    <Ionicons name="archive-outline" size={24} color={colors.primary} />
+                </TouchableOpacity>
             </View>
 
             <FlatList
@@ -87,18 +88,18 @@ export default function ProviderQuestionListScreen() {
                 renderItem={({ item, index }) => <QuestionItem item={item} onPress={handleSelectQuestion} index={index} colors={colors} />}
                 contentContainerStyle={styles.listContentContainer}
                 ListEmptyComponent={
-                    <Animatable.View animation="fadeIn" delay={300} style={styles.center}>
+                    <Animatable.View animation="fadeIn" delay={300} style={styles.emptyContainer}>
                         <Ionicons name="checkmark-done-circle-outline" size={80} color={colors.textSecondary} />
                         <Text style={styles.emptyTitle}>All Caught Up!</Text>
-                        <Text style={styles.emptyText}>There are no pending questions right now.</Text>
+                        <Text style={styles.emptyText}>There are no new questions at this time.</Text>
                     </Animatable.View>
                 }
                 refreshControl={
                     <RefreshControl 
                         refreshing={isRefreshing} 
                         onRefresh={onRefresh} 
-                        tintColor={colors.primary} // For iOS
-                        colors={[colors.primary]} // For Android
+                        tintColor={colors.primary}
+                        colors={[colors.primary]}
                     />
                 }
             />
@@ -115,18 +116,40 @@ const getStyles = (colors) => StyleSheet.create({
         flex: 1, 
         justifyContent: 'center', 
         alignItems: 'center', 
-        paddingHorizontal: 20,
-        marginTop: '40%'
+        backgroundColor: colors.background
     },
-    headerContainer: {
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         paddingHorizontal: 20,
         paddingTop: 20,
-        paddingBottom: 10,
+        paddingBottom: 16,
+        backgroundColor: colors.card,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: colors.border
     },
-    header: { 
-        fontSize: 32, 
+    headerTitle: { 
+        fontSize: 28, 
         fontWeight: 'bold', 
         color: colors.text 
+    },
+    headerSubtitle: {
+        fontSize: 16,
+        color: colors.textSecondary,
+        marginTop: 2,
+    },
+    historyButton: {
+        backgroundColor: colors.background,
+        padding: 10,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: colors.border
+    },
+    emptyContainer: {
+        alignItems: 'center', 
+        paddingTop: '30%',
+        paddingHorizontal: 20,
     },
     emptyTitle: {
         fontSize: 20,
@@ -141,7 +164,7 @@ const getStyles = (colors) => StyleSheet.create({
         textAlign: 'center'
     },
     listContentContainer: {
-        paddingHorizontal: 20,
+        padding: 20,
         paddingBottom: 40,
     },
     questionCard: {
@@ -152,7 +175,7 @@ const getStyles = (colors) => StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2, },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 10,
         elevation: 3,

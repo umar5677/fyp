@@ -1,5 +1,5 @@
-// fyp/server/api/qna.js
 const express = require('express');
+const { encrypt, decrypt } = require('../lib/encryption.js');
 
 function createQnaRouter(dbPool) {
     const router = express.Router();
@@ -75,10 +75,12 @@ function createQnaRouter(dbPool) {
             if (!isPremium || user.questionsAskedThisWeek >= weeklyLimit) {
                 return res.status(403).json({ message: 'You have reached your weekly question limit.' });
             }
+            
+            const encryptedQuestion = encrypt(questionText);
 
             await dbPool.query(
                 'INSERT INTO questions (userID, providerID, questionText, status) VALUES (?, ?, ?, ?)',
-                [userId, providerId, questionText, 'pending']
+                [userId, providerId, encryptedQuestion, 'pending']
             );
             
             await dbPool.query(
@@ -108,16 +110,54 @@ function createQnaRouter(dbPool) {
                 LEFT JOIN 
                     users AS p ON q.providerID = p.userID
                 WHERE 
-                    q.userID = ?
+                    q.userID = ? AND q.deletedByUser = FALSE
                 ORDER BY 
                     q.createdAt DESC
             `, [userId]);
     
-            res.json(questions);
+            const decryptedQuestions = questions.map(q => ({
+                ...q,
+                questionText: decrypt(q.questionText),
+                answerText: decrypt(q.answerText)
+            }));
+
+            res.json(decryptedQuestions);
     
         } catch (error) {
             console.error('Error fetching user questions:', error);
             res.status(500).json({ message: 'Error fetching your questions.' });
+        }
+    });
+
+    router.delete('/my-questions/:questionId', async (req, res) => {
+        const userId = req.user.userId;
+        const { questionId } = req.params;
+
+        try {
+            const [updateResult] = await dbPool.query(
+                `UPDATE questions SET deletedByUser = TRUE WHERE questionID = ? AND userID = ?`,
+                [questionId, userId]
+            );
+
+            if (updateResult.affectedRows === 0) {
+                return res.status(404).json({ message: 'Question not found or you do not have permission to delete it.' });
+            }
+
+            const [[question]] = await dbPool.query(
+                'SELECT deletedByProvider FROM questions WHERE questionID = ?',
+                [questionId]
+            );
+
+            if (question && question.deletedByProvider) {
+                await dbPool.query('DELETE FROM questions WHERE questionID = ?', [questionId]);
+                //console.log(`Permanently deleted question ${questionId} as both parties have removed it.`);
+            }
+
+            res.status(200).json({ success: true, message: 'Question removed from your history.' });
+
+        } catch (error) {
+            console.error('Error deleting user question:', error);
+            res.status(500).json({ message: 'An error occurred while removing the question.' });
         }
     });
 

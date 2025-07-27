@@ -1,5 +1,3 @@
-// fyp/food-app/screens/AskQuestionScreen.js
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, SafeAreaView, FlatList, ActivityIndicator, ScrollView, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -26,14 +24,6 @@ export default function AskQuestionScreen() {
     const styles = getStyles(colors);
     const navigation = useNavigation();
 
-    useEffect(() => {
-        navigation.setOptions({
-            headerStyle: { backgroundColor: colors.card },
-            headerTintColor: colors.text,
-            headerTitleStyle: { color: colors.text },
-        });
-    }, [colors, navigation]);
-
     const [questionText, setQuestionText] = useState('');
     const [allProviders, setAllProviders] = useState({});
     const [providerTypes, setProviderTypes] = useState([]);
@@ -49,8 +39,19 @@ export default function AskQuestionScreen() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [questionHistory, setQuestionHistory] = useState([]);
+    const [isDeleting, setIsDeleting] = useState(false);
 
-    useFocusEffect(useCallback(() => {
+    useEffect(() => {
+        navigation.setOptions({
+            headerStyle: { backgroundColor: colors.card },
+            headerTintColor: colors.text,
+            headerTitleStyle: { color: colors.text },
+        });
+    }, [colors, navigation]);
+    
+    // ** THIS FIXES THE useFocusEffect ERROR **
+    useFocusEffect(
+      useCallback(() => {
         const loadData = async () => {
             setIsLoading(true);
             try {
@@ -79,8 +80,10 @@ export default function AskQuestionScreen() {
                 setIsLoading(false);
             }
         };
+        
         loadData();
-    }, []));
+      }, [])
+    );
 
     useEffect(() => {
         if (selectedProviderType) {
@@ -103,6 +106,8 @@ export default function AskQuestionScreen() {
             setQuestionText('');
             setSelectedProviderType(null);
             setSelectedProvider(null);
+            
+            // Reload all data to get the latest history and remaining count
             const [historyData, qnaStatus] = await Promise.all([api.getMyQuestions(), api.getQnaStatus()]);
             setQuestionHistory(historyData);
             if (qnaStatus) {
@@ -112,6 +117,7 @@ export default function AskQuestionScreen() {
             }
         } catch (error) {
             if (error.message.includes('limit')) {
+                // If limit is hit, just refresh the QnA status
                 const qnaStatus = await api.getQnaStatus();
                 if (qnaStatus) {
                     setQuestionsRemaining(qnaStatus.questions_remaining || 0);
@@ -122,6 +128,38 @@ export default function AskQuestionScreen() {
         } finally {
             setIsSubmitting(false);
         }
+    };
+
+    const handleDeleteQuestion = () => {
+    Alert.alert(
+        "Delete Question",
+        "Are you sure you want to remove this question from your history? The provider will still be able to see it.",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: async () => {
+                        if (!selectedQuestion) return;
+                        setIsDeleting(true);
+                        try {
+                            await api.deleteQuestion(selectedQuestion.questionID);
+                            
+                            setQuestionHistory(prevHistory => 
+                                prevHistory.filter(q => q.questionID !== selectedQuestion.questionID)
+                            );
+                            
+                            setDetailModalVisible(false);
+                            Alert.alert("Success", "Your question has been deleted.");
+                        } catch (error) {
+                            Alert.alert("Error", error.message || "Failed to delete the question.");
+                        } finally {
+                            setIsDeleting(false);
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const handleSelectType = (type) => {
@@ -210,9 +248,42 @@ export default function AskQuestionScreen() {
                 <Modal visible={isProviderPickerVisible} onRequestClose={() => setIsProviderPickerVisible(false)} transparent={true} animationType="slide">
                      <View style={styles.modalOverlay}><View style={styles.modalContainer}><Text style={styles.modalTitle}>Select a {selectedProviderType}</Text><FlatList data={providersInType} keyExtractor={(item) => item.userID.toString()} renderItem={({ item }) => (<TouchableOpacity style={styles.modalItem} onPress={() => handleSelectProvider(item)}><Text style={styles.modalItemText}>{item.name}</Text></TouchableOpacity>)}/><TouchableOpacity style={styles.modalCloseButton} onPress={() => setIsProviderPickerVisible(false)}><Text style={styles.modalCloseButtonText}>Close</Text></TouchableOpacity></View></View>
                 </Modal>
-                {selectedQuestion && ( <Modal animationType="slide" transparent={true} visible={isDetailModalVisible} onRequestClose={() => setDetailModalVisible(false)}>
-                    <View style={styles.detailModalCenteredView}><View style={styles.detailModalView}><TouchableOpacity style={styles.detailModalCloseButton} onPress={() => setDetailModalVisible(false)}><Ionicons name="close-circle" size={32} color={colors.textSecondary} /></TouchableOpacity><ScrollView><View style={styles.detailModalCard}><Text style={styles.detailModalCardTitle}>YOUR QUESTION</Text><Text style={styles.detailModalQuestionText}>{selectedQuestion.questionText}</Text><Text style={styles.detailModalDate}>{new Date(selectedQuestion.createdAt).toLocaleString()}</Text></View>{selectedQuestion.answerText ? (<View style={[styles.detailModalCard, styles.detailModalAnswerCard]}><Text style={styles.detailModalCardTitle}>ANSWER FROM {selectedQuestion.providerFirstName?.toUpperCase() || 'PROVIDER'}</Text><Text style={styles.detailModalAnswerText}>{selectedQuestion.answerText}</Text><Text style={styles.detailModalDate}>{new Date(selectedQuestion.answeredAt).toLocaleString()}</Text></View>) : (<View style={styles.detailModalCard}><Text style={styles.detailModalWaitingText}>Waiting for a response...</Text></View>)}</ScrollView></View></View>
-                </Modal>)}
+                
+                {selectedQuestion && ( 
+                    <Modal animationType="slide" transparent={true} visible={isDetailModalVisible} onRequestClose={() => setDetailModalVisible(false)}>
+                        <View style={styles.detailModalCenteredView}>
+                            <View style={styles.detailModalView}>
+                                <TouchableOpacity style={styles.detailModalCloseButton} onPress={() => setDetailModalVisible(false)}>
+                                    <Ionicons name="close-circle" size={32} color={colors.textSecondary} />
+                                </TouchableOpacity>
+                                <ScrollView>
+                                    <View style={styles.detailModalCard}><Text style={styles.detailModalCardTitle}>YOUR QUESTION</Text><Text style={styles.detailModalQuestionText}>{selectedQuestion.questionText}</Text><Text style={styles.detailModalDate}>{new Date(selectedQuestion.createdAt).toLocaleString()}</Text></View>
+                                    {selectedQuestion.answerText ? (
+                                        <View style={[styles.detailModalCard, styles.detailModalAnswerCard]}>
+                                            <Text style={styles.detailModalCardTitle}>ANSWER FROM {selectedQuestion.providerFirstName?.toUpperCase() || 'PROVIDER'}</Text>
+                                            <Text style={styles.detailModalAnswerText}>{selectedQuestion.answerText}</Text>
+                                            <Text style={styles.detailModalDate}>{new Date(selectedQuestion.answeredAt).toLocaleString()}</Text>
+                                        </View>
+                                    ) : (
+                                        <View style={styles.detailModalCard}>
+                                            <Text style={styles.detailModalWaitingText}>Waiting for a response...</Text>
+                                        </View>
+                                    )}
+                                    <TouchableOpacity 
+                                        style={styles.deleteButton} 
+                                        onPress={handleDeleteQuestion}
+                                        disabled={isDeleting}
+                                    >
+                                        {isDeleting 
+                                            ? <ActivityIndicator color={colors.logoutText} /> 
+                                            : <Text style={styles.deleteButtonText}>Delete Question</Text>
+                                        }
+                                    </TouchableOpacity>
+                                </ScrollView>
+                            </View>
+                        </View>
+                    </Modal>
+                )}
             </KeyboardAvoidingView>
         </SafeAreaView>
     );
@@ -222,8 +293,8 @@ const getStyles = (colors) => StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     scrollContent: { padding: 20, paddingBottom: 50 },
     label: { fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 12, marginTop: 24 },
-    input: { backgroundColor: colors.card, color: colors.text, minHeight: 140, borderRadius: 12, padding: 16, fontSize: 16, textAlignVertical: 'top' },
-    pickerButton: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.card, padding: 16, borderRadius: 12 },
+    input: { backgroundColor: colors.card, color: colors.text, minHeight: 140, borderRadius: 12, padding: 16, fontSize: 16, textAlignVertical: 'top', borderWidth: 1, borderColor: colors.border },
+    pickerButton: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.card, padding: 16, borderRadius: 12, borderWidth: 1, borderColor: colors.border },
     pickerText: { fontSize: 16, color: colors.text },
     pickerPlaceholder: { fontSize: 16, color: colors.textSecondary },
     submitButton: { backgroundColor: colors.primary, padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 32 },
@@ -232,12 +303,12 @@ const getStyles = (colors) => StyleSheet.create({
     historySection: { marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: colors.border },
     historyTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 16 },
     emptyHistoryText: { textAlign: 'center', color: colors.textSecondary, marginTop: 20, fontSize: 14 },
-    historyCard: { backgroundColor: colors.card, borderRadius: 8, padding: 15, marginBottom: 10 },
+    historyCard: { backgroundColor: colors.card, borderRadius: 8, padding: 15, marginBottom: 10, borderWidth: 1, borderColor: colors.border },
     historyQuestionText: { fontSize: 16, color: colors.text, marginBottom: 10 },
     statusContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     statusText: { fontSize: 12, fontWeight: 'bold', textTransform: 'capitalize', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, overflow: 'hidden' },
-    statusPending: { backgroundColor: 'rgba(251, 191, 36, 0.2)', color: '#FBBF24' },
-    statusAnswered: { backgroundColor: 'rgba(74, 222, 128, 0.2)', color: '#4ADE80' },
+    statusPending: { backgroundColor: 'rgba(251, 191, 36, 0.2)', color: '#D97706' },
+    statusAnswered: { backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#059669' },
     historyDateText: { fontSize: 12, color: colors.textSecondary },
     modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
     modalContainer: { backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '60%' },
@@ -247,8 +318,8 @@ const getStyles = (colors) => StyleSheet.create({
     modalCloseButton: { marginTop: 20, backgroundColor: colors.background, borderRadius: 10, padding: 15 },
     modalCloseButtonText: { color: colors.primary, fontWeight: 'bold', textAlign: 'center', fontSize: 16 },
     detailModalCenteredView: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.6)' },
-    detailModalView: { backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingTop: 50, width: '100%', height: '85%' },
-    detailModalCloseButton: { position: 'absolute', top: 15, right: 15 },
+    detailModalView: { backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingTop: 50, width: '100%', maxHeight: '90%' },
+    detailModalCloseButton: { position: 'absolute', top: 15, right: 15, zIndex: 1 },
     detailModalCard: { width: '100%', padding: 15, borderRadius: 10, backgroundColor: colors.background, marginBottom: 15 },
     detailModalAnswerCard: { backgroundColor: 'rgba(249, 115, 22, 0.1)', borderColor: 'rgba(249, 115, 22, 0.3)' },
     detailModalCardTitle: { fontSize: 12, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 8, textTransform: 'uppercase' },
@@ -256,4 +327,17 @@ const getStyles = (colors) => StyleSheet.create({
     detailModalAnswerText: { fontSize: 16, color: colors.text, lineHeight: 24 },
     detailModalDate: { fontSize: 12, color: colors.textSecondary, marginTop: 12, textAlign: 'right' },
     detailModalWaitingText: { fontSize: 16, fontStyle: 'italic', color: colors.textSecondary, textAlign: 'center', padding: 20 },
+    deleteButton: {
+        marginTop: 20,
+        paddingVertical: 12,
+        borderRadius: 10,
+        backgroundColor: colors.logoutBackground,
+        alignItems: 'center',
+        marginHorizontal: 10,
+    },
+    deleteButtonText: {
+        color: colors.logoutText,
+        fontSize: 16,
+        fontWeight: '600',
+    },
 });

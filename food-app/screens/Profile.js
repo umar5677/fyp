@@ -1,4 +1,3 @@
-// fyp/food-app/screens/Profile.js
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Image, Switch,
@@ -6,12 +5,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker'; 
 import { api } from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
 import HeaderBackground from '../components/HeaderBackground';
+import { ReviewModal } from '../components/ReviewModal';
 
 const getStyles = (colors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background, },
@@ -55,11 +55,13 @@ const ProfileScreen = ({ navigation }) => {
     const [user, setUser] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [cacheBuster, setCacheBuster] = useState(Date.now());
+    const [isReviewModalVisible, setIsReviewModalVisible] = useState(false);
     const styles = getStyles(colors);
 
     useFocusEffect(
         useCallback(() => {
             const fetchProfile = async () => {
+                if (!isLoading) setIsLoading(true);
                 try {
                     const profileRes = await api.getProfile();
                     setUser(profileRes.user);
@@ -101,7 +103,7 @@ const ProfileScreen = ({ navigation }) => {
             const data = await api.uploadProfilePhoto(formData);
             if (data.imageUrl) {
                 setUser(currentUser => ({ ...currentUser, pfpUrl: data.imageUrl }));
-                setCacheBuster(Date.now()); // Force image refresh
+                setCacheBuster(Date.now());
                 Alert.alert('Success!', 'Your profile picture has been updated.');
             } else {
                 Alert.alert('Upload Failed', data.message || 'The server did not return an image URL.');
@@ -117,21 +119,25 @@ const ProfileScreen = ({ navigation }) => {
             { text: "Cancel", style: "cancel" },
             { text: "Log Out", style: "destructive",
                 onPress: async () => {
+                    const rootNavigator = navigation.getParent('RootStack');
                     await SecureStore.deleteItemAsync('accessToken');
                     await SecureStore.deleteItemAsync('refreshToken');
-                    navigation.getParent('RootStack').replace('Login');
+                    if (rootNavigator) {
+                        rootNavigator.replace('Login');
+                    } else {
+                        navigation.navigate('Login');
+                    }
                 },
             },
         ]);
     };
 
-    if (isLoading) {
+    if (isLoading || !user) {
         return <SafeAreaView style={styles.loadingContainer}><ActivityIndicator size="large" color="#F97316" /></SafeAreaView>;
     }
 
-    // Append cache-buster to the URI to prevent caching issues
-    const imageUri = user?.pfpUrl ? `${user.pfpUrl}?t=${cacheBuster}` : null;
-    const userInitial = user?.first_name ? user.first_name[0].toUpperCase() : 'A';
+    const imageUri = user.pfpUrl ? `${user.pfpUrl}?t=${cacheBuster}` : null;
+    const userInitial = user.first_name ? user.first_name[0].toUpperCase() : 'U';
 
     return (
         <SafeAreaView style={styles.safeArea}>
@@ -149,8 +155,8 @@ const ProfileScreen = ({ navigation }) => {
                         </View>
                     </TouchableOpacity>
                     <View style={styles.profileInfoContainer}>
-                        <Text style={styles.name} numberOfLines={1}>{user?.first_name || ''} {user?.last_name || ''}</Text>
-                        <Text style={styles.email} numberOfLines={1}>{user?.email}</Text>
+                        <Text style={styles.name} numberOfLines={1}>{user.first_name || ''} {user.last_name || ''}</Text>
+                        <Text style={styles.email} numberOfLines={1}>{user.email}</Text>
                     </View>
                     <TouchableOpacity style={styles.editButton} onPress={() => navigation.navigate('EditProfile')}>
                         <Text style={styles.editButtonText}>Edit</Text>
@@ -161,10 +167,21 @@ const ProfileScreen = ({ navigation }) => {
                      <ProfileMenuButton iconName="person-outline" text="Edit Profile" onPress={() => navigation.navigate('EditProfile')} colors={colors} />
                      <ProfileMenuButton iconName="lock-closed-outline" text="Change Password" onPress={() => navigation.navigate('ChangePassword')} colors={colors} />
                 </View>
+
                 <View style={styles.menuGroup}>
-                    <ProfileMenuButton iconName="alarm-outline" text="Reminders" onPress={() => navigation.navigate('Reminders')} colors={colors} />
-                    <ProfileMenuButton iconName="shield-checkmark-outline" text="Alerts and Sharing" onPress={() => navigation.navigate('Alerts')} colors={colors} />
-                    <ProfileMenuButton iconName="settings-outline" text="Dark Mode" isSwitch={true} switchValue={theme === 'dark'} onSwitchChange={toggleTheme} colors={colors} />
+                    {!user.isProvider && (
+                        <>
+                            <ProfileMenuButton iconName="alarm-outline" text="Reminders" onPress={() => navigation.navigate('Reminders')} colors={colors} />
+                            <ProfileMenuButton iconName="shield-checkmark-outline" text="Alerts and Sharing" onPress={() => navigation.navigate('Alerts')} colors={colors} />
+                            <ProfileMenuButton 
+                                iconName="star-outline" 
+                                text="Leave a Review" 
+                                onPress={() => setIsReviewModalVisible(true)} 
+                                colors={colors} 
+                            />
+                        </>
+                    )}
+                     <ProfileMenuButton iconName="settings-outline" text="Dark Mode" isSwitch={true} switchValue={theme === 'dark'} onSwitchChange={toggleTheme} colors={colors} />
                      <ProfileMenuButton iconName="chatbubble-ellipses-outline" text="Contact Us" onPress={() => Linking.openURL('mailto:glucobites.org@gmail.com')} colors={colors} />
                 </View>
 
@@ -173,6 +190,11 @@ const ProfileScreen = ({ navigation }) => {
                      <Text style={styles.logoutText}>Log out from this account</Text>
                 </TouchableOpacity>
             </ScrollView>
+            
+            <ReviewModal 
+                isVisible={isReviewModalVisible}
+                onClose={() => setIsReviewModalVisible(false)}
+            />
         </SafeAreaView>
     );
 };

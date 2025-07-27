@@ -1,4 +1,3 @@
-// server.js
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -7,8 +6,23 @@ const authenticateToken = require('./lib/authMiddleware.js');
 const multer = require('multer');
 const { S3Client } = require('@aws-sdk/client-s3');
 const multerS3 = require('multer-s3');
-const axios = require('axios');
 const { startScheduledReports } = require('./lib/reportScheduler.js');
+
+// Routers
+const createPasswordResetRouter = require('./api/passwordReset.js');
+const createReviewsRouter = require('./api/reviews.js');
+const loginApi = require('./api/login.js');
+const createGenerateReportRoute = require('./api/generateReport.js');
+const createUserSettingsRoutes = require('./api/userSettings.js');
+const createProvidersRouter = require('./api/providers.js');
+const createOcrRouter = require('./api/ocr.js');
+const createPredictionsRouter = require('./api/predictions.js');
+const createQnaRouter = require('./api/qna.js');
+const createProviderRouter = require('./api/provider.js');
+const createAiRouter = require('./api/aiFoodScan.js');
+const createNotificationsRouter = require('./api/notifications.js');
+const createRemindersRouter = require('./api/reminders.js');
+const createPostsRouter = require('./api/posts.js');
 
 
 const app = express();
@@ -37,10 +51,13 @@ const upload = multer({
     })
 });
 
-// PUBLIC ROUTES
-const loginApi = require('./api/login.js');
-const { createLoginRouter, hashPassword, comparePassword } = loginApi;
-app.use('/api/login', createLoginRouter(dbPool));
+
+// PUBLIC ROUTES 
+app.use('/api/login', loginApi.createLoginRouter(dbPool));
+app.use('/api/password-reset', createPasswordResetRouter(dbPool));
+
+app.use('/api/reviews', createReviewsRouter(dbPool));
+
 
 app.post('/api/token', (req, res) => {
     const { token } = req.body;
@@ -48,11 +65,17 @@ app.post('/api/token', (req, res) => {
 
     jwt.verify(token, process.env.JWT_REFRESH_SECRET, (err, user) => {
         if (err) return res.status(403).json({ message: 'Refresh Token is not valid.' });
-        const payload = { userId: user.userId };
+        
+        const payload = { 
+            userId: user.userId, 
+            isProvider: user.isProvider
+        };
+
         const accessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '15m' });
         res.json({ accessToken });
     });
 });
+
 
 // PROTECTED ROUTES
 app.use(authenticateToken);
@@ -68,19 +91,7 @@ app.post('/api/upload/profile-picture', upload.single('photo'), async (req, res)
     }
 });
 
-// MOUNT PROTECTED ROUTERS
-const createGenerateReportRoute = require('./api/generateReport.js');
-const createUserSettingsRoutes = require('./api/userSettings.js');
-const createProvidersRouter = require('./api/providers.js');
-const createOcrRouter = require('./api/ocr.js');
-const createPredictionsRouter = require('./api/predictions.js');
-const createQnaRouter = require('./api/qna.js');
-const createProviderRouter = require('./api/provider.js');
-const createAiRouter = require('./api/aiFoodScan.js');
-const createNotificationsRouter = require('./api/notifications.js');
-const createRemindersRouter = require('./api/reminders.js');
-const createPostsRouter = require('./api/posts.js');
-
+// MOUNT FULLY-PROTECTED ROUTERS
 app.use('/api/user-settings', createUserSettingsRoutes(dbPool));
 app.post('/api/generate-report', createGenerateReportRoute(dbPool));
 app.use('/api/providers', createProvidersRouter(dbPool));
@@ -93,6 +104,7 @@ app.use('/api/notifications', createNotificationsRouter(dbPool));
 app.use('/api/reminders', createRemindersRouter(dbPool));
 app.use('/api/posts', createPostsRouter(dbPool));
 
+
 app.put('/api/profile-setup', async (req, res) => {
     const userId = req.user.userId;
     const { dob, weight, height, diabetesType, gender, isInsulin } = req.body;
@@ -100,13 +112,10 @@ app.put('/api/profile-setup', async (req, res) => {
         return res.status(400).json({ message: 'All fields are required.' });
     }
     try {
-        const [result] = await dbPool.query(
+        await dbPool.query(
             `UPDATE users SET dob = ?, weight = ?, height = ?, diabetes = ?, gender = ?, isInsulin = ?, hasProfileSetup = 1 WHERE userID = ?`,
             [dob, weight, height, diabetesType, gender, isInsulin, userId]
         );
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: 'User not found.' });
-        }
         res.status(200).json({ success: true, message: 'Profile setup complete!' });
     } catch (error) {
         console.error('Profile setup error:', error);
@@ -129,11 +138,11 @@ app.post('/api/profile/change-password', async (req, res) => {
             return res.status(404).json({ message: 'User not found.' });
         }
         const user = users[0];
-        const isMatch = await comparePassword(currentPassword, user.password);
+        const isMatch = await loginApi.comparePassword(currentPassword, user.password);
         if (!isMatch) {
             return res.status(401).json({ message: 'Incorrect current password.' });
         }
-        const newHashedPassword = await hashPassword(newPassword);
+        const newHashedPassword = await loginApi.hashPassword(newPassword);
         await dbPool.query('UPDATE users SET password = ? WHERE userID = ?', [newHashedPassword, userId]);
         res.status(200).json({ success: true, message: 'Password changed successfully.' });
     } catch (error) {
@@ -145,7 +154,10 @@ app.post('/api/profile/change-password', async (req, res) => {
 app.get('/api/profile', async (req, res) => {
     const userId = req.user.userId;
     try {
-        const [users] = await dbPool.query('SELECT userID, email, first_name, last_name, dob, weight, height, gender, diabetes, isInsulin, pfpUrl FROM users WHERE userID = ?', [userId]);
+        const [users] = await dbPool.query(
+            'SELECT userID, email, first_name, last_name, dob, weight, height, gender, diabetes, isInsulin, pfpUrl, hasProfileSetup, setProvider AS isProvider FROM users WHERE userID = ?', 
+            [userId]
+        );
         if (users.length === 0) return res.status(404).json({ message: 'User not found.' });
         res.json({ user: users[0] });
     } catch (error) {
@@ -163,21 +175,18 @@ app.put('/api/profile', async (req, res) => {
     if (req.body.hasOwnProperty('last_name')) { queryFields.push('last_name = ?'); queryParams.push(last_name); }
     if (req.body.hasOwnProperty('email')) { queryFields.push('email = ?'); queryParams.push(email); }
     if (req.body.hasOwnProperty('dob')) { queryFields.push('dob = ?'); queryParams.push(dob); }
-    if (req.body.hasOwnProperty('height') && height) { queryFields.push('height = ?'); queryParams.push(parseFloat(height)); }
-    if (req.body.hasOwnProperty('weight') && weight) { queryFields.push('weight = ?'); queryParams.push(parseFloat(weight)); }
+    if (req.body.hasOwnProperty('height') && height != null) { queryFields.push('height = ?'); queryParams.push(parseFloat(height)); }
+    if (req.body.hasOwnProperty('weight') && weight != null) { queryFields.push('weight = ?'); queryParams.push(parseFloat(weight)); }
     if (req.body.hasOwnProperty('gender')) { queryFields.push('gender = ?'); queryParams.push(gender); }
     if (req.body.hasOwnProperty('diabetes')) { queryFields.push('diabetes = ?'); queryParams.push(diabetes); }
     if (req.body.hasOwnProperty('isInsulin')) { queryFields.push('isInsulin = ?'); queryParams.push(isInsulin); }
     if (queryFields.length === 0) {
-        return res.status(400).json({ message: 'No fields to update.' });
+        return res.status(400).json({ message: 'No valid fields to update.' });
     }
     const queryString = `UPDATE users SET ${queryFields.join(', ')} WHERE userID = ?`;
     queryParams.push(userId);
     try {
-        const [result] = await dbPool.query(queryString, queryParams);
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "User not found." });
-        }
+        await dbPool.query(queryString, queryParams);
         res.status(200).json({ message: "Profile updated successfully." });
     } catch (error) {
         console.error("Profile update error:", error);
@@ -188,6 +197,7 @@ app.put('/api/profile', async (req, res) => {
 app.delete('/api/profile', async (req, res) => {
     const userId = req.user.userId;
     try {
+        await dbPool.query('DELETE FROM reviews WHERE userID = ?', [userId]);
         await dbPool.query('DELETE FROM reportLogs WHERE userID = ?', [userId]);
         await dbPool.query('DELETE FROM user_thresholds WHERE userID = ?', [userId]);
         await dbPool.query('DELETE FROM dataLogs WHERE userID = ?', [userId]);
@@ -244,11 +254,11 @@ app.post('/api/logs', async (req, res) => {
     const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount < 0) { return res.status(400).json({ message: 'A valid, non-negative amount is required.' }); }
     try {
-        const [result] = await dbPool.query(
+        await dbPool.query(
             'INSERT INTO dataLogs (userID, type, amount, date, tag, foodName) VALUES (?, ?, ?, ?, ?, ?)',
             [userId, type, numericAmount, dateToInsert, tag || null, foodName || null]
         );
-        res.status(201).json({ success: true, message: 'Log created successfully!', logId: result.insertId });
+        res.status(201).json({ success: true, message: 'Log created successfully!' });
     } catch (error) {
         console.error('Error creating log:', error);
         res.status(500).json({ success: false, message: 'Error creating log.' });
@@ -262,11 +272,10 @@ app.put('/api/logs/:logId', async (req, res) => {
     const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount < 0) { return res.status(400).json({ success: false, message: 'A valid, non-negative amount is required.' }); }
     try {
-        const [result] = await dbPool.query(
+        await dbPool.query(
             `UPDATE dataLogs SET amount = ?, tag = ? WHERE logID = ? AND userID = ?`,
             [numericAmount, tag, logId, req.user.userId]
         );
-        if (result.affectedRows === 0) { return res.status(404).json({ success: false, message: 'Log not found or you do not have permission to edit it.' }); }
         res.status(200).json({ success: true, message: 'Log updated successfully.' });
     } catch (error) {
         console.error('Error updating log:', error);
@@ -278,8 +287,7 @@ app.delete('/api/logs/:logId', async (req, res) => {
     const { logId } = req.params;
     if (!logId) return res.status(400).json({ message: "Log ID is required." });
     try {
-        const [result] = await dbPool.query(`DELETE FROM dataLogs WHERE logID = ? AND userID = ?`, [logId, req.user.userId]);
-        if (result.affectedRows === 0) { return res.status(404).json({ message: 'Log not found or you do not have permission to delete it.' }); }
+        await dbPool.query(`DELETE FROM dataLogs WHERE logID = ? AND userID = ?`, [logId, req.user.userId]);
         res.status(200).json({ success: true, message: 'Log deleted successfully.' });
     } catch (error) {
         console.error('Error deleting log:', error);
