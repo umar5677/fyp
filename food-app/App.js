@@ -13,6 +13,7 @@ import * as Notifications from 'expo-notifications';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 import ProviderHistoryScreen from './screens/ProviderHistoryScreen';
+import BookmarkedPostsScreen from './screens/BookmarkedPostsScreen';
 
 // Font Imports
 import {
@@ -79,6 +80,16 @@ const AppNavigator = () => {
                         headerTintColor: colors.text,
                      }} 
                 />
+        <Stack.Screen 
+          name="BookmarkedPosts" 
+          component={BookmarkedPostsScreen} 
+          options={{ 
+              headerShown: true,
+              headerTitle: 'My Bookmarks',
+              headerStyle: { backgroundColor: colors.card },
+              headerTintColor: colors.text,
+          }} 
+        />
         <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
         <Stack.Screen name="MainApp" component={AppTabs} />
         <Stack.Screen name="ProviderApp" component={ProviderTabs} />

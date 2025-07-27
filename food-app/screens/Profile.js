@@ -173,6 +173,7 @@ const ProfileScreen = ({ navigation }) => {
                         <>
                             <ProfileMenuButton iconName="alarm-outline" text="Reminders" onPress={() => navigation.navigate('Reminders')} colors={colors} />
                             <ProfileMenuButton iconName="shield-checkmark-outline" text="Alerts and Sharing" onPress={() => navigation.navigate('Alerts')} colors={colors} />
+                            <ProfileMenuButton iconName="bookmark-outline" text="Bookmarked Posts" onPress={() => navigation.navigate('BookmarkedPosts')} colors={colors} />
                             <ProfileMenuButton 
                                 iconName="star-outline" 
                                 text="Leave a Review" 

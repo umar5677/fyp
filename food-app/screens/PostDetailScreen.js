@@ -1,26 +1,53 @@
-// fyp/food-app/screens/PostDetailScreen.js
 import React, { useState, useCallback, useEffect } from "react";
 import { 
-    View, Text, Image, StyleSheet, ScrollView, SafeAreaView,
+    View, Text, Image, StyleSheet, SafeAreaView,
     ActivityIndicator, TextInput, TouchableOpacity, FlatList,
-    KeyboardAvoidingView, Platform, Alert, Modal, Pressable
+    KeyboardAvoidingView, Platform, Alert, Modal, Pressable,
+    ScrollView 
 } from "react-native";
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "../utils/api";
 import { useTheme } from "../context/ThemeContext";
+import { showMessage } from "react-native-flash-message";
 
-const CommentItem = ({ item, colors }) => {
+dayjs.extend(relativeTime);
+
+const CommentItem = ({ item, colors, onToggleLike, onReport, currentUserId }) => {
     const styles = getStyles(colors);
+    const isOwnComment = item.userID === currentUserId;
+
     return (
         <View style={styles.commentContainer}>
             <Image source={{ uri: item.pfpUrl || `https://i.pravatar.cc/100?u=${item.userID}` }} style={styles.commentAvatar} />
-            <View style={styles.commentBubble}>
-                <Text style={styles.commentUsername}>{item.first_name} {item.last_name}</Text>
-                <Text style={styles.commentText}>{item.commentText}</Text>
-                <Text style={styles.commentDate}>{dayjs(item.createdAt).format("MMM DD, YYYY")}</Text>
+            <View style={styles.commentContent}>
+                <View style={styles.commentBubble}>
+                    <Text style={styles.commentUsername}>{item.first_name} {item.last_name}</Text>
+                    <Text style={styles.commentText}>{item.commentText}</Text>
+                </View>
+                <View style={styles.commentFooter}>
+                    <Text style={styles.commentDate}>{dayjs(item.createdAt).fromNow()}</Text>
+                    
+                    <TouchableOpacity style={styles.likeButton} onPress={onToggleLike}>
+                        <Ionicons 
+                            name={item.likedByUser ? "heart" : "heart-outline"}
+                            size={16}
+                            color={item.likedByUser ? colors.logoutText : colors.textSecondary}
+                        />
+                        <Text style={[styles.likeCount, { color: item.likedByUser ? colors.logoutText : colors.textSecondary }]}>
+                            {item.likeCount > 0 ? item.likeCount : ''}
+                        </Text>
+                    </TouchableOpacity>
+
+                    {!isOwnComment && (
+                        <TouchableOpacity style={styles.flagButton} onPress={onReport}>
+                            <Ionicons name="flag-outline" size={14} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                    )}
+                </View>
             </View>
         </View>
     );
@@ -52,10 +79,11 @@ export default function PostDetailScreen() {
     const { colors } = useTheme();
     const styles = getStyles(colors);
     const navigation = useNavigation();
-    const insets = useSafeAreaInsets(); // Get safe area dimensions
+    const insets = useSafeAreaInsets();
 
     const [post, setPost] = useState(null);
     const [comments, setComments] = useState([]);
+    const [currentUser, setCurrentUser] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [newComment, setNewComment] = useState('');
     const [isPostingComment, setIsPostingComment] = useState(false);
@@ -63,17 +91,26 @@ export default function PostDetailScreen() {
     const [selectedImage, setSelectedImage] = useState(null);
     const [showOptionsMenu, setShowOptionsMenu] = useState(false); 
     
+    useEffect(() => {
+        const fetchCurrentUser = async () => {
+            try {
+                const { user } = await api.getProfile();
+                setCurrentUser(user);
+            } catch (e) {
+                console.error("Failed to fetch current user profile for comments");
+            }
+        };
+        fetchCurrentUser();
+    }, []);
+
     const handleDeletePost = () => {
-        Alert.alert(
-            "Delete Post",
-            "Are you sure you want to permanently delete this post?",
+        Alert.alert( "Delete Post", "Are you sure you want to permanently delete this post?",
             [
                 { text: "Cancel", style: "cancel" },
                 {
-                    text: "Delete",
-                    style: "destructive",
+                    text: "Delete", style: "destructive",
                     onPress: async () => {
-                        setShowOptionsMenu(false); // Close menu
+                        setShowOptionsMenu(false);
                         try {
                             await api.deletePost(postId);
                             Alert.alert("Success", "Post deleted.");
@@ -89,11 +126,8 @@ export default function PostDetailScreen() {
 
     useEffect(() => {
         navigation.setOptions({
-            headerStyle: { backgroundColor: colors.card },
-            headerTintColor: colors.text,
-            title: 'Post',
+            headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.text, title: 'Post',
         });
-
         if (post?.isOwner) {
             navigation.setOptions({
                 headerRight: () => (
@@ -104,7 +138,6 @@ export default function PostDetailScreen() {
             });
         }
     }, [post, navigation, colors]);
-
 
     const fetchData = async () => {
         try {
@@ -123,18 +156,14 @@ export default function PostDetailScreen() {
     };
     
     useFocusEffect(useCallback(() => {
-        setIsLoading(true);
+        if (!isLoading) setIsLoading(true);
         fetchData();
     }, [postId]));
     
     const handleToggleLike = () => {
         if (!post) return;
         const wasLiked = post.likedByUser;
-        setPost(currentPost => ({
-            ...currentPost,
-            likedByUser: !wasLiked,
-            likeCount: wasLiked ? currentPost.likeCount - 1 : currentPost.likeCount + 1,
-        }));
+        setPost(p => ({ ...p, likedByUser: !wasLiked, likeCount: wasLiked ? p.likeCount - 1 : p.likeCount + 1 }));
         if (wasLiked) {
             api.unlikePost(postId).catch(() => fetchData());
         } else {
@@ -148,14 +177,39 @@ export default function PostDetailScreen() {
         try {
             await api.addComment(postId, newComment.trim());
             setNewComment('');
-            const updatedComments = await api.getPostComments(postId);
-            setComments(updatedComments);
-            setPost(p => ({...p, commentCount: (p.commentCount || 0) + 1}));
+            fetchData(); // Refetch all data to get latest comments and count
         } catch (error) {
             Alert.alert("Error", "Could not post your comment.");
         } finally {
             setIsPostingComment(false);
         }
+    };
+    
+    const handleToggleCommentLike = (commentId, wasLiked) => {
+        setComments(cs => cs.map(c => c.id === commentId ? { ...c, likedByUser: !wasLiked, likeCount: wasLiked ? c.likeCount - 1 : c.likeCount + 1 } : c));
+        if (wasLiked) {
+            api.unlikeComment(commentId).catch(() => fetchData());
+        } else {
+            api.likeComment(commentId).catch(() => fetchData());
+        }
+    };
+
+    const handleReportComment = (commentId) => {
+        Alert.alert( "Report Comment", "Are you sure you want to report this comment for review?",
+            [
+                { text: "Cancel", style: "cancel" },
+                { text: "Report", style: "destructive",
+                    onPress: async () => {
+                        try {
+                            const response = await api.reportComment(commentId);
+                            showMessage({ message: response.message, type: "success", icon: "success" });
+                        } catch (error) {
+                            Alert.alert("Error", error.message || "Could not report this comment.");
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const openImageViewer = (imageUri) => {
@@ -164,24 +218,33 @@ export default function PostDetailScreen() {
     };
 
     const navigateToEditPost = () => {
-        setShowOptionsMenu(false); // Close the options menu
+        setShowOptionsMenu(false);
         navigation.navigate('EditPost', { post });
     };
 
-    if (isLoading || !post) {
+    if (isLoading || !post || !currentUser) {
         return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
     }
     
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView 
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
                 style={{flex: 1}}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
             >
                 <FlatList
                     data={comments}
                     keyExtractor={(item) => item.id.toString()}
-                    renderItem={({ item }) => <CommentItem item={item} colors={colors} />}
+                    renderItem={({ item }) => (
+                        <CommentItem 
+                            item={item} 
+                            colors={colors}
+                            onToggleLike={() => handleToggleCommentLike(item.id, item.likedByUser)}
+                            onReport={() => handleReportComment(item.id)}
+                            currentUserId={currentUser.userID}
+                        />
+                    )}
                     ListHeaderComponent={
                         <View style={{paddingBottom: 16}}>
                             <View style={styles.cardHeader}>
@@ -232,18 +295,14 @@ export default function PostDetailScreen() {
             
             <ImageViewer visible={viewerVisible} imageUri={selectedImage} onClose={() => setViewerVisible(false)} />
 
-            {/* Options Menu Modal */}
             <Modal
                 transparent={true}
                 animationType="fade"
                 visible={showOptionsMenu}
                 onRequestClose={() => setShowOptionsMenu(false)}
             >
-                <Pressable 
-                    style={styles.modalOverlay} 
-                    onPress={() => setShowOptionsMenu(false)}
-                >
-                    <View style={[styles.optionsMenu, { top: Platform.OS === 'ios' ? 70 : 30, right: 20 }]}>
+                <Pressable style={styles.modalOverlay} onPress={() => setShowOptionsMenu(false)}>
+                    <View style={[styles.optionsMenu, { top: Platform.OS === 'ios' ? 90 : 50, right: 20 }]}>
                         <TouchableOpacity style={styles.menuItem} onPress={navigateToEditPost}>
                             <Ionicons name="pencil-outline" size={20} color={colors.text} style={styles.menuItemIcon} />
                             <Text style={styles.menuItemText}>Edit Post</Text>
@@ -255,7 +314,7 @@ export default function PostDetailScreen() {
                     </View>
                 </Pressable>
             </Modal>
-        </View>
+        </SafeAreaView>
     );
 }
 
@@ -275,44 +334,23 @@ const getStyles = (colors) => StyleSheet.create({
     actionText: { marginLeft: 8, fontSize: 14, fontWeight: '600' },
     commentsTitle: { fontSize: 18, fontWeight: 'bold', marginTop: 24, marginBottom: 8, color: colors.text },
     emptyCommentText: { textAlign: 'center', color: colors.textSecondary, marginTop: 20 },
-    commentContainer: { flexDirection: 'row', marginBottom: 16 },
+    commentContainer: { flexDirection: 'row', marginBottom: 16, alignItems: 'flex-start' },
     commentAvatar: { width: 36, height: 36, borderRadius: 18, marginRight: 12, backgroundColor: colors.border },
+    commentContent: { flex: 1 },
     commentBubble: { flex: 1, backgroundColor: colors.card, padding: 12, borderRadius: 12 },
-    commentUsername: { fontWeight: 'bold', color: colors.text, fontSize: 13, marginBottom: 2 },
-    commentText: { color: colors.text, lineHeight: 18 },
-    commentDate: { fontSize: 11, color: colors.textSecondary, marginTop: 4, textAlign: 'right' },
+    commentUsername: { fontWeight: 'bold', color: colors.text, fontSize: 13, marginBottom: 4 },
+    commentText: { color: colors.text, lineHeight: 20 },
+    commentFooter: { flexDirection: 'row', alignItems: 'center', marginTop: 6, paddingLeft: 4 },
+    commentDate: { fontSize: 11, color: colors.textSecondary },
+    likeButton: { flexDirection: 'row', alignItems: 'center', marginLeft: 16, paddingVertical: 4 },
+    likeCount: { fontSize: 12, marginLeft: 4, fontWeight: '600' },
+    flagButton: { marginLeft: 'auto', padding: 6 },
     commentInputContainer: { flexDirection: 'row', paddingHorizontal: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card },
-    commentInput: { flex: 1, backgroundColor: colors.background, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, fontSize: 16, color: colors.text, marginRight: 12 },
+    commentInput: { flex: 1, backgroundColor: colors.background, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 16, color: colors.text, marginRight: 12 },
     sendButton: { padding: 4, justifyContent: 'center' },
-
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.3)', 
-    },
-    optionsMenu: {
-        position: 'absolute',
-        backgroundColor: colors.card,
-        borderRadius: 8,
-        paddingVertical: 5,
-        right: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 5,
-        elevation: 6,
-        minWidth: 150,
-    },
-    menuItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 15,
-    },
-    menuItemIcon: {
-        marginRight: 10,
-    },
-    menuItemText: {
-        fontSize: 16,
-        color: colors.text,
-    },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
+    optionsMenu: { position: 'absolute', backgroundColor: colors.card, borderRadius: 8, paddingVertical: 5, right: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 5, elevation: 6, minWidth: 150 },
+    menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 15 },
+    menuItemIcon: { marginRight: 10 },
+    menuItemText: { fontSize: 16, color: colors.text },
 });

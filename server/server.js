@@ -52,12 +52,10 @@ const upload = multer({
 });
 
 
-// PUBLIC ROUTES 
+// --- PUBLIC ROUTES --- 
 app.use('/api/login', loginApi.createLoginRouter(dbPool));
 app.use('/api/password-reset', createPasswordResetRouter(dbPool));
-
-
-
+app.use('/api/reviews', createReviewsRouter(dbPool));
 
 app.post('/api/token', (req, res) => {
     const { token } = req.body;
@@ -77,7 +75,7 @@ app.post('/api/token', (req, res) => {
 });
 
 
-// PROTECTED ROUTES
+// --- PROTECTED ROUTES ---
 app.use(authenticateToken);
 
 app.post('/api/upload/profile-picture', upload.single('photo'), async (req, res) => {
@@ -103,21 +101,35 @@ app.use('/api/ai', createAiRouter(dbPool));
 app.use('/api/notifications', createNotificationsRouter(dbPool));
 app.use('/api/reminders', createRemindersRouter(dbPool));
 app.use('/api/posts', createPostsRouter(dbPool));
-app.use('/api/reviews', createReviewsRouter(dbPool));
 
 
 app.put('/api/profile-setup', async (req, res) => {
     const userId = req.user.userId;
     const { dob, weight, height, diabetesType, gender, isInsulin } = req.body;
+    
     if (dob === undefined || weight === undefined || height === undefined || gender === null || diabetesType === null || isInsulin === undefined) {
         return res.status(400).json({ message: 'All fields are required.' });
     }
+
     try {
+        let calorieGoal = 2000; // Default fallback value
+        const age = new Date().getFullYear() - new Date(dob).getFullYear();
+
+        if (gender === 'Male' && weight > 0 && height > 0 && age > 0) {
+            const bmr = 88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age);
+            calorieGoal = Math.round(bmr * 1.375);
+        } else if (gender === 'Female' && weight > 0 && height > 0 && age > 0) {
+            const bmr = 447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age);
+            calorieGoal = Math.round(bmr * 1.375);
+        }
+
         await dbPool.query(
-            `UPDATE users SET dob = ?, weight = ?, height = ?, diabetes = ?, gender = ?, isInsulin = ?, hasProfileSetup = 1 WHERE userID = ?`,
-            [dob, weight, height, diabetesType, gender, isInsulin, userId]
+            `UPDATE users SET dob = ?, weight = ?, height = ?, diabetes = ?, gender = ?, isInsulin = ?, calorieGoal = ?, hasProfileSetup = 1 WHERE userID = ?`,
+            [dob, weight, height, diabetesType, gender, isInsulin, calorieGoal, userId]
         );
+        
         res.status(200).json({ success: true, message: 'Profile setup complete!' });
+
     } catch (error) {
         console.error('Profile setup error:', error);
         res.status(500).json({ message: 'Error updating profile.' });
@@ -156,7 +168,7 @@ app.get('/api/profile', async (req, res) => {
     const userId = req.user.userId;
     try {
         const [users] = await dbPool.query(
-            'SELECT userID, email, first_name, last_name, dob, weight, height, gender, diabetes, isInsulin, pfpUrl, hasProfileSetup, setProvider AS isProvider FROM users WHERE userID = ?', 
+            'SELECT userID, email, first_name, last_name, dob, weight, height, gender, diabetes, isInsulin, pfpUrl, hasProfileSetup, setProvider AS isProvider, calorieGoal FROM users WHERE userID = ?', 
             [userId]
         );
         if (users.length === 0) return res.status(404).json({ message: 'User not found.' });
@@ -169,23 +181,38 @@ app.get('/api/profile', async (req, res) => {
 
 app.put('/api/profile', async (req, res) => {
     const userId = req.user.userId;
-    const { first_name, last_name, email, dob, height, weight, gender, diabetes, isInsulin } = req.body;
+    const updates = req.body;
+
+    if (updates.first_name === '' || updates.last_name === '' || updates.email === '' || 
+        updates.dob === '' || updates.height === '' || updates.weight === '') {
+        return res.status(400).json({ message: 'Required fields cannot be blank.' });
+    }
+    
+    // DYNAMIC QUERY BUILDING
     let queryFields = [];
     let queryParams = [];
-    if (req.body.hasOwnProperty('first_name')) { queryFields.push('first_name = ?'); queryParams.push(first_name); }
-    if (req.body.hasOwnProperty('last_name')) { queryFields.push('last_name = ?'); queryParams.push(last_name); }
-    if (req.body.hasOwnProperty('email')) { queryFields.push('email = ?'); queryParams.push(email); }
-    if (req.body.hasOwnProperty('dob')) { queryFields.push('dob = ?'); queryParams.push(dob); }
-    if (req.body.hasOwnProperty('height') && height != null) { queryFields.push('height = ?'); queryParams.push(parseFloat(height)); }
-    if (req.body.hasOwnProperty('weight') && weight != null) { queryFields.push('weight = ?'); queryParams.push(parseFloat(weight)); }
-    if (req.body.hasOwnProperty('gender')) { queryFields.push('gender = ?'); queryParams.push(gender); }
-    if (req.body.hasOwnProperty('diabetes')) { queryFields.push('diabetes = ?'); queryParams.push(diabetes); }
-    if (req.body.hasOwnProperty('isInsulin')) { queryFields.push('isInsulin = ?'); queryParams.push(isInsulin); }
+
+    // Define the list of fields that the user is allowed to update from this screen
+    const allowedFields = [
+        'first_name', 'last_name', 'email', 'dob', 'height', 
+        'weight', 'gender', 'diabetes', 'isInsulin', 'calorieGoal' 
+    ];
+
+    // Loop through the updates sent from the app
+    Object.keys(updates).forEach(key => {
+        if (allowedFields.includes(key) && updates[key] !== undefined) {
+            queryFields.push(`${key} = ?`);
+            queryParams.push(updates[key]);
+        }
+    });
+    
     if (queryFields.length === 0) {
         return res.status(400).json({ message: 'No valid fields to update.' });
     }
+
     const queryString = `UPDATE users SET ${queryFields.join(', ')} WHERE userID = ?`;
     queryParams.push(userId);
+    
     try {
         await dbPool.query(queryString, queryParams);
         res.status(200).json({ message: "Profile updated successfully." });

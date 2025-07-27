@@ -1,4 +1,3 @@
-// fyp/food-app/screens/Home.js
 import React, { useRef, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
@@ -26,62 +25,79 @@ export default function Home({ route }) {
     
     const { isProvider, userId } = route.params || {};
 
-    const today = new Date();
-    const todayString = today.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
-    
     const [userName, setUserName] = useState('User');
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [hasUnread, setHasUnread] = useState(false);
     const [qnaCount, setQnaCount] = useState(0);
     const [isPremiumUser, setIsPremiumUser] = useState(false);
+    const [summary, setSummary] = useState(null);
+    const [isLoadingSummary, setIsLoadingSummary] = useState(true);
 
     const scrollX = useRef(new Animated.Value(0)).current;
     const slidesCount = 2;
     const slideWidth = width - 40;
 
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
+        setIsLoadingSummary(true); // Control loading state from here
         try {
-            const [profileRes, notificationsData] = await Promise.all([
+            const [profileRes, calorieRes, notificationsData, qnaRes] = await Promise.all([
                 api.getProfile(),
-                AsyncStorage.getItem('notifications')
+                api.getHistory([1], 'day', new Date().toISOString()),
+                AsyncStorage.getItem('notifications'),
+                isProvider ? api.getProviderQuestions() : api.getQnaStatus(),
             ]);
             
+            // Set user name
             if (profileRes.user?.first_name) {
                 setUserName(profileRes.user.first_name);
             }
 
+            // Set notifications
             if (notificationsData) {
                 setHasUnread(JSON.parse(notificationsData).length > 0);
             } else {
                 setHasUnread(false);
             }
 
+            // Set Q&A related state
             if (isProvider) {
-                const providerQuestions = await api.getProviderQuestions();
-                setQnaCount(providerQuestions.length);
+                setQnaCount(qnaRes.length);
             } else {
-                const userQnaStatus = await api.getQnaStatus();
-                setQnaCount(userQnaStatus.questions_remaining || 0);
-                setIsPremiumUser(userQnaStatus.is_premium || false);
+                setQnaCount(qnaRes.questions_remaining || 0);
+                setIsPremiumUser(qnaRes.is_premium || false);
             }
+
+            // Set summary card data
+            const food = calorieRes.reduce((acc, log) => acc + (Number(log.amount) || 0), 0);
+            const goal = profileRes.user?.calorieGoal || 2100;
+            setSummary({
+                goal: Math.round(goal),
+                food: Math.round(food),
+                exercise: 0,
+            });
 
         } catch (error) {
             console.error("Failed to load home screen data:", error);
+            // Provide a fallback state in case of error
+            setSummary({ goal: 2100, food: 0, exercise: 0 });
             setIsPremiumUser(false);
+        } finally {
+            setIsLoadingSummary(false); // End loading
         }
-    };
+    }, [isProvider]);
     
     useFocusEffect(useCallback(() => {
         loadData();
-    }, [isProvider]));
+    }, [loadData]));
 
     const onRefresh = useCallback(async () => {
         setIsRefreshing(true);
         await loadData();
         setIsRefreshing(false);
-    }, [isProvider]);
+    }, [loadData]);
 
     const getGreeting = () => {
+        const today = new Date();
         const hour = today.getHours();
         if (hour < 12) return `Good Morning, ${userName}!`;
         if (hour < 18) return `Good Afternoon, ${userName}!`;
@@ -101,7 +117,6 @@ export default function Home({ route }) {
                         <View style={styles.header}>
                             <View>
                                 <Text style={styles.greetingText}>{getGreeting()}</Text>
-                                <Text style={styles.dateText}>Today, {todayString}</Text>
                             </View>
                             <TouchableOpacity style={styles.notificationButton} onPress={() => navigation.navigate('Notifications')}>
                                 <Ionicons name="notifications-outline" size={26} color={colors.icon} />
@@ -119,7 +134,9 @@ export default function Home({ route }) {
                                 onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
                                 scrollEventThrottle={16}
                             >
-                                <View style={styles.slide}><SummaryCard /></View>
+                                <View style={styles.slide}>
+                                    <SummaryCard summary={summary} isLoading={isLoadingSummary} />
+                                </View>
                                 <View style={styles.slide}>
                                     <PredictedGlucoseCard isPremium={isPremiumUser} />
                                 </View>
@@ -164,7 +181,6 @@ const getStyles = (colors) => StyleSheet.create({
     container: { paddingHorizontal: 20, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 10 : 10 },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
     greetingText: { fontSize: 22, fontWeight: 'bold', color: colors.text },
-    dateText: { fontSize: 14, color: colors.textSecondary, marginTop: 4 },
     notificationButton: { padding: 8, backgroundColor: colors.card, borderRadius: 20, elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 5 },
     notificationDot: {
         position: 'absolute',

@@ -1,82 +1,17 @@
-// fyp/food-app/screens/Community.js
 import React, { useState, useCallback } from 'react';
 import { 
-    View, Text, Image, FlatList, StyleSheet, ActivityIndicator, 
+    View, Text, FlatList, StyleSheet, ActivityIndicator, 
     TouchableOpacity, RefreshControl, SafeAreaView, Alert,
-    Platform, // <--- ADDED: Import Platform
-    StatusBar // <--- ADDED: Import StatusBar
+    Platform,
+    StatusBar
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 import { api } from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
-
-const PostItem = ({ item, onToggleLike, navigation, colors }) => {
-    const styles = getStyles(colors);
-
-    const handleFlagPost = () => {
-        Alert.alert(
-            "Report Post",
-            `Are you sure you want to report this post by ${item.first_name} ${item.last_name}?`,
-            [
-                { text: "Cancel", style: "cancel" },
-                { 
-                    text: "Report", 
-                    style: "destructive", 
-                    onPress: () => {
-                        // In a real application, you would send a report/flag request to your API
-                        console.log(`Reporting post ${item.id} by user ${item.userID}`);
-                        Alert.alert("Report Submitted", "Thank you for reporting this post. Our team will review it.");
-                        // Example API call: api.reportPost(item.id).catch(err => console.error("Failed to report:", err));
-                    }
-                }
-            ]
-        );
-    };
-
-    return (
-        <View style={styles.card}>
-            <View style={styles.cardHeader}>
-                <Image source={{ uri: item.pfpUrl || `https://i.pravatar.cc/100?u=${item.userID}` }} style={styles.avatar} />
-                <View style={styles.userInfo}>
-                    <Text style={styles.username}>{item.first_name} {item.last_name}</Text>
-                    <Text style={styles.date}>{dayjs(item.createdAt).format("MMM DD, YYYY · h:mm A")}</Text>
-                </View>
-                
-                {/* Conditional Flagging icon */}
-                {!item.isOwner && ( // Only show flag if NOT the owner's post
-                    <TouchableOpacity onPress={handleFlagPost} style={styles.flagIconButton}>
-                        <Ionicons name="flag-outline" size={22} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                )}
-            </View>
-
-            {/* Card Content */}
-            <TouchableOpacity onPress={() => navigation.navigate("PostDetail", { postId: item.id })}>
-                <Text style={styles.content}>{item.content}</Text>
-                {item.images && item.images.length > 0 && (
-                    <Image source={{ uri: item.images[0] }} style={styles.postImage} />
-                )}
-            </TouchableOpacity>
-            
-            <View style={styles.actionBar}>
-                <TouchableOpacity style={styles.actionButton} onPress={() => onToggleLike(item.id, item.likedByUser)}>
-                    <Ionicons name={item.likedByUser ? "heart" : "heart-outline"} size={26} color={item.likedByUser ? '#EF4444' : colors.textSecondary} />
-                    <Text style={[styles.actionText, { color: item.likedByUser ? '#EF4444' : colors.textSecondary }]}>
-                        {item.likeCount}
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate("PostDetail", { postId: item.id })}>
-                    <Ionicons name={"chatbubble-outline"} size={24} color={colors.textSecondary} />
-                    <Text style={[styles.actionText, { color: colors.textSecondary }]}>
-                        {item.commentCount}
-                    </Text>
-                </TouchableOpacity>
-            </View>
-        </View>
-    );
-};
+import { showMessage } from "react-native-flash-message";
+import { PostItem } from '../components/PostItem';
 
 export default function CommunityScreen() {
     const navigation = useNavigation();
@@ -92,17 +27,19 @@ export default function CommunityScreen() {
             setPosts(data);
         } catch (err) {
             console.error("Failed to fetch posts", err);
+            Alert.alert("Error", "Could not fetch community posts.");
         } finally {
             setIsLoading(false);
         }
     };
 
     useFocusEffect(useCallback(() => {
-        setIsLoading(true);
+        if (!isLoading) setIsLoading(true);
         fetchPosts();
     }, []));
     
     const onRefresh = useCallback(() => {
+        setIsLoading(true);
         fetchPosts();
     }, []);
 
@@ -110,7 +47,7 @@ export default function CommunityScreen() {
         setPosts(currentPosts => 
             currentPosts.map(post => {
                 if (post.id === postId) {
-                    return { ...post, likedByUser: !wasLiked, likeCount: wasLiked ? post.likeCount - 1 : post.likeCount + 1, };
+                    return { ...post, likedByUser: !wasLiked, likeCount: wasLiked ? post.likeCount - 1 : post.likeCount + 1 };
                 }
                 return post;
             })
@@ -119,6 +56,35 @@ export default function CommunityScreen() {
             api.unlikePost(postId).catch(() => fetchPosts());
         } else {
             api.likePost(postId).catch(() => fetchPosts());
+        }
+    };
+
+    const handleToggleBookmark = (postId, wasBookmarked) => {
+        setPosts(currentPosts => 
+            currentPosts.map(post => {
+                if (post.id === postId) {
+                    return { ...post, bookmarkedByUser: !wasBookmarked };
+                }
+                return post;
+            })
+        );
+        if (wasBookmarked) {
+            api.unbookmarkPost(postId).catch(() => fetchPosts());
+        } else {
+            api.bookmarkPost(postId).catch(() => fetchPosts());
+        }
+    };
+
+    const handleReportPost = async (postId) => {
+        try {
+            const response = await api.reportPost(postId);
+            showMessage({
+                message: response.message,
+                type: 'success',
+                icon: 'success'
+            });
+        } catch (error) {
+            Alert.alert("Error", error.message || "Could not report this post.");
         }
     };
 
@@ -131,7 +97,7 @@ export default function CommunityScreen() {
             <View style={styles.header}>
                 <View style={styles.logoContainer}>
                     <View style={styles.logoIcon} />
-                    <Text style={styles.headerTitle}>GlucoBites</Text>
+                    <Text style={styles.headerTitle}>Community</Text>
                 </View>
                 <TouchableOpacity style={styles.createButton} onPress={() => navigation.navigate('AddPost')}>
                     <Ionicons name="add" size={16} color="#FFFFFF"/>
@@ -141,7 +107,15 @@ export default function CommunityScreen() {
             <FlatList
                 data={posts}
                 keyExtractor={(item) => item.id.toString()}
-                renderItem={({ item }) => <PostItem item={item} onToggleLike={handleToggleLike} navigation={navigation} colors={colors} />}
+                renderItem={({ item }) => (
+                    <PostItem 
+                        item={item} 
+                        onToggleLike={handleToggleLike} 
+                        onToggleBookmark={handleToggleBookmark} 
+                        onReport={handleReportPost} 
+                        navigation={navigation} 
+                    />
+                )}
                 contentContainerStyle={styles.list}
                 refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor={colors.primary}/>}
                 ListEmptyComponent={
@@ -159,7 +133,6 @@ const getStyles = (colors) => StyleSheet.create({
     container: { 
         flex: 1, 
         backgroundColor: colors.background,
-        // <--- MODIFIED: Add paddingTop for Android status bar
         paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
     },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -200,38 +173,5 @@ const getStyles = (colors) => StyleSheet.create({
         marginLeft: 4,
     },
     list: { paddingVertical: 16 },
-    card: { backgroundColor: colors.card, marginBottom: 16, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
-    cardHeader: { 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        paddingHorizontal: 16, 
-        paddingTop: 16,
-    },
-    avatar: { width: 44, height: 44, borderRadius: 22, marginRight: 12, backgroundColor: colors.border },
-    userInfo: { flex: 1 }, 
-    username: { fontWeight: 'bold', color: colors.text, fontSize: 16 },
-    date: { fontSize: 12, color: colors.textSecondary },
-    content: { fontSize: 15, color: colors.text, lineHeight: 22, paddingHorizontal: 16, marginVertical: 8 },
-    postImage: { width: '100%', height: 250, backgroundColor: colors.border, marginTop: 4 }, // Fixed width string
     emptyText: { color: colors.textSecondary, marginTop: 16, fontSize: 16 },
-    actionBar: { 
-        flexDirection: 'row', 
-        justifyContent: 'space-around',
-        paddingVertical: 12, 
-        borderTopWidth: 1, 
-        borderTopColor: colors.border,
-    },
-    actionButton: { 
-        flexDirection: 'row', 
-        alignItems: 'center',
-    },
-    actionText: { 
-        marginLeft: 8, 
-        fontSize: 14, 
-        fontWeight: '600',
-    },
-    flagIconButton: {
-        padding: 4, 
-        marginLeft: 10, 
-    }
 });

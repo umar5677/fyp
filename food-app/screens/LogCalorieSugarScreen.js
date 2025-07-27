@@ -246,14 +246,12 @@ export default function LogCalorieSugarScreen({ navigation }) {
             
             setHistory(data);
             const tempGroups = {};
-            const timeThreshold = 300000;
             data.forEach(log => {
-                const logTime = new Date(log.date).getTime();
-                const foundGroupKey = Object.keys(tempGroups).find(key => Math.abs(logTime - Number(key)) < timeThreshold);
-                if (foundGroupKey) {
-                    tempGroups[foundGroupKey].push(log);
+                const groupKey = log.date + (log.foodName || '');
+                if (tempGroups[groupKey]) {
+                    tempGroups[groupKey].push(log);
                 } else {
-                    tempGroups[logTime] = [log];
+                    tempGroups[groupKey] = [log];
                 }
             });
             const finalGrouped = Object.values(tempGroups).map(logs => ({

@@ -1,11 +1,7 @@
-// food-app/components/SummaryCard.js
-import React, { useState, useCallback } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
 import { Svg, Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
-import { api } from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
-
 
 const ProgressRing = ({ progress = 0, size = 140, colors }) => {
     const strokeWidth = 18;
@@ -18,8 +14,8 @@ const ProgressRing = ({ progress = 0, size = 140, colors }) => {
             <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
                  <Defs>
                     <LinearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
-                        <Stop offset="0" stopColor="#4D9FFF" stopOpacity="1" />
-                        <Stop offset="1" stopColor="#3D88F8" stopOpacity="1" />
+                        <Stop offset="0" stopColor="#F97316" stopOpacity="1" />
+                        <Stop offset="1" stopColor="#F97316" stopOpacity="1" />
                     </LinearGradient>
                 </Defs>
                 <Circle
@@ -47,43 +43,9 @@ const ProgressRing = ({ progress = 0, size = 140, colors }) => {
     );
 };
 
-
-export default function SummaryCard() {
+export default function SummaryCard({ summary, isLoading }) {
     const { colors } = useTheme(); 
     const styles = getStyles(colors);
-    const [summary, setSummary] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useFocusEffect(
-        useCallback(() => {
-            const fetchSummaryData = async () => {
-                if (!isLoading) setIsLoading(true);
-
-                try {
-                    const [profileRes, calorieRes] = await Promise.all([
-                        api.getProfile(),
-                        api.getHistory([1], 'day', new Date().toISOString()),
-                    ]);
-                    
-                    const food = calorieRes.reduce((acc, log) => acc + log.amount, 0);
-                    const goal = profileRes.user?.calorieGoal || 2100;
-
-                    setSummary({
-                        goal: Math.round(goal),
-                        food: Math.round(food),
-                        exercise: 0,
-                    });
-                } catch (error) {
-                    console.error("Failed to load summary data:", error);
-                    setSummary({ goal: 2100, food: 0, exercise: 0 });
-                } finally {
-                    setIsLoading(false);
-                }
-            };
-            
-            fetchSummaryData();
-        }, [])
-    );
 
     if (isLoading || !summary) {
         return (
@@ -98,7 +60,7 @@ export default function SummaryCard() {
 
     return (
         <View style={styles.card}>
-            <Text style={styles.title}>Calorie Summary</Text>
+            <Text style={styles.title}>Calorie Consumed</Text>
             
             <View style={styles.ringContainer}>
                 <ProgressRing progress={progress} colors={colors} />
@@ -112,7 +74,7 @@ export default function SummaryCard() {
 
             <View style={styles.detailsContainer}>
                 <View style={styles.detailItem}>
-                    <View style={[styles.detailDot, { backgroundColor: '#4CAF50' }]} />
+                    <View style={[styles.detailDot, { backgroundColor: '#F97316' }]} />
                     <Text style={styles.detailText}>Goal: {summary.goal.toLocaleString()}</Text>
                 </View>
                 <View style={styles.detailItem}>

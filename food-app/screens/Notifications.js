@@ -1,7 +1,7 @@
 // screens/Notifications.js
 import React, { useState, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, SafeAreaView } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, SafeAreaView, Platform, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
 import { api } from '../utils/api'; 
@@ -108,7 +108,11 @@ export default function NotificationsScreen({ navigation }) {
 };
 
 const getStyles = (colors) => StyleSheet.create({
-    safeArea: { flex: 1, backgroundColor: colors.background },
+    safeArea: { 
+        flex: 1, 
+        backgroundColor: colors.background,
+        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0
+    },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.card },
     backButton: { padding: 5 },
     title: { color: colors.text, fontSize: 20, fontWeight: 'bold' },

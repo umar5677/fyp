@@ -3,7 +3,7 @@ import {
     View, Text, TextInput, Alert, StyleSheet, ActivityIndicator,
     ScrollView, TouchableOpacity, Switch, Platform, KeyboardAvoidingView
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import * as SecureStore from 'expo-secure-store';
 import { api } from '../utils/api';
@@ -69,6 +69,10 @@ const getStyles = (colors) => StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 15,
+    },
+    required: {
+        color: colors.logoutText,
+        fontSize: 16,
     }
 });
 
@@ -92,6 +96,7 @@ export default function EditProfileScreen({ navigation }) {
         first_name: '', last_name: '', email: '', dob: '',
         height: '', weight: '', gender: '',
         diabetes: null, isInsulin: false,
+        calorieGoal: '',
     });
     const [dobDate, setDobDate] = useState(null);
     const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
@@ -115,6 +120,7 @@ export default function EditProfileScreen({ navigation }) {
                         weight: user.weight?.toString() || '',
                         diabetes: user.diabetes,
                         isInsulin: !!user.isInsulin,
+                        calorieGoal: user.calorieGoal?.toString() || '',
                     });
                 })
                 .catch(err => {
@@ -125,6 +131,14 @@ export default function EditProfileScreen({ navigation }) {
         }, [])
     );
 
+    useEffect(() => {
+      navigation.setOptions({
+          headerStyle: { backgroundColor: colors.card },
+          headerTintColor: colors.text,
+          headerTitleStyle: { color: colors.text },
+      });
+    }, [colors, navigation]);
+
     const handleConfirmDate = (date) => {
         setDobDate(date);
         setForm(f => ({ ...f, dob: date.toISOString().split('T')[0] }));
@@ -132,18 +146,22 @@ export default function EditProfileScreen({ navigation }) {
     };
 
     const handleSave = async () => {
+        if (!form.first_name?.trim() || !form.last_name?.trim() || !form.email?.trim() || 
+            !form.dob || !form.height?.trim() || !form.weight?.trim() || !form.calorieGoal?.trim()) {
+            Alert.alert('Incomplete Profile', 'Please fill out all required fields marked with (*).');
+            return;
+        }
+        if (isNaN(parseInt(form.calorieGoal)) || parseInt(form.calorieGoal) <= 0) {
+            Alert.alert('Invalid Goal', 'Please enter a valid number for your calorie goal.');
+            return;
+        }
         setLoading(true);
         try {
             const updates = {
-                first_name: form.first_name,
-                last_name: form.last_name,
-                email: form.email,
-                dob: form.dob,
-                gender: form.gender,
+                ...form,
                 height: parseFloat(form.height) || null,
                 weight: parseFloat(form.weight) || null,
-                diabetes: form.diabetes,
-                isInsulin: form.isInsulin,
+                calorieGoal: parseInt(form.calorieGoal),
             };
             await api.updateProfile(updates);
             Alert.alert('Success', 'Your profile has been updated.');
@@ -158,50 +176,27 @@ export default function EditProfileScreen({ navigation }) {
     
     const handleDeleteAccount = async () => {
         Alert.alert(
-            "Delete Account",
-            "Are you sure you want to permanently delete your account? This action is irreversible and all your data will be lost.",
+            "Delete Account", "This action is irreversible. Are you sure?",
             [
                 { text: "Cancel", style: "cancel" },
                 {
-                    text: "I'm Sure", style: "destructive",
-                    onPress: () => {
-                        Alert.alert(
-                            "Final Confirmation",
-                            "This is the final confirmation. Pressing 'Delete' will remove your account immediately.",
-                            [
-                                { text: "Cancel", style: "cancel" },
-                                {
-                                    text: "Delete", style: "destructive",
-                                    onPress: async () => {
-                                        setIsDeleting(true);
-                                        try {
-                                            await api.deleteProfile();
-                                            await SecureStore.deleteItemAsync('accessToken');
-                                            await SecureStore.deleteItemAsync('refreshToken');
-                                            navigation.getParent('RootStack').replace('Login');
-                                        } catch (err) {
-                                            console.error("Failed to delete account:", err);
-                                            Alert.alert("Error", err.message || "Could not delete your account. Please try again.");
-                                        } finally {
-                                            setIsDeleting(false);
-                                        }
-                                    }
-                                }
-                            ]
-                        )
+                    text: "Delete", style: "destructive",
+                    onPress: async () => {
+                        setIsDeleting(true);
+                        try {
+                            await api.deleteProfile();
+                            await SecureStore.deleteItemAsync('accessToken');
+                            await SecureStore.deleteItemAsync('refreshToken');
+                            navigation.getParent('RootStack').replace('Login');
+                        } catch (err) {
+                            setIsDeleting(false);
+                            Alert.alert("Error", "Could not delete your account.");
+                        }
                     }
-                },
+                }
             ]
         );
     };
-    
-    useEffect(() => {
-      navigation.setOptions({
-          headerStyle: { backgroundColor: colors.card },
-          headerTintColor: colors.text,
-          headerTitleStyle: { color: colors.text },
-      });
-    }, [colors, navigation]);
 
     if (loading) {
         return ( <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View> );
@@ -216,16 +211,16 @@ export default function EditProfileScreen({ navigation }) {
             <ScrollView contentContainerStyle={styles.container}>
                 <Text style={styles.section}>Personal Information</Text>
                 
-                <Text style={styles.label}>First Name</Text>
+                <Text style={styles.label}>First Name <Text style={styles.required}>*</Text></Text>
                 <TextInput style={styles.input} placeholderTextColor={colors.textSecondary} value={form.first_name} onChangeText={t => setForm(f => ({ ...f, first_name: t }))} />
 
-                <Text style={styles.label}>Last Name</Text>
+                <Text style={styles.label}>Last Name <Text style={styles.required}>*</Text></Text>
                 <TextInput style={styles.input} placeholderTextColor={colors.textSecondary} value={form.last_name} onChangeText={t => setForm(f => ({ ...f, last_name: t }))} />
 
-                <Text style={styles.label}>Email</Text>
+                <Text style={styles.label}>Email <Text style={styles.required}>*</Text></Text>
                 <TextInput style={styles.input} placeholderTextColor={colors.textSecondary} value={form.email} onChangeText={t => setForm(f => ({ ...f, email: t }))} keyboardType="email-address" autoCapitalize='none' />
                 
-                <Text style={styles.label}>Date of Birth</Text>
+                <Text style={styles.label}>Date of Birth <Text style={styles.required}>*</Text></Text>
                 <TouchableOpacity style={styles.input} onPress={() => setDatePickerVisibility(true)}>
                     <Text style={{ color: form.dob ? colors.text : colors.textSecondary, fontSize: 16 }}>
                         {dobDate ? dobDate.toLocaleDateString('en-GB', {day:'2-digit', month:'long', year:'numeric'}) : 'Select Date'}
@@ -239,13 +234,16 @@ export default function EditProfileScreen({ navigation }) {
                     <RadioButton label="Other" selected={form.gender === 'Other'} onSelect={() => setForm(f => ({...f, gender: 'Other'}))} colors={colors}/>
                 </View>
 
-                <Text style={styles.label}>Height (cm)</Text>
+                <Text style={styles.label}>Height (cm) <Text style={styles.required}>*</Text></Text>
                 <TextInput style={styles.input} placeholderTextColor={colors.textSecondary} keyboardType="numeric" value={form.height} onChangeText={t => setForm(f => ({ ...f, height: t }))} />
 
-                <Text style={styles.label}>Weight (kg)</Text>
+                <Text style={styles.label}>Weight (kg) <Text style={styles.required}>*</Text></Text>
                 <TextInput style={styles.input} placeholderTextColor={colors.textSecondary} keyboardType="numeric" value={form.weight} onChangeText={t => setForm(f => ({ ...f, weight: t }))} />
                 
-                <Text style={styles.section}>Health Information</Text>
+                <Text style={styles.section}>Health & Goals</Text>
+
+                <Text style={styles.label}>Daily Calorie Goal <Text style={styles.required}>*</Text></Text>
+                <TextInput style={styles.input} placeholderTextColor={colors.textSecondary} keyboardType="number-pad" value={form.calorieGoal} onChangeText={t => setForm(f => ({ ...f, calorieGoal: t }))} placeholder="e.g., 2000" />
                 
                 <Text style={styles.label}>Diabetes Type</Text>
                 <View style={styles.radioGroup}>
