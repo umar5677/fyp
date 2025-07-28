@@ -1,28 +1,18 @@
+// fyp/food-app/components/CalorieBurnt.js
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 
-const calorieData = {
-  Day: [
-    { date: '5/5/25', calories: 225 },
-    { date: '6/5/25', calories: 600 },
-    { date: '7/5/25', calories: 400 },
-  ],
-  Week: [
-    { date: 'Week 1', calories: 2200 },
-    { date: 'Week 2', calories: 3100 },
-  ],
-  Month: [
-    { date: 'May', calories: 12000 },
-    { date: 'June', calories: 9000 },
-  ],
-};
-
-export default function CalorieSection() {
+// The component now accepts its data as props from the Home screen
+export default function CalorieSection({ calorieData, isLoading, onRefresh }) {
   const { colors } = useTheme();
   const styles = getStyles(colors);
+  
   const [activeTab, setActiveTab] = useState('Day');
 
+  // The internal state and data fetching logic have been removed.
+  // It now relies entirely on the props passed from Home.js.
+  
   const renderItem = ({ item }) => (
         <View style={styles.row}>
             <Text style={styles.date}>{item.date}</Text>
@@ -33,6 +23,7 @@ export default function CalorieSection() {
     return (
         <View style={styles.container}>
             <Text style={styles.title}>Calorie Burnt</Text>
+            
             <View style={styles.tabs}>
                 {['Day', 'Week', 'Month'].map((tab) => (
                     <TouchableOpacity
@@ -44,11 +35,23 @@ export default function CalorieSection() {
                     </TouchableOpacity>
                 ))}
             </View>
-            <FlatList
-                data={calorieData[activeTab]}
-                renderItem={renderItem}
-                keyExtractor={(item, index) => `${item.date}-${index}`}
-            />
+
+            {/* It uses the isLoading prop from the Home screen */}
+            {isLoading ? (
+              <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
+            ) : (
+              <FlatList
+                  // It uses the calorieData prop from the Home screen
+                  data={calorieData[activeTab]}
+                  renderItem={renderItem}
+                  keyExtractor={(item, index) => `${item.date}-${index}`}
+                  ListEmptyComponent={<Text style={styles.emptyText}>No exercise data recorded for this period.</Text>}
+                  // The onRefresh prop is also passed down, so pulling to refresh
+                  // triggers a refresh of the entire Home screen's data.
+                  onRefresh={onRefresh}
+                  refreshing={isLoading}
+              />
+            )}
         </View>
     );
 }
@@ -102,5 +105,9 @@ const getStyles = (colors) => StyleSheet.create({
         color: '#FFA726',
         fontWeight: 'bold',
     },
+    emptyText: {
+        textAlign: 'center',
+        color: colors.textSecondary,
+        paddingVertical: 20,
+    },
 });
-

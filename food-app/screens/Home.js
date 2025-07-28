@@ -1,3 +1,4 @@
+// food-app/screens/Home.js
 import React, { useRef, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
@@ -8,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
+import useCalorieBLE from '../hooks/useCalorieBLE'; // Import the hook here
 
 import SummaryCard from '../components/SummaryCard';
 import PredictedGlucoseCard from '../components/PredictedGlucoseCard';
@@ -15,6 +17,7 @@ import MiniGlucoseChart from '../components/MiniGlucoseChart';
 import CalorieBurnt from '../components/CalorieBurnt';
 import ProviderAnswerCard from '../components/ProviderAnswerCard';
 import AskProviderCard from '../components/AskProviderCard';
+import BleDeviceCard from '../components/BleDeviceCard'; // Import the new card
 
 const { width } = Dimensions.get('window');
 
@@ -23,6 +26,9 @@ export default function Home({ route }) {
     const styles = getStyles(colors);
     const navigation = useNavigation();
     
+    // The BLE logic is now managed by the Home screen
+    const { connectionStatus, startScan } = useCalorieBLE();
+
     const { isProvider, userId } = route.params || {};
 
     const [userName, setUserName] = useState('User');
@@ -32,57 +38,58 @@ export default function Home({ route }) {
     const [isPremiumUser, setIsPremiumUser] = useState(false);
     const [summary, setSummary] = useState(null);
     const [isLoadingSummary, setIsLoadingSummary] = useState(true);
+    const [exerciseSummary, setExerciseSummary] = useState({ Day: [], Week: [], Month: [] });
+
 
     const scrollX = useRef(new Animated.Value(0)).current;
     const slidesCount = 2;
     const slideWidth = width - 40;
 
     const loadData = useCallback(async () => {
-        setIsLoadingSummary(true); // Control loading state from here
+        setIsLoadingSummary(true); 
         try {
-            const [profileRes, calorieRes, notificationsData, qnaRes] = await Promise.all([
+            const [profileRes, calorieRes, notificationsData, qnaRes, exerciseRes] = await Promise.all([
                 api.getProfile(),
                 api.getHistory([1], 'day', new Date().toISOString()),
                 AsyncStorage.getItem('notifications'),
                 isProvider ? api.getProviderQuestions() : api.getQnaStatus(),
+                api.getExerciseSummary() 
             ]);
             
-            // Set user name
             if (profileRes.user?.first_name) {
                 setUserName(profileRes.user.first_name);
             }
 
-            // Set notifications
             if (notificationsData) {
                 setHasUnread(JSON.parse(notificationsData).length > 0);
             } else {
                 setHasUnread(false);
             }
 
-            // Set Q&A related state
             if (isProvider) {
                 setQnaCount(qnaRes.length);
             } else {
                 setQnaCount(qnaRes.questions_remaining || 0);
                 setIsPremiumUser(qnaRes.is_premium || false);
             }
+            
+            setExerciseSummary(exerciseRes);
+            const todaysExercise = exerciseRes.Day.length > 0 ? exerciseRes.Day[0].calories : 0;
 
-            // Set summary card data
             const food = calorieRes.reduce((acc, log) => acc + (Number(log.amount) || 0), 0);
             const goal = profileRes.user?.calorieGoal || 2100;
             setSummary({
                 goal: Math.round(goal),
                 food: Math.round(food),
-                exercise: 0,
+                exercise: Math.round(todaysExercise),
             });
 
         } catch (error) {
             console.error("Failed to load home screen data:", error);
-            // Provide a fallback state in case of error
             setSummary({ goal: 2100, food: 0, exercise: 0 });
             setIsPremiumUser(false);
         } finally {
-            setIsLoadingSummary(false); // End loading
+            setIsLoadingSummary(false); 
         }
     }, [isProvider]);
     
@@ -124,33 +131,33 @@ export default function Home({ route }) {
                             </TouchableOpacity>
                         </View>
                         
-                        <View>
-                             <ScrollView
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                snapToInterval={slideWidth}
-                                decelerationRate="fast"
-                                contentContainerStyle={styles.swiperContainer}
-                                onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
-                                scrollEventThrottle={16}
-                            >
-                                <View style={styles.slide}>
-                                    <SummaryCard summary={summary} isLoading={isLoadingSummary} />
-                                </View>
-                                <View style={styles.slide}>
-                                    <PredictedGlucoseCard isPremium={isPremiumUser} />
-                                </View>
-                            </ScrollView>
-
-                            <View style={styles.dotsContainer}>
-                                {[...Array(slidesCount)].map((_, i) => {
-                                    const inputRange = [(i - 1) * slideWidth, i * slideWidth, (i + 1) * slideWidth];
-                                    const scale = scrollX.interpolate({ inputRange, outputRange: [0.8, 1.4, 0.8], extrapolate: 'clamp' });
-                                    const opacity = scrollX.interpolate({ inputRange, outputRange: [0.5, 1, 0.5], extrapolate: 'clamp' });
-                                    return <Animated.View key={`dot-${i}`} style={[styles.dot, { opacity, transform: [{ scale }] }]} />;
-                                })}
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            snapToInterval={slideWidth}
+                            decelerationRate="fast"
+                            contentContainerStyle={styles.swiperContainer}
+                            onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
+                            scrollEventThrottle={16}
+                        >
+                            <View style={styles.slide}>
+                                <SummaryCard summary={summary} isLoading={isLoadingSummary} />
                             </View>
+                            <View style={styles.slide}>
+                                <PredictedGlucoseCard isPremium={isPremiumUser} />
+                            </View>
+                        </ScrollView>
+
+                        <View style={styles.dotsContainer}>
+                            {[...Array(slidesCount)].map((_, i) => {
+                                const inputRange = [(i - 1) * slideWidth, i * slideWidth, (i + 1) * slideWidth];
+                                const scale = scrollX.interpolate({ inputRange, outputRange: [0.8, 1.4, 0.8], extrapolate: 'clamp' });
+                                const opacity = scrollX.interpolate({ inputRange, outputRange: [0.5, 1, 0.5], extrapolate: 'clamp' });
+                                return <Animated.View key={`dot-${i}`} style={[styles.dot, { opacity, transform: [{ scale }] }]} />;
+                            })}
                         </View>
+                        
+                        <BleDeviceCard status={connectionStatus} onScanPress={startScan} />
                         
                         <MiniGlucoseChart />
                         
@@ -167,7 +174,7 @@ export default function Home({ route }) {
                             />
                         )}
 
-                        <CalorieBurnt />
+                        <CalorieBurnt calorieData={exerciseSummary} isLoading={isLoadingSummary} onRefresh={loadData} />
                     </View>
                 }
                 contentContainerStyle={{ paddingBottom: 50 }}
@@ -195,6 +202,6 @@ const getStyles = (colors) => StyleSheet.create({
     },
     swiperContainer: { paddingVertical: 10 },
     slide: { width: width - 40, height: 250, paddingRight: 10 },
-    dotsContainer: { flexDirection: 'row', justifyContent: 'center', marginTop: 0, marginBottom: 20 },
+    dotsContainer: { flexDirection: 'row', justifyContent: 'center', marginTop: 0, marginBottom: 10 },
     dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary, marginHorizontal: 4 },
 });

@@ -6,8 +6,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext'; 
 
-import useCalorieBLE from '../hooks/useCalorieBLE'; // Import the hook for Bluetooth functionality
-
 import HomeStack from '../screens/HomeStack';
 import Community from '../screens/Community';
 import Leaderboard from '../screens/Leaderboard';
@@ -19,9 +17,6 @@ const DummyAddScreen = () => null;
 
 const AppTabs = ({ navigation, route }) => {
   const { userId, isProvider } = route.params || {};
-
-  // This custom hook will now run in the background, managing the BLE connection to the Pi
-  useCalorieBLE(); 
 
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
