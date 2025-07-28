@@ -51,12 +51,8 @@
         }
       ],
       "expo-font",
-      "react-native-ble-plx",
-      {
-          "isBackgroundEnabled": true,
-          "modes": ["peripheral", "central"],
-          "bluetoothAlwaysPermission": "Allow $(PRODUCT_NAME) to connect to bluetooth devices"
-        }
+      "react-native-ble-plx"
+      
     ],
     "extra": {
       "eas": {
