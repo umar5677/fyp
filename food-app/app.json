@@ -20,18 +20,24 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "permissions": [],
+      "permissions": [
+        "BLUETOOTH_SCAN",
+        "BLUETOOTH_CONNECT",
+        "ACCESS_FINE_LOCATION"
+      ],
       "package": "com.dope9402.GlucoBites",
-      
       "networkSecurityConfig": {
-      "domainConfigurations": {
-        "api.glucobites.org": {
-          "domains": ["13.214.71.4", "api.glucobites.org"],
-          "includeSubdomains": false,
-          "cleartextTrafficPermitted": true
+        "domainConfigurations": {
+          "api.glucobites.org": {
+            "domains": [
+              "13.214.71.4",
+              "api.glucobites.org"
+            ],
+            "includeSubdomains": false,
+            "cleartextTrafficPermitted": true
+          }
         }
       }
-}
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -44,7 +50,13 @@
           "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera"
         }
       ],
-      "expo-font"
+      "expo-font",
+      "react-native-ble-plx",
+      {
+          "isBackgroundEnabled": true,
+          "modes": ["peripheral", "central"],
+          "bluetoothAlwaysPermission": "Allow $(PRODUCT_NAME) to connect to bluetooth devices"
+        }
     ],
     "extra": {
       "eas": {

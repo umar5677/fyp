@@ -23,6 +23,7 @@ const createAiRouter = require('./api/aiFoodScan.js');
 const createNotificationsRouter = require('./api/notifications.js');
 const createRemindersRouter = require('./api/reminders.js');
 const createPostsRouter = require('./api/posts.js');
+const createExerciseRouter = require('./api/exercise.js');
 
 
 const app = express();
@@ -51,11 +52,11 @@ const upload = multer({
     })
 });
 
-
-// --- PUBLIC ROUTES --- 
+// PUBLIC ROUTES
 app.use('/api/login', loginApi.createLoginRouter(dbPool));
 app.use('/api/password-reset', createPasswordResetRouter(dbPool));
 app.use('/api/reviews', createReviewsRouter(dbPool));
+app.use('/api/exercise', createExerciseRouter(dbPool));
 
 app.post('/api/token', (req, res) => {
     const { token } = req.body;
@@ -75,7 +76,7 @@ app.post('/api/token', (req, res) => {
 });
 
 
-// --- PROTECTED ROUTES ---
+// PROTECTED ROUTES
 app.use(authenticateToken);
 
 app.post('/api/upload/profile-picture', upload.single('photo'), async (req, res) => {

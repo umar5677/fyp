@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
 
-const BASE_URL = 'http://192.168.10.120:3000/api';
+const BASE_URL = 'http://172.20.10.5:3000/api';
 
 const handlePublicFetch = async (response) => {
     const data = await response.json();
@@ -122,6 +122,15 @@ export const api = {
     addLog: (logData) => authenticatedFetch('/logs', { method: 'POST', body: JSON.stringify(logData) }),
     updateLog: (logId, updateData) => authenticatedFetch(`/logs/${logId}`, { method: 'PUT', body: JSON.stringify(updateData) }),
     deleteLog: (logId) => authenticatedFetch(`/logs/${logId}`, { method: 'DELETE' }),
+
+    // For sending data received from the Pi via BLE to the server
+    addExerciseLog: (calorieData) => authenticatedFetch('/exercise/log', { 
+        method: 'POST', 
+        body: JSON.stringify(calorieData) 
+    }),
+    
+    // For fetching the aggregated summary to display in the CalorieBurnt component
+    getExerciseSummary: () => authenticatedFetch('/exercise/summary'),
 
     // AI, OCR, & Predictions
     getGlucosePrediction: () => authenticatedFetch('/predictions/glucose'),
