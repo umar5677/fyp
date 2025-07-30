@@ -16,7 +16,9 @@
       "infoPlist": {
         "NSBluetoothPeripheralUsageDescription": "GlucoBites needs Bluetooth to connect to your glucose tracking device.",
         "NSBluetoothAlwaysUsageDescription": "GlucoBites needs Bluetooth to sync with your health devices.",
-        "NSLocationWhenInUseUsageDescription": "GlucoBites uses location to find and connect to nearby Bluetooth devices."
+        "NSLocationWhenInUseUsageDescription": "GlucoBites uses location to find and connect to nearby Bluetooth devices.",
+        "NSCameraUsageDescription": "Allow GlucoBites to use your camera to scan food labels or take a profile picture.",
+        "NSPhotoLibraryUsageDescription": "Allow GlucoBites to access your photos to upload images for posts or your profile picture."
       }
     },
     "android": {
@@ -57,12 +59,17 @@
       ],
       "expo-font",
       "react-native-ble-plx"
-      
     ],
     "extra": {
       "eas": {
         "projectId": "4ea78716-6ca7-47a9-8638-34b6f273b00f"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/4ea78716-6ca7-47a9-8638-34b6f273b00f"
     }
   }
 }
