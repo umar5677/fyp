@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
-import useCalorieBLE from '../hooks/useCalorieBLE'; // Import the hook here
+//import useCalorieBLE from '../hooks/useCalorieBLE'; 
 
 import SummaryCard from '../components/SummaryCard';
 import PredictedGlucoseCard from '../components/PredictedGlucoseCard';
@@ -17,7 +17,7 @@ import MiniGlucoseChart from '../components/MiniGlucoseChart';
 import CalorieBurnt from '../components/CalorieBurnt';
 import ProviderAnswerCard from '../components/ProviderAnswerCard';
 import AskProviderCard from '../components/AskProviderCard';
-import BleDeviceCard from '../components/BleDeviceCard'; // Import the new card
+//import BleDeviceCard from '../components/BleDeviceCard';
 
 const { width } = Dimensions.get('window');
 
@@ -26,8 +26,7 @@ export default function Home({ route }) {
     const styles = getStyles(colors);
     const navigation = useNavigation();
     
-    // The BLE logic is now managed by the Home screen
-    const { connectionStatus, startScan } = useCalorieBLE();
+    //const { connectionStatus, startScan, disconnectDevice } = useCalorieBLE();
 
     const { isProvider, userId } = route.params || {};
 
@@ -74,19 +73,18 @@ export default function Home({ route }) {
             }
             
             setExerciseSummary(exerciseRes);
-            const todaysExercise = exerciseRes.Day.length > 0 ? exerciseRes.Day[0].calories : 0;
 
             const food = calorieRes.reduce((acc, log) => acc + (Number(log.amount) || 0), 0);
             const goal = profileRes.user?.calorieGoal || 2100;
+            
             setSummary({
                 goal: Math.round(goal),
                 food: Math.round(food),
-                exercise: Math.round(todaysExercise),
             });
 
         } catch (error) {
             console.error("Failed to load home screen data:", error);
-            setSummary({ goal: 2100, food: 0, exercise: 0 });
+            setSummary({ goal: 2100, food: 0 });
             setIsPremiumUser(false);
         } finally {
             setIsLoadingSummary(false); 
@@ -157,7 +155,11 @@ export default function Home({ route }) {
                             })}
                         </View>
                         
-                        <BleDeviceCard status={connectionStatus} onScanPress={startScan} />
+                        {/* <BleDeviceCard 
+                            status={connectionStatus} 
+                            onScanPress={startScan} 
+                            onDisconnectPress={disconnectDevice} 
+                        /> */}
                         
                         <MiniGlucoseChart />
                         

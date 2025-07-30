@@ -55,7 +55,7 @@ export default function SummaryCard({ summary, isLoading }) {
         );
     }
 
-    const remaining = summary.goal - summary.food + summary.exercise;
+    const remaining = summary.goal - summary.food;
     const progress = summary.goal > 0 ? Math.min(summary.food / summary.goal, 1) : 0; 
 
     return (
@@ -82,8 +82,8 @@ export default function SummaryCard({ summary, isLoading }) {
                     <Text style={styles.detailText}>Food: {summary.food.toLocaleString()}</Text>
                 </View>
                 <View style={styles.detailItem}>
-                    <View style={[styles.detailDot, { backgroundColor: '#FFA726' }]} />
-                    <Text style={styles.detailText}>Exercise: {summary.exercise.toLocaleString()}</Text>
+                    <View style={[styles.detailDot, { backgroundColor: '#4CAF50' }]} />
+                    <Text style={styles.detailText}>Left: {remaining.toLocaleString()}</Text>
                 </View>
             </View>
         </View>

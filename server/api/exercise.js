@@ -6,7 +6,6 @@ function createExerciseRouter(dbPool) {
     const router = express.Router();
 
     // --- Unauthenticated Endpoint for Direct IoT Devices (e.g., Wi-Fi Pi) ---
-    // This route uses a device token for security instead of a user's JWT.
     router.post('/log/iot', async (req, res) => {
         const deviceToken = req.headers['x-device-token'];
         const { calories } = req.body;
@@ -38,10 +37,8 @@ function createExerciseRouter(dbPool) {
     });
 
     // --- Authenticated Endpoints for the Mobile App ---
-    // All routes below this line will be protected and require a valid user JWT.
     
     // POST /api/exercise/log
-    // Used by the app to log data received from a Bluetooth device.
     router.post('/log', authenticateToken, async (req, res) => {
         const userId = req.user.userId;
         const { caloriesBurnt } = req.body;
@@ -62,35 +59,30 @@ function createExerciseRouter(dbPool) {
     });
 
     // GET /api/exercise/summary
-    // Used by the CalorieBurnt component to fetch aggregated data.
     router.get('/summary', authenticateToken, async (req, res) => {
         const userId = req.user.userId;
         try {
             const today = new Date();
             const year = today.getFullYear();
 
-            // Daily Summary for the last 7 days
             const [dayLogs] = await dbPool.query(
                 `SELECT DATE_FORMAT(timestamp, '%Y-%m-%d') as date, SUM(caloriesBurnt) as calories 
                  FROM exerciseLogs WHERE userID = ? AND DATE(timestamp) >= CURDATE() - INTERVAL 6 DAY
                  GROUP BY DATE(timestamp) ORDER BY date DESC`, [userId]
             );
 
-            // Weekly Summary for the last 4 weeks
             const [weekLogs] = await dbPool.query(
                 `SELECT YEARWEEK(timestamp, 1) as date, SUM(caloriesBurnt) as calories 
                  FROM exerciseLogs WHERE userID = ? AND YEAR(timestamp) = ?
                  GROUP BY YEARWEEK(timestamp, 1) ORDER BY date DESC LIMIT 4`, [userId, year]
             );
 
-            // Monthly Summary for the last 6 months
             const [monthLogs] = await dbPool.query(
                 `SELECT DATE_FORMAT(timestamp, '%Y-%m') as date, SUM(caloriesBurnt) as calories 
                  FROM exerciseLogs WHERE userID = ? AND YEAR(timestamp) = ?
                  GROUP BY DATE_FORMAT(timestamp, '%Y-%m') ORDER BY date DESC LIMIT 6`, [userId, year]
             );
             
-            // Format data for the frontend
             const formattedData = {
                 Day: dayLogs.map(log => ({
                     date: new Date(log.date).toLocaleDateString('en-GB'),
@@ -110,6 +102,56 @@ function createExerciseRouter(dbPool) {
         } catch (error) {
             console.error('Error fetching exercise summary:', error);
             res.status(500).json({ message: 'Error fetching exercise summary.' });
+        }
+    });
+    
+    // GET /api/exercise/leaderboard
+    router.get('/leaderboard', authenticateToken, async (req, res) => {
+        const { period = 'Day' } = req.query; 
+
+        let dateFilterSql = '';
+        switch (period) {
+            case 'Week':
+                dateFilterSql = 'AND YEARWEEK(el.timestamp, 1) = YEARWEEK(CURDATE(), 1)';
+                break;
+            case 'Month':
+                dateFilterSql = 'AND YEAR(el.timestamp) = YEAR(CURDATE()) AND MONTH(el.timestamp) = MONTH(CURDATE())';
+                break;
+            case 'Day':
+            default:
+                dateFilterSql = 'AND DATE(el.timestamp) = CURDATE()';
+                break;
+        }
+
+        try {
+            const query = `
+                SELECT
+                    u.userID,
+                    u.first_name,
+                    u.last_name,
+                    u.pfpUrl,
+                    SUM(el.caloriesBurnt) AS totalCalories
+                FROM exerciseLogs el
+                JOIN users u ON el.userID = u.userID
+                WHERE 1=1 ${dateFilterSql}
+                GROUP BY u.userID
+                ORDER BY totalCalories DESC
+                LIMIT 20;
+            `;
+
+            const [leaderboardData] = await dbPool.query(query);
+            
+            const formattedLeaderboard = leaderboardData.map(user => ({
+                userID: user.userID,
+                name: `${user.first_name} ${user.last_name}`,
+                avatar: user.pfpUrl || `https://i.pravatar.cc/150?u=${user.userID}`,
+                calories: Math.round(user.totalCalories),
+            }));
+
+            res.json(formattedLeaderboard);
+        } catch (error) {
+            console.error(`Error fetching leaderboard for period "${period}":`, error);
+            res.status(500).json({ message: 'Error fetching leaderboard data.' });
         }
     });
 

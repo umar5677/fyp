@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker'; 
+import * as ImagePicker from 'expo-image-picker';
 import { api } from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
 import HeaderBackground from '../components/HeaderBackground';
@@ -169,19 +169,22 @@ const ProfileScreen = ({ navigation }) => {
                 </View>
 
                 <View style={styles.menuGroup}>
+                    {/* Items for regular (non-provider) users ONLY */}
                     {!user.isProvider && (
                         <>
                             <ProfileMenuButton iconName="alarm-outline" text="Reminders" onPress={() => navigation.navigate('Reminders')} colors={colors} />
                             <ProfileMenuButton iconName="shield-checkmark-outline" text="Alerts and Sharing" onPress={() => navigation.navigate('Alerts')} colors={colors} />
-                            <ProfileMenuButton iconName="bookmark-outline" text="Bookmarked Posts" onPress={() => navigation.navigate('BookmarkedPosts')} colors={colors} />
-                            <ProfileMenuButton 
-                                iconName="star-outline" 
-                                text="Leave a Review" 
-                                onPress={() => setIsReviewModalVisible(true)} 
-                                colors={colors} 
-                            />
                         </>
                     )}
+
+                    {/* Items for ALL users (regular and provider) */}
+                    <ProfileMenuButton iconName="bookmark-outline" text="Bookmarked Posts" onPress={() => navigation.navigate('BookmarkedPosts')} colors={colors} />
+                    <ProfileMenuButton
+                        iconName="star-outline"
+                        text="Leave a Review"
+                        onPress={() => setIsReviewModalVisible(true)}
+                        colors={colors}
+                    />
                      <ProfileMenuButton iconName="settings-outline" text="Dark Mode" isSwitch={true} switchValue={theme === 'dark'} onSwitchChange={toggleTheme} colors={colors} />
                      <ProfileMenuButton iconName="chatbubble-ellipses-outline" text="Contact Us" onPress={() => Linking.openURL('mailto:glucobites.org@gmail.com')} colors={colors} />
                 </View>

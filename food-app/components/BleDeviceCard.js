@@ -4,35 +4,63 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import * as Animatable from 'react-native-animatable';
 
-const BleDeviceCard = ({ status, onRetryScan }) => {
+const BleDeviceCard = ({ status, onScanPress, onDisconnectPress }) => {
     const { colors } = useTheme();
     const styles = getStyles(colors);
 
+    const RenderButtons = () => {
+        if (['Connected', 'Connecting...', 'Discovering...'].includes(status)) {
+            return (
+                <TouchableOpacity style={[styles.button, styles.disconnectButton]} onPress={onDisconnectPress}>
+                    <Text style={[styles.buttonText, styles.disconnectButtonText]}>Stop Connection</Text>
+                </TouchableOpacity>
+            );
+        }
+
+        if (['Disconnected', 'Device Not Found', 'Error Connecting', 'Scan Error', 'Permissions Disabled'].includes(status)) {
+            let buttonText = 'Scan for Device';
+            if (status.includes('Error') || status.includes('Found')) {
+                buttonText = 'Retry Scan';
+            }
+            if (status.includes('Permissions')) {
+                buttonText = 'Grant Permissions & Scan';
+            }
+            return (
+                <TouchableOpacity style={styles.button} onPress={onScanPress}>
+                    <Text style={styles.buttonText}>{buttonText}</Text>
+                </TouchableOpacity>
+            );
+        }
+
+        return null;
+    };
+    
     const getStatusInfo = () => {
         switch (status) {
             case 'Connected':
-                return { color: '#4CAF50', text: 'Receiving live data from your device.', icon: 'bluetooth', showLoader: true, showButton: false, buttonText: '' };
+                return { color: '#4CAF50', text: 'Receiving live data from your device.', icon: 'bluetooth', showLoader: true };
             case 'Scanning...':
             case 'Initializing...':
-                return { color: '#FF9800', text: 'Searching for your GlucoBites tracker...', icon: 'bluetooth-searching', showLoader: true, showButton: false, buttonText: '' };
+                return { color: '#FF9800', text: 'Searching for your GlucoBites tracker...', icon: 'bluetooth-searching', showLoader: true };
             case 'Connecting...':
             case 'Discovering...':
-                return { color: '#FF9800', text: 'Connecting to your device...', icon: 'bluetooth-connect', showLoader: true, showButton: false, buttonText: '' };
+                return { color: '#FF9800', text: 'Connecting to your device...', icon: 'bluetooth-connect', showLoader: true };
             case 'Disconnected':
+                return { color: colors.textSecondary, text: 'Ready to connect. Press the button to start scanning.', icon: 'bluetooth-outline', showLoader: false };
             case 'Device Not Found':
             case 'Error Connecting':
             case 'Scan Error':
-                 return { color: '#F44336', text: 'Device not found. Please ensure it is on and nearby.', icon: 'alert-circle-outline', showLoader: false, showButton: true, buttonText: 'Retry Scan' };
+                 return { color: '#F44336', text: 'Device not found. Please ensure it is on and nearby.', icon: 'alert-circle-outline', showLoader: false };
             case 'Permissions Disabled':
-                 return { color: '#F44336', text: 'Bluetooth/Location permissions are required.', icon: 'alert-circle-outline', showLoader: false, showButton: true, buttonText: 'Grant Permissions & Scan' };
-             case 'Bluetooth Off':
-                 return { color: colors.textSecondary, text: 'Please turn on Bluetooth to connect.', icon: 'bluetooth-outline', showLoader: false, showButton: false, buttonText: '' };
+                 return { color: '#F44336', text: 'Bluetooth/Location permissions are required.', icon: 'alert-circle-outline', showLoader: false };
+            case 'Bluetooth Off':
+                 return { color: colors.textSecondary, text: 'Please turn on Bluetooth to connect.', icon: 'bluetooth-off-outline', showLoader: false };
             default:
-                return { color: colors.textSecondary, text: 'Preparing to connect...', icon: 'bluetooth-outline', showLoader: false, showButton: false, buttonText: '' };
+                return { color: colors.textSecondary, text: 'Preparing to connect...', icon: 'bluetooth-outline', showLoader: false };
         }
     };
 
-    const { color, text, icon, showLoader, showButton, buttonText } = getStatusInfo();
+    const { color, text, icon, showLoader } = getStatusInfo();
 
     return (
         <View style={styles.card}>
@@ -56,11 +84,7 @@ const BleDeviceCard = ({ status, onRetryScan }) => {
                 <Text style={[styles.statusText, { color }]}>{text}</Text>
             </View>
 
-            {showButton && (
-                <TouchableOpacity style={styles.button} onPress={onRetryScan}>
-                    <Text style={styles.buttonText}>{buttonText}</Text>
-                </TouchableOpacity>
-            )}
+            <RenderButtons />
         </View>
     );
 };
@@ -120,6 +144,14 @@ const getStyles = (colors) => StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
     },
+    disconnectButton: {
+        backgroundColor: colors.card,
+        borderWidth: 1,
+        borderColor: colors.logoutText,
+    },
+    disconnectButtonText: {
+        color: colors.logoutText,
+    }
 });
 
 export default BleDeviceCard;
