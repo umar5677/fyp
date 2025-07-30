@@ -1,23 +1,24 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-    View, Text, TextInput, StyleSheet, Alert,
+    View, Text, StyleSheet, Alert,
     TouchableOpacity, ActivityIndicator, Modal, FlatList,
-    KeyboardAvoidingView, Platform, SafeAreaView
+    Platform,
+    SafeAreaView
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { useFocusEffect } from '@react-navigation/native';
 import { Calendar } from 'react-native-calendars';
-import DateTimePickerModal from "react-native-modal-datetime-picker";
 import * as Animatable from 'react-native-animatable';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { showMessage } from "react-native-flash-message";
+import * as Notifications from 'expo-notifications';
 
 import { api } from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
+import LogBloodSugarModal from '../components/LogBloodSugarModal';
+import useDeviceSyncBLE from '../hooks/useDeviceSyncBLE'; 
 
-const TAG_OPTIONS = ['Fasting', 'Pre-Meal', 'Post-Meal'];
 const THRESHOLD_KEYS = ['lowThreshold', 'highFastingThreshold', 'highPostMealThreshold', 'veryHighThreshold'];
 
 const STATUS_COLORS = {
@@ -39,6 +40,7 @@ const getBloodSugarStatus = (amount, tag, thresholds) => {
     }
     return { level: 'Check Tag', color: STATUS_COLORS.default, isAlert: false };
 };
+
 
 const getStyles = (colors) => StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -74,8 +76,6 @@ const getStyles = (colors) => StyleSheet.create({
     emptyContainer: { alignItems: 'center', marginTop: 60, paddingHorizontal: 40 },
     emptyText: { fontSize: 20, fontWeight: '600', color: '#ADB5BD', marginTop: 16 },
     emptySubtext: { fontSize: 15, color: '#CED4DA', marginTop: 8, textAlign: 'center' },
-    fabContainer: { position: 'absolute', bottom: 35, right: 25 },
-    fab: { backgroundColor: '#42A5F5', width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#42A5F5', shadowRadius: 8, shadowOpacity: 0.4, shadowOffset: { height: 4, width: 0 } },
     logItemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16, marginVertical: 6, marginHorizontal: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 3 },
     logItemIconContainer: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
     logItemDataContainer: { flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
@@ -89,23 +89,6 @@ const getStyles = (colors) => StyleSheet.create({
     statusText: { fontSize: 14, fontWeight: '500' },
     calendarBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
     calendarModalContainer: { position: 'absolute', top: '25%', left: '5%', right: '5%', borderRadius: 16, elevation: 10, overflow: 'hidden'},
-    modalOverlay: { flex: 1, justifyContent: 'flex-end' },
-    modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-    modalContent: { backgroundColor: colors.background, paddingHorizontal: 20, paddingTop: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-    modalTitle: { fontSize: 16, fontWeight: '600', color: colors.textSecondary, textAlign: 'center', marginBottom: 15 },
-    tagSelectorContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-    tagOption: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: colors.border, marginHorizontal: 4, alignItems: 'center' },
-    tagOptionSelected: { backgroundColor: '#42A5F5' },
-    tagOptionText: { color: colors.text, fontWeight: '600' },
-    tagOptionTextSelected: { color: 'white' },
-    modalInput: { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 12, padding: 15, fontSize: 36, fontWeight: 'bold', textAlign: 'center', marginBottom: 20, color: colors.text },
-    datePickerButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, backgroundColor: colors.card, borderRadius: 12, marginBottom: 20, borderWidth: 1, borderColor: colors.border },
-    datePickerText: { marginLeft: 12, fontSize: 17, fontWeight: '600', color: '#42A5F5' },
-    scanButtonsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 25 },
-    scanButton: { flex: 1, flexDirection: 'row', backgroundColor: '#42A5F5', paddingVertical: 14, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginHorizontal: 5 },
-    scanButtonText: { color: '#fff', marginLeft: 8, fontWeight: '600', fontSize: 16 },
-    modalActions: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', marginTop: 10 },
-    modalButtonText: { color: '#42A5F5', fontSize: 17, padding: 10, fontWeight: '500' },
 });
 
 const LogItem = ({ item, onPress, index, thresholds, colors }) => {
@@ -133,113 +116,6 @@ const LogItem = ({ item, onPress, index, thresholds, colors }) => {
       </TouchableOpacity>
     </Animatable.View>
   );
-};
-
-const TagSelector = ({ selectedTag, onSelectTag, colors }) => {
-    const styles = getStyles(colors);
-    return (
-        <View style={styles.tagSelectorContainer}>
-            {TAG_OPTIONS.map(tag => (
-                <TouchableOpacity 
-                    key={tag}
-                    style={[styles.tagOption, selectedTag === tag && styles.tagOptionSelected]}
-                    onPress={() => onSelectTag(tag)}
-                >
-                    <Text style={[styles.tagOptionText, selectedTag === tag && styles.tagOptionTextSelected]}>{tag}</Text>
-                </TouchableOpacity>
-            ))}
-        </View>
-    );
-};
-
-const EditLogModal = ({ modalVisible, setModalVisible, log, onSave, onDelete, onScan, inputValue, setInputValue, colors }) => {
-    const { theme } = useTheme();
-    const styles = getStyles(colors);
-    const [isSaving, setIsSaving] = useState(false);
-    const [isScanning, setIsScanning] = useState(false);
-    const [logDate, setLogDate] = useState(new Date());
-    const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
-    const [tag, setTag] = useState(null);
-    const today = new Date();
-
-    useEffect(() => {
-        if (modalVisible) {
-            setInputValue(String(log?.amount || ''));
-            setLogDate(log?.date ? new Date(log.date) : new Date());
-            setTag(log?.tag || null);
-        }
-    }, [log, modalVisible]);
-
-    if (!log) return null;
-
-    const handleSave = async () => {
-        if (!tag) {
-            Alert.alert("Tag Required", "Please select a tag (e.g., Fasting, Pre-Meal) for this reading.");
-            return;
-        }
-        if (isSaving) return;
-        setIsSaving(true);
-        await onSave(log.logID, inputValue, logDate, tag);
-        setIsSaving(false);
-        setModalVisible(false);
-    };
-
-    const handleDelete = () => {
-        Alert.alert("Delete Log", "Are you sure you want to delete this log?", [
-            { text: "Cancel", style: "cancel" },
-            { text: "Delete", style: "destructive", onPress: () => { onDelete(log.logID); setModalVisible(false); }},
-        ]);
-    };
-
-    const handlePickImage = async (type) => {
-        const permissions = type === 'camera' ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!permissions.granted) { Alert.alert('Permission Denied'); return; }
-        const pickerResult = type === 'camera' ? await ImagePicker.launchCameraAsync() : await ImagePicker.launchImageLibraryAsync();
-        if (pickerResult.canceled || !pickerResult.assets?.length) return;
-        
-        setIsScanning(true);
-        const scanResult = await onScan(pickerResult.assets[0].uri);
-        setIsScanning(false);
-        if (scanResult) setInputValue(scanResult);
-    };
-
-    return (
-        <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
-            <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.modalOverlay}>
-                <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setModalVisible(false)} />
-                <View style={styles.modalContent}>
-                    <Text style={styles.modalTitle}>{log.logID ? 'Edit Reading' : 'Log New Reading'}</Text>
-                    <TouchableOpacity onPress={() => setDatePickerVisibility(true)} style={styles.datePickerButton} disabled={!!log.logID}>
-                        <Ionicons name="calendar-outline" size={22} color="#42A5F5" />
-                        <Text style={styles.datePickerText}>{logDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</Text>
-                    </TouchableOpacity>
-                    <DateTimePickerModal 
-                        isVisible={isDatePickerVisible} mode="datetime" date={logDate}
-                        onConfirm={(d) => { setDatePickerVisibility(false); setLogDate(d); }} 
-                        onCancel={() => setDatePickerVisibility(false)}
-                        display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                        isDarkModeEnabled={theme === 'dark'} maximumDate={today} 
-                    />
-                    
-                    <TagSelector selectedTag={tag} onSelectTag={setTag} colors={colors} />
-                    
-                    <TextInput style={styles.modalInput} value={inputValue} onChangeText={setInputValue} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.textSecondary} autoFocus={!log.logID} />
-                    
-                    {isScanning ? <ActivityIndicator color={colors.primary} /> : (
-                        <View style={styles.scanButtonsContainer}>
-                            <TouchableOpacity style={styles.scanButton} onPress={() => handlePickImage('camera')}><Ionicons name="camera-outline" size={20} color="#fff" /><Text style={styles.scanButtonText}>Scan</Text></TouchableOpacity>
-                            <TouchableOpacity style={styles.scanButton} onPress={() => handlePickImage('gallery')}><Ionicons name="image-outline" size={20} color="#fff" /><Text style={styles.scanButtonText}>Upload</Text></TouchableOpacity>
-                        </View>
-                    )}
-                    <View style={styles.modalActions}>
-                        <TouchableOpacity onPress={() => setModalVisible(false)}><Text style={styles.modalButtonText}>Cancel</Text></TouchableOpacity>
-                        {log.logID && <TouchableOpacity onPress={handleDelete}><Text style={[styles.modalButtonText, { color: '#FF3B30' }]}>Delete</Text></TouchableOpacity>}
-                        <TouchableOpacity onPress={handleSave} disabled={isSaving}><Text style={[styles.modalButtonText, { fontWeight: 'bold' }]}>Save</Text></TouchableOpacity>
-                    </View>
-                </View>
-            </KeyboardAvoidingView>
-        </Modal>
-    );
 };
 
 const SegmentedControl = ({ options, selectedOption, onSelect, colors }) => {
@@ -329,20 +205,18 @@ const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate, colors }) 
 };
 
 export default function LogBloodSugarScreen({ navigation }) {
-    const { theme, colors } = useTheme();
+    const { colors } = useTheme();
     const styles = getStyles(colors);
+    const { getDeviceSyncData } = useDeviceSyncBLE();
 
     const [history, setHistory] = useState([]);
     const [lastReading, setLastReading] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isLoadingLastReading, setIsLoadingLastReading] = useState(true);
     const [selectedLog, setSelectedLog] = useState(null);
-    const [modalVisible, setModalVisible] = useState(false);
-    const [modalInputValue, setModalInputValue] = useState('');
     const [timePeriod, setTimePeriod] = useState('day');
     const [displayDate, setDisplayDate] = useState(new Date());
     const [isCalendarVisible, setIsCalendarVisible] = useState(false);
-    const fabRef = useRef(null);
     const [thresholds, setThresholds] = useState({
         lowThreshold: 70, highFastingThreshold: 100,
         highPostMealThreshold: 140, veryHighThreshold: 180
@@ -379,36 +253,49 @@ export default function LogBloodSugarScreen({ navigation }) {
         loadDependencies();
     }, [timePeriod, displayDate]));
 
-    useEffect(() => {
-        if (fabRef.current) fabRef.current.bounceIn(800);
-    }, []);
+    const createPersistentAlert = async (status, amount) => {
+    if (!status.isAlert) return; 
 
-    const createNotification = async (amount, tag) => {
-        try {
-            const status = getBloodSugarStatus(amount, tag, thresholds);
-            if (!status.isAlert) {
-                showMessage({ message: "Log Saved", description: `Your reading of ${amount} mg/dL is within normal range.`, type: "success", icon: "success" });
-                return;
-            }
-            showMessage({ message: `${status.level} Glucose Detected`, description: `Your reading of ${amount} mg/dL is outside the normal range.`, type: "danger", icon: "danger", duration: 5000 });
-            const newNotification = { id: Date.now().toString(), message: `${status.level} Glucose Detected: ${amount} mg/dL`, timestamp: new Date().toISOString(), type: 'alert' };
-            const existingNotifications = await AsyncStorage.getItem('notifications');
-            const notifications = existingNotifications ? JSON.parse(existingNotifications) : [];
-            notifications.unshift(newNotification);
-            await AsyncStorage.setItem('notifications', JSON.stringify(notifications));
-        } catch (error) { console.error("Failed to create notification:", error); }
-    };
+    try {
+        const newNotification = { 
+            message: `${status.level} Glucose Detected: ${amount} mg/dL`, 
+            type: 'alert' 
+        };
 
+        await api.addNotification(newNotification);
+
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                title: "Abnormal Glucose Reading",
+                body: newNotification.message,
+            },
+            trigger: null, // deliver immediately
+        });
+        
+        const existingNotifications = await AsyncStorage.getItem('notifications');
+        const notifications = existingNotifications ? JSON.parse(existingNotifications) : [];
+        notifications.unshift({ ...newNotification, id: Date.now().toString() }); // Add a temp id for local use
+        await AsyncStorage.setItem('notifications', JSON.stringify(notifications));
+
+    } catch (error) { 
+        console.error("Failed to create and save persistent alert:", error); 
+    }
+};
+    
     const handleSave = async (logId, amount, date, tag) => {
         try {
-            const updateData = { amount, tag };
+            const status = getBloodSugarStatus(amount, tag, thresholds);
+            
             if (logId) {
-                await api.updateLog(logId, updateData);
+                await api.updateLog(logId, { amount, tag });
                 showMessage({ message: "Log Updated", description: `Reading changed to ${amount} mg/dL.`, type: "info" });
             } else {
                 await api.addLog({ amount, type: 3, date: date.toISOString(), tag });
-                await createNotification(amount, tag);
+                if (!status.isAlert) {
+                     showMessage({ message: "Log Saved", description: `Your reading of ${amount} mg/dL is within normal range.`, type: "success", icon: "success" });
+                }
             }
+            await createPersistentAlert(status, amount);
         } catch (e) { Alert.alert('Error', 'An unexpected error occurred while saving.'); }
         loadDependencies();
     };
@@ -431,9 +318,54 @@ export default function LogBloodSugarScreen({ navigation }) {
         } catch (error) { Alert.alert('Scan Error', 'An error occurred while scanning the image.'); }
         return null;
     };
+    
+    const handleHistoryPress = (item) => { 
+        setSelectedLog(item);
+    };
 
-    const handleHistoryPress = (item) => { setSelectedLog(item); setModalVisible(true); };
-    const handleAddNew = () => { fabRef.current?.rubberBand(800); setSelectedLog({}); setModalVisible(true); };
+    const handleAddNew = (showModalCallback) => {
+        setSelectedLog({});
+        showModalCallback();
+    };
+    
+    const handleSyncDevice = async () => {
+        showMessage({ message: "Syncing with device...", type: "info", icon: "info" });
+        try {
+            const data = await getDeviceSyncData();
+            
+            showMessage({ message: "Sync successful, logging data...", type: "default", icon: "info", duration: 1500 });
+
+            await Promise.all([
+                api.addLog({
+                    amount: data.glucose,
+                    type: 3, 
+                    date: data.date.toISOString(),
+                    tag: data.tag
+                }),
+                api.addLog({
+                    amount: data.calories,
+                    type: 1, 
+                    date: data.date.toISOString(),
+                    foodName: `Synced Meal (${data.tag})` 
+                })
+            ]);
+            
+            const status = getBloodSugarStatus(data.glucose, data.tag, thresholds);
+            await createPersistentAlert(status, data.glucose);
+
+            showMessage({ message: "Logs Added Successfully!", type: "success", icon: "success" });
+            loadDependencies();
+            return data; 
+
+        } catch (error) {
+            Alert.alert("Sync Failed", error.message);
+            return null;
+        }
+    };
+
+    const clearSelectedLog = () => {
+        setSelectedLog(null);
+    };
     
     const renderLastReadingContent = () => {
         if (isLoadingLastReading) return <ActivityIndicator color={colors.primary} style={{ paddingVertical: 20 }}/>;
@@ -476,10 +408,6 @@ export default function LogBloodSugarScreen({ navigation }) {
 
     return (
         <SafeAreaView style={styles.container}>
-            <EditLogModal 
-                modalVisible={modalVisible} setModalVisible={setModalVisible} log={selectedLog} onSave={handleSave} 
-                onDelete={handleDelete} onScan={handleScan} inputValue={modalInputValue} setInputValue={setModalInputValue} colors={colors}
-            />
             <CalendarModal isVisible={isCalendarVisible} onClose={() => setIsCalendarVisible(false)} onDayPress={setDisplayDate} initialDate={displayDate} colors={colors}/>
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Blood Sugar</Text>
@@ -487,7 +415,7 @@ export default function LogBloodSugarScreen({ navigation }) {
                     <Ionicons name="close-circle" size={32} color={colors.textSecondary} />
                 </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.lastReadingCard} onPress={() => lastReading ? handleHistoryPress(lastReading) : handleAddNew()} disabled={isLoadingLastReading} activeOpacity={0.7}>
+            <TouchableOpacity style={styles.lastReadingCard} onPress={() => handleHistoryPress(lastReading || {})} disabled={isLoadingLastReading} activeOpacity={0.7}>
                 <Text style={styles.cardTitle}>Last Reading</Text>
                 {renderLastReadingContent()}
             </TouchableOpacity>
@@ -511,11 +439,16 @@ export default function LogBloodSugarScreen({ navigation }) {
                 onRefresh={loadDependencies}
                 refreshing={isLoading}
             />
-            <Animatable.View ref={fabRef} style={styles.fabContainer}>
-                <TouchableOpacity style={styles.fab} onPress={handleAddNew} activeOpacity={0.8}>
-                    <Ionicons name="add" size={34} color="white" />
-                </TouchableOpacity>
-            </Animatable.View>
+            
+            <LogBloodSugarModal 
+                log={selectedLog}
+                onSave={handleSave}
+                onDelete={handleDelete}
+                onScan={handleScan}
+                onAddNew={handleAddNew}
+                onSyncDevice={handleSyncDevice}
+                clearSelectedLog={clearSelectedLog}
+            />
         </SafeAreaView>
     );
 };

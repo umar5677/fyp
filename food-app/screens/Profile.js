@@ -1,13 +1,14 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Image, Switch,
-  Alert, ScrollView, ActivityIndicator, Linking, StatusBar,
+  Alert, ScrollView, ActivityIndicator, Linking, StatusBar, Modal, Pressable
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as Animatable from 'react-native-animatable';
 import { api } from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
 import HeaderBackground from '../components/HeaderBackground';
@@ -33,7 +34,71 @@ const getStyles = (colors) => StyleSheet.create({
   chevronIcon: { color: colors.textSecondary, },
   logoutButton: { backgroundColor: colors.logoutBackground, borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', },
   logoutText: { color: colors.logoutText, fontSize: 16, fontWeight: '600', marginLeft: 8, },
+  
+  // Styles for the image viewer modal
+  viewerContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
+  fullscreenImage: { width: '100%', height: '100%' },
+  closeButton: { position: 'absolute', top: 60, right: 20, padding: 10, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20 },
+  
+  // ** NEW STYLES for the custom Action Sheet **
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', },
+  actionSheetContainer: { backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, paddingTop: 20, },
+  actionButton: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, },
+  actionButtonText: { fontSize: 18, color: colors.text, marginLeft: 16, },
+  cancelButton: { backgroundColor: colors.background, borderRadius: 12, marginTop: 10, paddingVertical: 16, alignItems: 'center', },
+  cancelButtonText: { color: colors.primary, fontSize: 18, fontWeight: '600', },
 });
+
+// ** NEW COMPONENT: A beautiful, themed action sheet for avatar options **
+const AvatarActionSheet = ({ isVisible, onClose, onView, onChange, hasProfilePic, colors }) => {
+    const styles = getStyles(colors);
+    return (
+        <Modal
+            animationType="slide"
+            transparent={true}
+            visible={isVisible}
+            onRequestClose={onClose}
+        >
+            <Pressable style={styles.modalOverlay} onPress={onClose}>
+                <Animatable.View animation="fadeInUpBig" duration={400} style={styles.actionSheetContainer}>
+                    {/* Conditionally show the "View Picture" button */}
+                    {hasProfilePic && (
+                        <TouchableOpacity style={styles.actionButton} onPress={onView}>
+                            <Ionicons name="eye-outline" size={24} color={colors.text} />
+                            <Text style={styles.actionButtonText}>View Picture</Text>
+                        </TouchableOpacity>
+                    )}
+                    <TouchableOpacity style={styles.actionButton} onPress={onChange}>
+                        <Ionicons name="image-outline" size={24} color={colors.text} />
+                        <Text style={styles.actionButtonText}>
+                            {hasProfilePic ? "Change Picture" : "Choose New Picture"}
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+                        <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                </Animatable.View>
+            </Pressable>
+        </Modal>
+    );
+};
+
+
+const ImageViewer = ({ visible, imageUri, onClose }) => {
+    const styles = getStyles({}); 
+    if (!imageUri) return null;
+    return (
+        <Modal visible={visible} transparent={true} animationType="fade" onRequestClose={onClose}>
+            <SafeAreaView style={styles.viewerContainer}>
+                <Image source={{ uri: imageUri }} style={styles.fullscreenImage} resizeMode="contain" />
+                <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+                    <Ionicons name="close" size={32} color="#FFFFFF" />
+                </TouchableOpacity>
+            </SafeAreaView>
+        </Modal>
+    );
+};
+
 
 const ProfileMenuButton = ({ iconName, text, onPress, colors, isSwitch = false, switchValue, onSwitchChange }) => {
     const styles = getStyles(colors);
@@ -56,6 +121,8 @@ const ProfileScreen = ({ navigation }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [cacheBuster, setCacheBuster] = useState(Date.now());
     const [isReviewModalVisible, setIsReviewModalVisible] = useState(false);
+    const [isViewerVisible, setIsViewerVisible] = useState(false);
+    const [isActionSheetVisible, setIsActionSheetVisible] = useState(false); // State for the new modal
     const styles = getStyles(colors);
 
     useFocusEffect(
@@ -132,6 +199,11 @@ const ProfileScreen = ({ navigation }) => {
         ]);
     };
 
+    // This single handler now opens our custom action sheet
+    const handleAvatarPress = () => {
+        setIsActionSheetVisible(true);
+    };
+
     if (isLoading || !user) {
         return <SafeAreaView style={styles.loadingContainer}><ActivityIndicator size="large" color="#F97316" /></SafeAreaView>;
     }
@@ -145,7 +217,7 @@ const ProfileScreen = ({ navigation }) => {
             <HeaderBackground />
             <ScrollView contentContainerStyle={styles.scrollViewContent}>
                 <View style={styles.profileCard}>
-                    <TouchableOpacity onPress={pickImageAndUpload}>
+                    <TouchableOpacity onPress={handleAvatarPress}>
                          <View style={styles.avatarContainer}>
                             {imageUri ? (
                                 <Image source={{ uri: imageUri }} style={styles.avatar} />
@@ -169,15 +241,12 @@ const ProfileScreen = ({ navigation }) => {
                 </View>
 
                 <View style={styles.menuGroup}>
-                    {/* Items for regular (non-provider) users ONLY */}
                     {!user.isProvider && (
                         <>
                             <ProfileMenuButton iconName="alarm-outline" text="Reminders" onPress={() => navigation.navigate('Reminders')} colors={colors} />
                             <ProfileMenuButton iconName="shield-checkmark-outline" text="Alerts and Sharing" onPress={() => navigation.navigate('Alerts')} colors={colors} />
                         </>
                     )}
-
-                    {/* Items for ALL users (regular and provider) */}
                     <ProfileMenuButton iconName="bookmark-outline" text="Bookmarked Posts" onPress={() => navigation.navigate('BookmarkedPosts')} colors={colors} />
                     <ProfileMenuButton
                         iconName="star-outline"
@@ -198,6 +267,25 @@ const ProfileScreen = ({ navigation }) => {
             <ReviewModal 
                 isVisible={isReviewModalVisible}
                 onClose={() => setIsReviewModalVisible(false)}
+            />
+            <ImageViewer
+                visible={isViewerVisible}
+                imageUri={imageUri}
+                onClose={() => setIsViewerVisible(false)}
+            />
+            <AvatarActionSheet 
+                isVisible={isActionSheetVisible}
+                onClose={() => setIsActionSheetVisible(false)}
+                onView={() => {
+                    setIsActionSheetVisible(false);
+                    setIsViewerVisible(true);
+                }}
+                onChange={() => {
+                    setIsActionSheetVisible(false);
+                    pickImageAndUpload();
+                }}
+                hasProfilePic={!!user.pfpUrl}
+                colors={colors}
             />
         </SafeAreaView>
     );

@@ -12,7 +12,12 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSBluetoothPeripheralUsageDescription": "GlucoBites needs Bluetooth to connect to your glucose tracking device.",
+        "NSBluetoothAlwaysUsageDescription": "GlucoBites needs Bluetooth to sync with your health devices.",
+        "NSLocationWhenInUseUsageDescription": "GlucoBites uses location to find and connect to nearby Bluetooth devices."
+      }
     },
     "android": {
       "adaptiveIcon": {
