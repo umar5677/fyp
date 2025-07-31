@@ -1,3 +1,5 @@
+// fyp/food-app/screens/ProviderQuestionListScreen.js
+
 import React, { useState, useCallback } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, SafeAreaView, RefreshControl } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -38,13 +40,20 @@ export default function ProviderQuestionListScreen() {
     const [questions, setQuestions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [hasUnread, setHasUnread] = useState(false);
 
-    const fetchQuestions = async () => {
+    const fetchData = async () => {
         try {
-            const data = await api.getProviderQuestions();
-            setQuestions(data);
+            const [questionsData, notificationsData] = await Promise.all([
+                api.getProviderQuestions(),
+                api.getNotifications()
+            ]);
+
+            setQuestions(questionsData);
+            setHasUnread(notificationsData && notificationsData.length > 0);
+
         } catch (error) {
-            console.error("Failed to fetch questions:", error.message);
+            console.error("Failed to fetch dashboard data:", error.message);
         } finally {
             setIsLoading(false);
             setIsRefreshing(false);
@@ -53,12 +62,12 @@ export default function ProviderQuestionListScreen() {
 
     useFocusEffect(useCallback(() => {
         setIsLoading(true);
-        fetchQuestions();
+        fetchData();
     }, []));
 
     const onRefresh = useCallback(() => {
         setIsRefreshing(true);
-        fetchQuestions();
+        fetchData();
     }, []);
 
     const handleSelectQuestion = (question) => {
@@ -77,9 +86,15 @@ export default function ProviderQuestionListScreen() {
                     <Text style={styles.headerTitle}>Dashboard</Text>
                     <Text style={styles.headerSubtitle}>Pending Questions</Text>
                 </View>
-                <TouchableOpacity style={styles.historyButton} onPress={() => navigation.navigate('ProviderHistory')}>
-                    <Ionicons name="archive-outline" size={24} color={colors.primary} />
-                </TouchableOpacity>
+                <View style={styles.headerActions}>
+                     <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('ProviderHistory')}>
+                        <Ionicons name="archive-outline" size={24} color={colors.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('Notifications')}>
+                        <Ionicons name="notifications-outline" size={26} color={colors.primary} />
+                        {hasUnread && <View style={styles.notificationDot} />}
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <FlatList
@@ -139,12 +154,28 @@ const getStyles = (colors) => StyleSheet.create({
         color: colors.textSecondary,
         marginTop: 2,
     },
-    historyButton: {
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    actionButton: {
         backgroundColor: colors.background,
         padding: 10,
-        borderRadius: 20,
+        borderRadius: 25,
         borderWidth: 1,
-        borderColor: colors.border
+        borderColor: colors.border,
+        marginLeft: 10,
+    },
+    notificationDot: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#FF3B30',
+        borderWidth: 1,
+        borderColor: colors.card
     },
     emptyContainer: {
         alignItems: 'center', 

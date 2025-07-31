@@ -1,7 +1,10 @@
+// fyp/server/api/provider.js
+
 const express = require('express');
 const authenticateToken = require('../lib/authMiddleware.js');
 const isProvider = require('../lib/isProvider.js');
 const { encrypt, decrypt } = require('../lib/encryption.js');
+const { createNotification } = require('../lib/notificationManager.js');
 
 function createProviderRouter(dbPool) {
     const router = express.Router();
@@ -115,6 +118,17 @@ function createProviderRouter(dbPool) {
         }
     
         try {
+            // Find the original user's ID to send them a notification.
+            const [questions] = await dbPool.query(
+                'SELECT userID FROM questions WHERE questionID = ? AND providerID = ?', 
+                [questionId, providerId]
+            );
+
+            if (questions.length === 0) {
+                 return res.status(404).json({ message: 'Question not found or you are not authorized to answer it.' });
+            }
+            const originalAskerId = questions[0].userID;
+
             const encryptedAnswer = encrypt(answerText);
 
             const [result] = await dbPool.query(`
@@ -130,6 +144,10 @@ function createProviderRouter(dbPool) {
             if (result.affectedRows === 0) {
                 return res.status(404).json({ message: 'Question not found or you are not authorized to answer it.' });
             }
+
+            // Create a notification for the user who asked the question.
+            const notificationMessage = `Your provider has answered your question.`;
+            await createNotification(dbPool, originalAskerId, notificationMessage, 'info');
             
             res.json({ success: true, message: 'Answer submitted successfully.' });
     

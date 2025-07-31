@@ -1,5 +1,8 @@
+// fyp/server/api/qna.js
+
 const express = require('express');
 const { encrypt, decrypt } = require('../lib/encryption.js');
+const { createNotification } = require('../lib/notificationManager.js');
 
 function createQnaRouter(dbPool) {
     const router = express.Router();
@@ -62,6 +65,9 @@ function createQnaRouter(dbPool) {
         }
 
         try {
+            const [currentUser] = await dbPool.query('SELECT first_name FROM users WHERE userID = ?', [userId]);
+            const askerName = currentUser[0]?.first_name || 'A user';
+
             const [users] = await dbPool.query(
                 'SELECT setPremium, questionsAskedThisWeek FROM users WHERE userID = ?',
                 [userId]
@@ -87,6 +93,9 @@ function createQnaRouter(dbPool) {
                 'UPDATE users SET questionsAskedThisWeek = questionsAskedThisWeek + 1 WHERE userID = ?',
                 [userId]
             );
+            
+            const notificationMessage = `${askerName} has asked you a new question.`;
+            await createNotification(dbPool, providerId, notificationMessage, 'info');
             
             res.status(201).json({ success: true, message: 'Your question has been submitted successfully!' });
 
@@ -150,7 +159,6 @@ function createQnaRouter(dbPool) {
 
             if (question && question.deletedByProvider) {
                 await dbPool.query('DELETE FROM questions WHERE questionID = ?', [questionId]);
-                //console.log(`Permanently deleted question ${questionId} as both parties have removed it.`);
             }
 
             res.status(200).json({ success: true, message: 'Question removed from your history.' });
