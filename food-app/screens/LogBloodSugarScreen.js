@@ -335,25 +335,18 @@ export default function LogBloodSugarScreen({ navigation }) {
             
             showMessage({ message: "Sync successful, logging data...", type: "default", icon: "info", duration: 1500 });
 
-            await Promise.all([
-                api.addLog({
-                    amount: data.glucose,
-                    type: 3, 
-                    date: data.date.toISOString(),
-                    tag: data.tag
-                }),
-                api.addLog({
-                    amount: data.calories,
-                    type: 1, 
-                    date: data.date.toISOString(),
-                    foodName: `Synced Meal (${data.tag})` 
-                })
-            ]);
+            await api.addLog({
+                amount: data.glucose,
+                type: 3,
+                date: data.date.toISOString(),
+                tag: data.tag
+            });
+
             
             const status = getBloodSugarStatus(data.glucose, data.tag, thresholds);
             await createPersistentAlert(status, data.glucose);
 
-            showMessage({ message: "Logs Added Successfully!", type: "success", icon: "success" });
+            showMessage({ message: "Glucose Log Added Successfully!", type: "success", icon: "success" });
             loadDependencies();
             return data; 
 

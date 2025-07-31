@@ -95,7 +95,7 @@ const FoodLogItem = ({ item, onEdit, index, colors }) => {
                             <View style={styles.logDetailRow}>
                                 <Ionicons name="flame" size={18} color="#F57C00" />
                                 <Text style={styles.logValueText}>{parseInt(calorieLog.amount, 10)}</Text>
-                                <Text style={styles.logUnitText}>kcal</Text>
+                                <Text style={styles.logUnitText}>cal</Text>
                             </View>
                         ) : null}
                         {sugarLog ? (
@@ -351,7 +351,7 @@ export default function LogCalorieSugarScreen({ navigation }) {
                     <View style={styles.summaryDetails}>
                         <View style={styles.summaryItem}>
                             <Text style={[styles.summaryValue, {color: '#F57C00'}]}>🔥 {totalCalories.toFixed(0)}</Text>
-                            <Text style={styles.summaryLabel}>kcal</Text>
+                            <Text style={styles.summaryLabel}>cal</Text>
                         </View>
                         <View style={styles.summaryItem}>
                             <Text style={[styles.summaryValue, {color: '#D32F2F'}]}>🍬 {totalSugar.toFixed(1)}</Text>

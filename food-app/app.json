@@ -18,8 +18,10 @@
         "NSBluetoothAlwaysUsageDescription": "GlucoBites needs Bluetooth to sync with your health devices.",
         "NSLocationWhenInUseUsageDescription": "GlucoBites uses location to find and connect to nearby Bluetooth devices.",
         "NSCameraUsageDescription": "Allow GlucoBites to use your camera to scan food labels or take a profile picture.",
-        "NSPhotoLibraryUsageDescription": "Allow GlucoBites to access your photos to upload images for posts or your profile picture."
-      }
+        "NSPhotoLibraryUsageDescription": "Allow GlucoBites to access your photos to upload images for posts or your profile picture.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.dope9402.GlucoBites"
     },
     "android": {
       "adaptiveIcon": {
@@ -28,9 +30,12 @@
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
-        "BLUETOOTH_SCAN",
-        "BLUETOOTH_CONNECT",
-        "ACCESS_FINE_LOCATION"
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN"
       ],
       "package": "com.dope9402.GlucoBites",
       "networkSecurityConfig": {

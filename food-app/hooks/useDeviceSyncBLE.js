@@ -66,12 +66,11 @@ function useDeviceSyncBLE() {
 
                             const syncData = {
                                 glucose: parseFloat(parts[0]),
-                                calories: parseFloat(parts[1]),
                                 tag: parts[2],
                                 date: new Date(parts[3]),
                             };
 
-                            if (!isNaN(syncData.glucose) && !isNaN(syncData.calories) && syncData.tag) {
+                            if (!isNaN(syncData.glucose) && syncData.tag) {
                                 console.log('[DeviceSync] Success! Parsed data:', syncData);
                                 resolve(syncData);
                             } else {

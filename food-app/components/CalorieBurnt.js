@@ -170,7 +170,7 @@ export default function CalorieBurnt({ calorieData, isLoading }) {
                     ) : (
                         <Animatable.View animation="fadeInUp" duration={500} key={`${totalBurnt}-${period}`} style={styles.centeredContent}>
                             <Text style={styles.totalDisplayText}>{Math.round(totalBurnt)}</Text>
-                            <Text style={styles.totalDisplayLabel}>TOTAL KCAL BURNT</Text>
+                            <Text style={styles.totalDisplayLabel}>TOTAL CALORIES BURNT</Text>
                         </Animatable.View>
                     )}
                 </LinearGradient>
@@ -195,7 +195,7 @@ export default function CalorieBurnt({ calorieData, isLoading }) {
                     ) : (
                         <Animatable.View animation="fadeIn" duration={600} style={styles.centeredContent}>
                             <Text style={styles.calorieValue}>{Math.round(todaysTotal)}</Text>
-                            <Text style={styles.calorieLabel}>kcal (Today)</Text>
+                            <Text style={styles.calorieLabel}>calories (Today)</Text>
                         </Animatable.View>
                     )}
                 </View>
