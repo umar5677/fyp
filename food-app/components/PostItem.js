@@ -1,3 +1,4 @@
+// fyp/food-app/components/PostItem.js
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +9,7 @@ import { useTheme } from '../context/ThemeContext';
 export const PostItem = ({ item, onToggleLike, onToggleBookmark, onReport, navigation }) => {
     const { colors } = useTheme();
     const styles = getStyles(colors);
+    const authorInitial = item.first_name ? item.first_name[0].toUpperCase() : '?';
 
     const handleFlagPress = () => {
         Alert.alert(
@@ -27,7 +29,13 @@ export const PostItem = ({ item, onToggleLike, onToggleBookmark, onReport, navig
     return (
         <View style={styles.card}>
             <View style={styles.cardHeader}>
-                <Image source={{ uri: item.pfpUrl || `https://i.pravatar.cc/100?u=${item.userID}` }} style={styles.avatar} />
+                <View style={styles.avatarContainer}>
+                    {item.pfpUrl ? (
+                        <Image source={{ uri: item.pfpUrl }} style={styles.avatar} />
+                    ) : (
+                        <Text style={styles.avatarInitial}>{authorInitial}</Text>
+                    )}
+                </View>
                 <View style={styles.userInfo}>
                     <Text style={styles.username}>{item.first_name} {item.last_name}</Text>
                     <Text style={styles.date}>{dayjs(item.createdAt).format("MMM DD, YYYY · h:mm A")}</Text>
@@ -73,7 +81,15 @@ export const PostItem = ({ item, onToggleLike, onToggleBookmark, onReport, navig
 const getStyles = (colors) => StyleSheet.create({
     card: { backgroundColor: colors.card, marginBottom: 16, borderRadius: 12, overflow: 'hidden' },
     cardHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16 },
-    avatar: { width: 44, height: 44, borderRadius: 22, marginRight: 12, backgroundColor: colors.border },
+    avatar: { width: 44, height: 44, borderRadius: 22 },
+    avatarContainer: {
+        width: 44, height: 44, borderRadius: 22,
+        marginRight: 12, backgroundColor: colors.border,
+        justifyContent: 'center', alignItems: 'center',
+    },
+    avatarInitial: {
+        fontSize: 20, color: colors.primary, fontWeight: 'bold'
+    },
     userInfo: { flex: 1 },
     username: { fontWeight: 'bold', color: colors.text, fontSize: 16 },
     date: { fontSize: 12, color: colors.textSecondary },

@@ -1,3 +1,4 @@
+// fyp/food-app/screens/PostDetailScreen.js
 import React, { useState, useCallback, useEffect } from "react";
 import { 
     View, Text, Image, StyleSheet, SafeAreaView,
@@ -5,6 +6,7 @@ import {
     KeyboardAvoidingView, Platform, Alert, Modal, Pressable,
     ScrollView 
 } from "react-native";
+import { useHeaderHeight } from '@react-navigation/elements';
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import dayjs from "dayjs";
@@ -16,13 +18,20 @@ import { showMessage } from "react-native-flash-message";
 
 dayjs.extend(relativeTime);
 
-const CommentItem = ({ item, colors, onToggleLike, onReport, currentUserId }) => {
+const CommentItem = ({ item, colors, onToggleLike, onReport, currentUserId, onDelete }) => {
     const styles = getStyles(colors);
     const isOwnComment = item.userID === currentUserId;
+    const commenterInitial = item.first_name ? item.first_name[0].toUpperCase() : '?';
 
     return (
         <View style={styles.commentContainer}>
-            <Image source={{ uri: item.pfpUrl || `https://i.pravatar.cc/100?u=${item.userID}` }} style={styles.commentAvatar} />
+            <View style={styles.commentAvatarContainer}>
+                {item.pfpUrl ? (
+                    <Image source={{ uri: item.pfpUrl }} style={styles.commentAvatar} />
+                ) : (
+                    <Text style={styles.commentAvatarInitial}>{commenterInitial}</Text>
+                )}
+            </View>
             <View style={styles.commentContent}>
                 <View style={styles.commentBubble}>
                     <Text style={styles.commentUsername}>{item.first_name} {item.last_name}</Text>
@@ -42,7 +51,11 @@ const CommentItem = ({ item, colors, onToggleLike, onReport, currentUserId }) =>
                         </Text>
                     </TouchableOpacity>
 
-                    {!isOwnComment && (
+                    {isOwnComment ? (
+                        <TouchableOpacity style={styles.flagButton} onPress={onDelete}>
+                            <Ionicons name="trash-outline" size={14} color={colors.logoutText} />
+                        </TouchableOpacity>
+                    ) : (
                         <TouchableOpacity style={styles.flagButton} onPress={onReport}>
                             <Ionicons name="flag-outline" size={14} color={colors.textSecondary} />
                         </TouchableOpacity>
@@ -80,6 +93,7 @@ export default function PostDetailScreen() {
     const styles = getStyles(colors);
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
+    const headerHeight = useHeaderHeight();
 
     const [post, setPost] = useState(null);
     const [comments, setComments] = useState([]);
@@ -117,6 +131,32 @@ export default function PostDetailScreen() {
                             navigation.goBack();
                         } catch (error) {
                             Alert.alert("Error", error.message || "Failed to delete post.");
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const handleDeleteComment = (commentId) => {
+        Alert.alert(
+            "Delete Comment",
+            "Are you sure you want to permanently delete this comment?",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            await api.deleteComment(commentId);
+                            setComments(currentComments =>
+                                currentComments.filter(comment => comment.id !== commentId)
+                            );
+                            fetchData(); 
+                            showMessage({ message: "Comment deleted", type: "success" });
+                        } catch (error) {
+                            Alert.alert("Error", "Could not delete your comment.");
                         }
                     },
                 },
@@ -177,7 +217,7 @@ export default function PostDetailScreen() {
         try {
             await api.addComment(postId, newComment.trim());
             setNewComment('');
-            fetchData(); // Refetch all data to get latest comments and count
+            fetchData();
         } catch (error) {
             Alert.alert("Error", "Could not post your comment.");
         } finally {
@@ -226,12 +266,14 @@ export default function PostDetailScreen() {
         return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
     }
     
+    const postAuthorInitial = post.first_name ? post.first_name[0].toUpperCase() : '?';
+    
     return (
         <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView 
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
                 style={{flex: 1}}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+                keyboardVerticalOffset={headerHeight}
             >
                 <FlatList
                     data={comments}
@@ -243,12 +285,19 @@ export default function PostDetailScreen() {
                             onToggleLike={() => handleToggleCommentLike(item.id, item.likedByUser)}
                             onReport={() => handleReportComment(item.id)}
                             currentUserId={currentUser.userID}
+                            onDelete={() => handleDeleteComment(item.id)}
                         />
                     )}
                     ListHeaderComponent={
                         <View style={{paddingBottom: 16}}>
                             <View style={styles.cardHeader}>
-                                <Image source={{ uri: post.pfpUrl || `https://i.pravatar.cc/100?u=${post.userID}` }} style={styles.avatar} />
+                                <View style={styles.avatarContainer}>
+                                    {post.pfpUrl ? (
+                                        <Image source={{ uri: post.pfpUrl }} style={styles.avatar} />
+                                    ) : (
+                                        <Text style={styles.avatarInitial}>{postAuthorInitial}</Text>
+                                    )}
+                                </View>
                                 <View>
                                     <Text style={styles.username}>{post.first_name} {post.last_name}</Text>
                                     <Text style={styles.date}>{dayjs(post.createdAt).format("MMM DD, YYYY · HH:mm")}</Text>
@@ -279,6 +328,7 @@ export default function PostDetailScreen() {
                     ListEmptyComponent={<Text style={styles.emptyCommentText}>No comments yet. Be the first to comment!</Text>}
                     contentContainerStyle={{ paddingHorizontal: 16 }}
                 />
+                
                 <View style={[styles.commentInputContainer, { paddingBottom: insets.bottom || 12 }]}>
                     <TextInput
                         style={styles.commentInput}
@@ -322,7 +372,15 @@ const getStyles = (colors) => StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
     cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, paddingTop: 16 },
-    avatar: { width: 50, height: 50, borderRadius: 25, marginRight: 12, backgroundColor: colors.border },
+    avatar: { width: 50, height: 50, borderRadius: 25 },
+    avatarContainer: { 
+        width: 50, height: 50, borderRadius: 25, 
+        marginRight: 12, backgroundColor: colors.border,
+        justifyContent: 'center', alignItems: 'center' 
+    },
+    avatarInitial: {
+        fontSize: 22, color: colors.primary, fontWeight: 'bold'
+    },
     username: { fontWeight: 'bold', fontSize: 16, color: colors.text },
     date: { fontSize: 12, color: colors.textSecondary },
     title: { fontSize: 24, fontWeight: "bold", marginBottom: 8, color: colors.text },
@@ -335,7 +393,15 @@ const getStyles = (colors) => StyleSheet.create({
     commentsTitle: { fontSize: 18, fontWeight: 'bold', marginTop: 24, marginBottom: 8, color: colors.text },
     emptyCommentText: { textAlign: 'center', color: colors.textSecondary, marginTop: 20 },
     commentContainer: { flexDirection: 'row', marginBottom: 16, alignItems: 'flex-start' },
-    commentAvatar: { width: 36, height: 36, borderRadius: 18, marginRight: 12, backgroundColor: colors.border },
+    commentAvatar: { width: 36, height: 36, borderRadius: 18 },
+    commentAvatarContainer: { 
+        width: 36, height: 36, borderRadius: 18, 
+        marginRight: 12, backgroundColor: colors.border,
+        justifyContent: 'center', alignItems: 'center'
+    },
+    commentAvatarInitial: {
+        fontSize: 16, color: colors.primary, fontWeight: 'bold'
+    },
     commentContent: { flex: 1 },
     commentBubble: { flex: 1, backgroundColor: colors.card, padding: 12, borderRadius: 12 },
     commentUsername: { fontWeight: 'bold', color: colors.text, fontSize: 13, marginBottom: 4 },

@@ -1,7 +1,9 @@
+// fyp/server/api/posts.js
 const express = require('express');
 const multer = require('multer');
 const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const multerS3 = require('multer-s3');
+const { createNotification } = require('../lib/notificationManager.js');
 
 function createPostsRouter(dbPool) {
     const router = express.Router();
@@ -327,12 +329,25 @@ function createPostsRouter(dbPool) {
     router.post('/:postId/comment', async (req, res) => {
         const { postId } = req.params;
         const { commentText } = req.body;
-        const userId = req.user.userId;
+        const commenterId = req.user.userId;
         const connection = await dbPool.getConnection();
         try {
             await connection.beginTransaction();
-            await connection.query('INSERT INTO post_comments (postID, userID, commentText, createdAt) VALUES (?, ?, ?, ?)', [postId, userId, commentText.trim(), new Date()]);
+            
+            const [posts] = await connection.query('SELECT userID FROM posts WHERE id = ?', [postId]);
+            const [commenter] = await connection.query('SELECT first_name FROM users WHERE userID = ?', [commenterId]);
+            
+            const postAuthorId = posts[0]?.userID;
+            const commenterName = commenter[0]?.first_name || 'Someone';
+
+            await connection.query('INSERT INTO post_comments (postID, userID, commentText, createdAt) VALUES (?, ?, ?, ?)', [postId, commenterId, commentText.trim(), new Date()]);
             await connection.query('UPDATE posts SET commentCount = (SELECT COUNT(*) FROM post_comments WHERE postID = ?) WHERE id = ?', [postId, postId]);
+            
+            if (postAuthorId && postAuthorId !== commenterId) {
+                const notificationMessage = `${commenterName} commented on your post.`;
+                await createNotification(connection, postAuthorId, notificationMessage, 'info');
+            }
+            
             await connection.commit();
             res.status(201).json({ success: true, message: "Comment added successfully." });
         } catch (error) {
@@ -394,6 +409,48 @@ function createPostsRouter(dbPool) {
         } catch (error) {
             console.error(`Error reporting comment ${commentId} by user ${reportingUserId}:`, error);
             res.status(500).json({ message: "Failed to report comment." });
+        }
+    });
+
+    router.delete('/comments/:commentId', async (req, res) => {
+        const { commentId } = req.params;
+        const userId = req.user.userId;
+        const connection = await dbPool.getConnection();
+        
+        try {
+            await connection.beginTransaction();
+
+            // First, find the post ID for updating the count and verify ownership
+            const [comments] = await connection.query('SELECT userID, postID FROM post_comments WHERE id = ?', [commentId]);
+            if (comments.length === 0) {
+                await connection.rollback();
+                return res.status(404).json({ message: 'Comment not found.' });
+            }
+
+            const comment = comments[0];
+            const postId = comment.postID;
+
+            // Security check: ensure the user making the request is the owner of the comment
+            if (comment.userID !== userId) {
+                await connection.rollback();
+                return res.status(403).json({ message: 'Forbidden: You are not the owner of this comment.' });
+            }
+            
+            // Delete the comment itself
+            await connection.query('DELETE FROM post_comments WHERE id = ?', [commentId]);
+
+            // After deleting, update the commentCount on the parent post
+            await connection.query('UPDATE posts SET commentCount = (SELECT COUNT(*) FROM post_comments WHERE postID = ?) WHERE id = ?', [postId, postId]);
+            
+            await connection.commit();
+            res.status(200).json({ success: true, message: 'Comment deleted successfully.' });
+
+        } catch (error) {
+            await connection.rollback();
+            console.error("Error deleting comment:", error);
+            res.status(500).json({ message: "Failed to delete comment." });
+        } finally {
+            connection.release();
         }
     });
 

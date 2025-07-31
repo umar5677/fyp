@@ -85,13 +85,13 @@ const SpeedDialButton = ({ navigation, userId }) => {
     // This container just centers the main button and acts as a relative
     <View style={styles.container}>
       <Animated.View style={[styles.secondaryButtonContainer, bloodSugarStyle]}>
-        <TouchableOpacity style={[styles.secondaryButton, styles.bloodSugarButton]} onPress={() => handleActionPress('bloodSugar')} activeOpacity={0.7}>
-          <MaterialCommunityIcons name="diabetes" size={24} color="#FFFFFF" />
+        <TouchableOpacity style={[styles.secondaryButton, styles.bloodSugarButton]} onPress={() => handleActionPress('bloodSugar')} activeOpacity={1}>
+          <MaterialCommunityIcons name="diabetes" size={40} color="#FFFFFF" />
         </TouchableOpacity>
       </Animated.View>
       <Animated.View style={[styles.secondaryButtonContainer, calorieSugarStyle]}>
-        <TouchableOpacity style={[styles.secondaryButton, styles.calorieSugarButton]} onPress={() => handleActionPress('calorieSugar')} activeOpacity={0.7}>
-          <Ionicons name="restaurant-outline" size={24} color="#FFFFFF" />
+        <TouchableOpacity style={[styles.secondaryButton, styles.calorieSugarButton]} onPress={() => handleActionPress('calorieSugar')} activeOpacity={1}>
+          <Ionicons name="restaurant-outline" size={40} color="#FFFFFF" />
         </TouchableOpacity>
       </Animated.View>
 
@@ -118,8 +118,8 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   mainButton: {
-    width: 60,
-    height: 60,
+    width: 65,
+    height: 65,
     borderRadius: 30,
     backgroundColor: '#F97316', 
     justifyContent: 'center',
@@ -130,8 +130,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryButton: {
-    width: 48,
-    height: 48,
+    width: 55,
+    height: 55,
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',

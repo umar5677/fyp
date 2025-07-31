@@ -171,6 +171,7 @@ export const api = {
     likeComment: (commentId) => authenticatedFetch(`/posts/comments/${commentId}/like`, { method: 'POST' }),
     unlikeComment: (commentId) => authenticatedFetch(`/posts/comments/${commentId}/like`, { method: 'DELETE' }),
     reportComment: (commentId) => authenticatedFetch(`/posts/comments/${commentId}/report`, { method: 'POST' }),
+    deleteComment: (commentId) => authenticatedFetch(`/posts/comments/${commentId}`, { method: 'DELETE' }),
 
     // Settings, Providers & Reports
     getUserThresholds: () => authenticatedFetch('/user-settings/thresholds'),
