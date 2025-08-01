@@ -1,10 +1,10 @@
 require('dotenv').config();
+const crypto = require('crypto');
+const { sendEmail } = require('./lib/emailSender.js');
 const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
-const { sendEmail } = require('./lib/emailSender.js');
+const jwt = require('jsonwebtoken'); 
 const authenticateToken = require('./lib/authMiddleware.js');
 const multer = require('multer');
 const { S3Client } = require('@aws-sdk/client-s3');

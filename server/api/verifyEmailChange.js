@@ -1,4 +1,4 @@
-// fyp/server/api/verifyEmailChange.js
+// /home/ec2-user/fyp/server/api/verifyEmailChange.js
 const express = require('express');
 
 function createVerifyEmailChangeRouter(dbPool) {
@@ -11,7 +11,6 @@ function createVerifyEmailChangeRouter(dbPool) {
                 return res.status(400).json({ message: 'Verification token is required.' });
             }
 
-            // Find user with a matching, unexpired token
             const findUserSql = "SELECT userID, new_email_pending FROM users WHERE email_change_token = ? AND email_change_token_expires > UTC_TIMESTAMP()";
             const [rows] = await dbPool.query(findUserSql, [token]);
 
@@ -20,7 +19,6 @@ function createVerifyEmailChangeRouter(dbPool) {
             }
             const user = rows[0];
 
-            // Update the email and clear the temporary fields
             const updateUserSql = "UPDATE users SET email = ?, new_email_pending = NULL, email_change_token = NULL, email_change_token_expires = NULL WHERE userID = ?";
             await dbPool.query(updateUserSql, [user.new_email_pending, user.userID]);
             
