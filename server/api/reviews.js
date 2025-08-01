@@ -1,12 +1,11 @@
 // fyp/server/api/reviews.js
 
 const express = require('express');
+const authenticateToken = require('../lib/authMiddleware.js');
 
 function createReviewsRouter(dbPool) {
     const router = express.Router();
 
-    // PUBLIC ENDPOINT: For the website to fetch good reviews.
-    // This will be mounted at GET /api/reviews/public
     router.get('/public', async (req, res) => {
         try {
             const query = `
@@ -33,9 +32,7 @@ function createReviewsRouter(dbPool) {
         }
     });
 
-    // AUTHENTICATED ENDPOINT: For logged-in app users to submit a review.
-    // This will be mounted at POST /api/reviews
-    router.post('/', async (req, res) => {
+    router.post('/', authenticateToken, async (req, res) => {
         const userId = req.user.userId;
         const { rating, reviewText } = req.body;
 
