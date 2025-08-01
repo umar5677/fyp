@@ -93,7 +93,37 @@ function createRegisterRouter(dbPool) {
                 from: `"GlucoBites" <${process.env.EMAIL_USER}>`,
                 to: email,
                 subject: 'Welcome to GlucoBites! Please Verify Your Email',
-                html: `... your email HTML here ...`, // Paste your existing email HTML
+                html: `
+              <div style="background-color: #f8f9fa; padding: 40px; font-family: Arial, sans-serif;">
+                <div style="max-width: 600px; margin: auto; background-color: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                  <div style="background-color: #00BBFF; color: white; padding: 20px; text-align: center;">
+                    <h1 style="margin: 0; font-size: 24px;">Welcome to GlucoBites!</h1>
+                  </div>
+                  <div style="padding: 30px;">
+                    <h2 style="font-size: 20px; color: #333;">Hi ${firstName},</h2>
+                    <p style="color: #555; line-height: 1.6;">
+                      Thank you for registering. We're excited to have you on board.
+                      To complete your setup and secure your account, please verify your email address by clicking the button below.
+                    </p>
+                    <div style="text-align: center; margin: 30px 0;">
+                      <a href="${verificationLink}" 
+                         style="background-color: #00BBFF; color: white; padding: 15px 25px; text-decoration: none; border-radius: 5px; font-size: 16px; font-weight: bold; display: inline-block;">
+                        Verify My Email
+                      </a>
+                    </div>
+                    <p style="color: #555; line-height: 1.6;">
+                      This verification link is valid for one hour.
+                    </p>
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+                    <p style="font-size: 12px; color: #999; text-align: center;">
+                      If you did not create this account, you can safely ignore this email.
+                      <br/>
+                      © 2025 GlucoBites. All rights reserved.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            `,
             };
             await transporter.sendMail(mailOptions);
             
