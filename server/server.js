@@ -63,8 +63,8 @@ const upload = multer({
 // PUBLIC ROUTES
 app.use('/api/login', loginApi.createLoginRouter(dbPool));
 app.use('/api/password-reset', createPasswordResetRouter(dbPool));
-// The /api/reviews router has been moved to the PROTECTED section to fix the bug
 app.use('/api/exercise', createExerciseRouter(dbPool));
+app.use('/api/reviews', createReviewsRouter(dbPool)); 
 
 app.post('/api/token', (req, res) => {
     const { token } = req.body;
@@ -99,7 +99,6 @@ app.post('/api/upload/profile-picture', upload.single('photo'), async (req, res)
 });
 
 // MOUNT FULLY-PROTECTED ROUTERS
-app.use('/api/reviews', createReviewsRouter(dbPool)); // MOVED HERE TO FIX ERROR
 app.use('/api/user-settings', createUserSettingsRoutes(dbPool));
 app.post('/api/generate-report', createGenerateReportRoute(dbPool));
 app.use('/api/providers', createProvidersRouter(dbPool));
