@@ -2,7 +2,9 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
-const jwt = require('jsonwebtoken'); 
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const { sendEmail } = require('./lib/emailSender.js');
 const authenticateToken = require('./lib/authMiddleware.js');
 const multer = require('multer');
 const { S3Client } = require('@aws-sdk/client-s3');
@@ -10,6 +12,7 @@ const multerS3 = require('multer-s3');
 const { startScheduledReports } = require('./lib/reportScheduler.js');
 
 // Routers
+const createVerifyEmailChangeRouter = require('./api/verifyEmailChange.js');
 const createPasswordResetRouter = require('./api/passwordReset.js');
 const createVerifyEmailRouter = require('./api/verifyEmail.js');
 const createRegisterRouter = require('./api/register.js');
@@ -63,6 +66,7 @@ const upload = multer({
 });
 
 // PUBLIC ROUTES
+app.use('/api/profile/verify-email-change', createVerifyEmailChangeRouter(dbPool));
 app.use('/api/verify-email', createVerifyEmailRouter(dbPool));
 app.use('/api/register', createRegisterRouter(dbPool));
 app.use('/api/login', loginApi.createLoginRouter(dbPool));
@@ -195,40 +199,61 @@ app.get('/api/profile', async (req, res) => {
 app.put('/api/profile', async (req, res) => {
     const userId = req.user.userId;
     const updates = req.body;
+    const newEmail = updates.email ? updates.email.trim() : undefined;
 
-    if (updates.first_name === '' || updates.last_name === '' || updates.email === '' || 
-        updates.dob === '' || updates.height === '' || updates.weight === '') {
-        return res.status(400).json({ message: 'Required fields cannot be blank.' });
-    }
-    
-    // DYNAMIC QUERY BUILDING
-    let queryFields = [];
-    let queryParams = [];
-
-    // Define the list of fields that the user is allowed to update from this screen
-    const allowedFields = [
-        'first_name', 'last_name', 'email', 'dob', 'height', 
-        'weight', 'gender', 'diabetes', 'isInsulin', 'calorieGoal' 
-    ];
-
-    // Loop through the updates sent from the app
-    Object.keys(updates).forEach(key => {
-        if (allowedFields.includes(key) && updates[key] !== undefined) {
-            queryFields.push(`${key} = ?`);
-            queryParams.push(updates[key]);
-        }
-    });
-    
-    if (queryFields.length === 0) {
-        return res.status(400).json({ message: 'No valid fields to update.' });
-    }
-
-    const queryString = `UPDATE users SET ${queryFields.join(', ')} WHERE userID = ?`;
-    queryParams.push(userId);
-    
     try {
-        await dbPool.query(queryString, queryParams);
-        res.status(200).json({ message: "Profile updated successfully." });
+        const [users] = await dbPool.query('SELECT email FROM users WHERE userID = ?', [userId]);
+        if (users.length === 0) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+        const currentUserEmail = users[0].email;
+
+        if (newEmail && newEmail !== currentUserEmail) {
+            const [existingEmail] = await dbPool.query('SELECT userID FROM users WHERE email = ?', [newEmail]);
+            if (existingEmail.length > 0) {
+                return res.status(409).json({ message: 'This email address is already in use.' });
+            }
+
+            const token = crypto.randomBytes(32).toString('hex');
+            const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+            await dbPool.query(
+                'UPDATE users SET new_email_pending = ?, email_change_token = ?, email_change_token_expires = ? WHERE userID = ?',
+                [newEmail, token, expires, userId]
+            );
+
+            const verificationLink = `https://glucobites.org/verify-email-change?token=${token}`;
+            const emailSubject = 'Please Verify Your New GlucoBites Email Address';
+            const emailText = `Hello,\n\nYou requested to change the email address for your GlucoBites account. Please click the link below to confirm this change:\n\n${verificationLink}\n\nThis link will expire in one hour. If you did not request this change, please ignore this email.\n\nThanks,\nThe GlucoBites Team`;
+            
+            await sendEmail(newEmail, emailSubject, emailText);
+
+            delete updates.email;
+        }
+
+        let queryFields = [];
+        let queryParams = [];
+        const allowedFields = ['first_name', 'last_name', 'dob', 'height', 'weight', 'gender', 'diabetes', 'isInsulin', 'calorieGoal'];
+
+        Object.keys(updates).forEach(key => {
+            if (allowedFields.includes(key) && updates[key] !== undefined) {
+                queryFields.push(`${key} = ?`);
+                queryParams.push(updates[key]);
+            }
+        });
+
+        if (queryFields.length > 0) {
+            const queryString = `UPDATE users SET ${queryFields.join(', ')} WHERE userID = ?`;
+            queryParams.push(userId);
+            await dbPool.query(queryString, queryParams);
+        }
+
+        if (newEmail && newEmail !== currentUserEmail) {
+            res.status(200).json({ message: "Verification required. Please check your new email address to complete the change." });
+        } else {
+            res.status(200).json({ message: "Profile updated successfully." });
+        }
+
     } catch (error) {
         console.error("Profile update error:", error);
         res.status(500).json({ message: "Error updating profile." });

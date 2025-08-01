@@ -78,7 +78,7 @@ const Login = ({ navigation }) => {
                 contentContainerStyle={styles.container}
                 keyboardShouldPersistTaps="handled"
             >
-                <Image source={require('../assets/GlucoBites.png')} style={styles.logo} />
+                <Image source={require('../assets/GlucoBitesLogo.png')} style={styles.logo} />
                 <Text style={styles.welcome}>Welcome to <Text style={styles.appName}>GlucoBites</Text></Text>
 
                 <View style={styles.formContainer}>
