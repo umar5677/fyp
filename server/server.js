@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const mysql = require('mysql2/promise');
 const jwt = require('jsonwebtoken'); 
 const authenticateToken = require('./lib/authMiddleware.js');
@@ -27,6 +28,13 @@ const createExerciseRouter = require('./api/exercise.js');
 
 
 const app = express();
+const corsOptions = {
+    origin: [
+        'https://glucobites.org',
+        'https://www.glucobites.org',
+    ]
+};
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 
 const dbPool = mysql.createPool({ host: process.env.DB_HOST, user: process.env.DB_USER, password: process.env.DB_PASSWORD, database: process.env.DB_NAME, waitForConnections: true, connectionLimit: 10, queueLimit: 0 });

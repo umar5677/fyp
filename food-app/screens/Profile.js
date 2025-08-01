@@ -226,6 +226,7 @@ const ProfileScreen = ({ navigation }) => {
                             )}
                         </View>
                     </TouchableOpacity>
+
                     <View style={styles.profileInfoContainer}>
                         <Text style={styles.name} numberOfLines={1}>{user.first_name || ''} {user.last_name || ''}</Text>
                         <Text style={styles.email} numberOfLines={1}>{user.email}</Text>
@@ -233,6 +234,7 @@ const ProfileScreen = ({ navigation }) => {
                     <TouchableOpacity style={styles.editButton} onPress={() => navigation.navigate('EditProfile')}>
                         <Text style={styles.editButtonText}>Edit</Text>
                     </TouchableOpacity>
+                    
                 </View>
 
                 <View style={styles.menuGroup}>
@@ -247,6 +249,7 @@ const ProfileScreen = ({ navigation }) => {
                             <ProfileMenuButton iconName="shield-checkmark-outline" text="Alerts and Sharing" onPress={() => navigation.navigate('Alerts')} colors={colors} />
                         </>
                     )}
+                    <ProfileMenuButton iconName="reader-outline" text="My Posts" onPress={() => navigation.navigate('MyPosts')} colors={colors} />
                     <ProfileMenuButton iconName="bookmark-outline" text="Bookmarked Posts" onPress={() => navigation.navigate('BookmarkedPosts')} colors={colors} />
                     <ProfileMenuButton
                         iconName="star-outline"

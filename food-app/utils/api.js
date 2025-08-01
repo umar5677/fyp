@@ -157,6 +157,7 @@ export const api = {
     // Community & Posts
     getPosts: () => authenticatedFetch('/posts'),
     getPostDetails: (postId) => authenticatedFetch(`/posts/${postId}`),
+    getMyPosts: () => authenticatedFetch('/posts/my-posts'),
     createPost: (formData) => authenticatedFetch('/posts', { method: 'POST', body: formData }),
     updatePost: (postId, formData) => authenticatedFetch(`/posts/${postId}`, { method: 'PUT', body: formData }),
     deletePost: (postId) => authenticatedFetch(`/posts/${postId}`, { method: 'DELETE' }),

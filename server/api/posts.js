@@ -86,6 +86,40 @@ function createPostsRouter(dbPool) {
             res.status(500).json({ message: 'Error fetching bookmarked posts' });
         }
     });
+
+    router.get('/my-posts', async (req, res) => {
+    const currentUserID = req.user.userId;
+    try {
+        const query = `
+            SELECT 
+                p.id, p.title, p.content, p.createdAt, p.likeCount, p.commentCount,
+                u.userID, u.first_name, u.last_name, u.pfpUrl,
+                GROUP_CONCAT(pi.imageUrl) as images,
+                (SELECT COUNT(*) FROM post_likes WHERE postID = p.id AND userID = ?) > 0 AS likedByUser,
+                (SELECT COUNT(*) FROM post_bookmarks WHERE postID = p.id AND userID = ?) > 0 AS bookmarkedByUser
+            FROM posts p
+            JOIN users u ON p.userID = u.userID
+            LEFT JOIN post_images pi ON p.id = pi.postID
+            WHERE p.userID = ?
+            GROUP BY p.id
+            ORDER BY p.createdAt DESC;
+        `;
+        // The currentUserID is used three times in this query
+        const [posts] = await dbPool.query(query, [currentUserID, currentUserID, currentUserID]);
+
+        const formattedPosts = posts.map(post => ({
+            ...post,
+            images: post.images ? post.images.split(',') : [],
+            likedByUser: !!post.likedByUser,
+            bookmarkedByUser: !!post.bookmarkedByUser,
+            isOwner: true // All posts from this endpoint are owned by the user
+        }));
+        res.json(formattedPosts);
+        } catch (error) {
+            console.error('Error fetching user\'s own posts:', error);
+            res.status(500).json({ message: 'Error fetching your posts' });
+        }
+    });
     
     // POST /api/posts - Create a new post
     router.post('/', upload.array('images', 5), async (req, res) => {
