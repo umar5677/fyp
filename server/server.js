@@ -11,6 +11,7 @@ const { startScheduledReports } = require('./lib/reportScheduler.js');
 
 // Routers
 const createPasswordResetRouter = require('./api/passwordReset.js');
+const createVerifyEmailRouter = require('./api/verifyEmail.js');
 const createRegisterRouter = require('./api/register.js');
 const createReviewsRouter = require('./api/reviews.js');
 const loginApi = require('./api/login.js');
@@ -62,6 +63,7 @@ const upload = multer({
 });
 
 // PUBLIC ROUTES
+app.use('/api/verify-email', createVerifyEmailRouter(dbPool));
 app.use('/api/register', createRegisterRouter(dbPool));
 app.use('/api/login', loginApi.createLoginRouter(dbPool));
 app.use('/api/password-reset', createPasswordResetRouter(dbPool));
