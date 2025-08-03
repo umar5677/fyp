@@ -2,8 +2,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, Image, ActivityIndicator, ScrollView, StyleSheet, Alert, TouchableOpacity, SafeAreaView, Modal,
-  Platform, // <--- ADDED: Import Platform
-  StatusBar // <--- ADDED: Import StatusBar
+  Platform,StatusBar
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
@@ -16,7 +15,6 @@ const getStyles = (colors) => StyleSheet.create({
     safeArea: { 
         flex: 1, 
         backgroundColor: colors.background,
-        // <--- MODIFIED: Add paddingTop for Android status bar
         paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
     },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.background },

@@ -17,7 +17,7 @@ import * as Notifications from 'expo-notifications';
 import { api } from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
 import LogBloodSugarModal from '../components/LogBloodSugarModal';
-import useDeviceSyncBLE from '../hooks/useDeviceSyncBLE'; 
+//import useDeviceSyncBLE from '../hooks/useDeviceSyncBLE'; 
 
 const THRESHOLD_KEYS = ['lowThreshold', 'highFastingThreshold', 'highPostMealThreshold', 'veryHighThreshold'];
 
@@ -207,7 +207,7 @@ const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate, colors }) 
 export default function LogBloodSugarScreen({ navigation }) {
     const { colors } = useTheme();
     const styles = getStyles(colors);
-    const { getDeviceSyncData } = useDeviceSyncBLE();
+    //const { getDeviceSyncData } = useDeviceSyncBLE();
 
     const [history, setHistory] = useState([]);
     const [lastReading, setLastReading] = useState(null);

@@ -31,6 +31,7 @@ const createRemindersRouter = require('./api/reminders.js');
 const createPostsRouter = require('./api/posts.js');
 const createExerciseRouter = require('./api/exercise.js');
 const createBarcodeRouter = require('./api/barcodeScan.js'); 
+const createLogsRouter = require('./api/logs.js');
 
 const app = express();
 const corsOptions = {
@@ -119,6 +120,7 @@ app.use('/api/notifications', createNotificationsRouter(dbPool));
 app.use('/api/reminders', createRemindersRouter(dbPool));
 app.use('/api/posts', createPostsRouter(dbPool));
 app.use('/api/barcode', createBarcodeRouter(dbPool));
+app.use('/api/logs', createLogsRouter(dbPool));
 
 app.put('/api/profile-setup', async (req, res) => {
     const userId = req.user.userId;
@@ -272,92 +274,6 @@ app.delete('/api/profile', async (req, res) => {
     } catch (error) {
         console.error("Account deletion error:", error);
         res.status(500).json({ message: "Error deleting account." });
-    }
-});
-
-app.get('/api/logs/history', async (req, res) => {
-    const userId = req.user.userId;
-    const { types, period = 'day', targetDate, limit } = req.query;
-    if (!types) { return res.status(400).json({ message: "Log type(s) are required as a query parameter." }); }
-    const typeArray = types.split(',').map(t => parseInt(t.trim()));
-    if (typeArray.some(isNaN)) { return res.status(400).json({ message: "Invalid 'types' parameter." }); }
-    let query = `SELECT logID, type, amount, date, tag, foodName FROM dataLogs WHERE userID = ? AND type IN (?)`;
-    const queryParams = [userId, typeArray];
-    if (period !== 'all') {
-        const date = targetDate ? new Date(targetDate) : new Date();
-        if (period === 'day') { query += ` AND DATE(date) = DATE(?)`; queryParams.push(date); }
-        else if (period === 'week') {
-            const weekStart = new Date(date);
-            weekStart.setDate(date.getDate() - date.getDay());
-            weekStart.setHours(0, 0, 0, 0);
-            const weekEnd = new Date(weekStart);
-            weekEnd.setDate(weekStart.getDate() + 6);
-            weekEnd.setHours(23, 59, 59, 999);
-            query += ` AND date BETWEEN ? AND ?`;
-            queryParams.push(weekStart, weekEnd);
-        } else if (period === 'month') {
-            query += ` AND YEAR(date) = ? AND MONTH(date) = ?`;
-            queryParams.push(date.getFullYear(), date.getMonth() + 1);
-        }
-    }
-    query += ` ORDER BY date DESC`;
-    if (limit && /^\d+$/.test(limit)) { query += ` LIMIT ?`; queryParams.push(parseInt(limit)); }
-    try {
-        const [logs] = await dbPool.query(query, queryParams);
-        res.status(200).json(logs);
-    } catch (error) {
-        console.error('Error fetching history:', error);
-        res.status(500).json({ message: 'Error fetching history.' });
-    }
-});
-
-app.post('/api/logs', async (req, res) => {
-    const userId = req.user.userId;
-    const { amount, type, date, tag, foodName } = req.body;
-    const dateToInsert = date ? new Date(date) : new Date();
-    if (amount == null || type == null) { return res.status(400).json({ message: 'Amount and type are required.' }); }
-    if (type === 3 && !tag) { return res.status(400).json({ message: 'A tag (e.g., Fasting, Pre-Meal) is required for blood glucose logs.' }); }
-    const numericAmount = parseFloat(amount);
-    if (isNaN(numericAmount) || numericAmount < 0) { return res.status(400).json({ message: 'A valid, non-negative amount is required.' }); }
-    try {
-        await dbPool.query(
-            'INSERT INTO dataLogs (userID, type, amount, date, tag, foodName) VALUES (?, ?, ?, ?, ?, ?)',
-            [userId, type, numericAmount, dateToInsert, tag || null, foodName || null]
-        );
-        res.status(201).json({ success: true, message: 'Log created successfully!' });
-    } catch (error) {
-        console.error('Error creating log:', error);
-        res.status(500).json({ success: false, message: 'Error creating log.' });
-    }
-});
-
-app.put('/api/logs/:logId', async (req, res) => {
-    const { logId } = req.params;
-    const { amount, tag } = req.body;
-    if (amount === undefined || tag === undefined) { return res.status(400).json({ success: false, message: 'Amount and tag are required for an update.' }); }
-    const numericAmount = parseFloat(amount);
-    if (isNaN(numericAmount) || numericAmount < 0) { return res.status(400).json({ success: false, message: 'A valid, non-negative amount is required.' }); }
-    try {
-        await dbPool.query(
-            `UPDATE dataLogs SET amount = ?, tag = ? WHERE logID = ? AND userID = ?`,
-            [numericAmount, tag, logId, req.user.userId]
-        );
-        res.status(200).json({ success: true, message: 'Log updated successfully.' });
-    } catch (error) {
-        console.error('Error updating log:', error);
-        res.status(500).json({ success: false, message: 'Error updating log.' });
-    }
-});
-
-app.delete('/api/logs/:logId', async (req, res) => {
-    const { logId } = req.params;
-    if (!logId) return res.status(400).json({ message: "Log ID is required." });
-    try {
-        await dbPool.query(`DELETE FROM dataLogs WHERE logID = ? AND userID = ?`, [logId, req.user.userId]);
-        res.status(200).json({ success: true, message: 'Log deleted successfully.' });
-    } catch (error) {
-        console.error('Error deleting log:', error);
-        res.status(500).json({ message: 'Error deleting log.' });
     }
 });
 
