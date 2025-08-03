@@ -9,7 +9,7 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { Calendar } from 'react-native-calendars';
 import * as Animatable from 'react-native-animatable';
@@ -70,6 +70,7 @@ const getStyles = (colors) => StyleSheet.create({
     secondaryFab: { position: 'absolute', },
     aiFab: { backgroundColor: '#E67E22' },
     manualFab: { backgroundColor: '#3498DB' },
+    barcodeFab: { backgroundColor: '#27ae60' },
 });
 
 const FoodLogItem = ({ item, onEdit, index, colors }) => {
@@ -298,6 +299,18 @@ export default function LogCalorieSugarScreen({ navigation }) {
         }
     };
 
+    const handleBarcodeScan = () => {
+        toggleMenu();
+        if (isPremiumUser) {
+            navigation.navigate('BarcodeScan');
+        } else {
+            Alert.alert(
+                "Premium Feature",
+                "Barcode scanning is a premium feature. Please upgrade to use it."
+            );
+        }
+    };
+
     const handleSave = async (logsToEdit, newValues, logDate, foodName) => {
         setIsLoading(true);
         try {
@@ -333,7 +346,8 @@ export default function LogCalorieSugarScreen({ navigation }) {
     const totalSugar = history.filter(l => l.type === 2).reduce((sum, l) => sum + Number(l.amount || 0), 0);
     const mainFabRotate = menuAnimation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] });
     const aiScanStyle = { transform: [ { scale: menuAnimation }, { translateY: menuAnimation.interpolate({ inputRange: [0, 1], outputRange: [0, -60] }) } ], opacity: menuAnimation };
-    const manualAddStyle = { transform: [ { scale: menuAnimation }, { translateY: menuAnimation.interpolate({ inputRange: [0, 1], outputRange: [0, -115] }) } ], opacity: menuAnimation };
+    const barcodeScanStyle = { transform: [ { scale: menuAnimation }, { translateY: menuAnimation.interpolate({ inputRange: [0, 1], outputRange: [0, -115] }) } ], opacity: menuAnimation };
+    const manualAddStyle = { transform: [ { scale: menuAnimation }, { translateY: menuAnimation.interpolate({ inputRange: [0, 1], outputRange: [0, -170] }) } ], opacity: menuAnimation };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -379,6 +393,11 @@ export default function LogCalorieSugarScreen({ navigation }) {
                 <Animated.View style={[styles.secondaryFab, manualAddStyle]}>
                     <TouchableOpacity style={[styles.fab, styles.manualFab]} onPress={handleAddNew} activeOpacity={0.8}>
                         <Ionicons name="pencil" size={22} color="white" />
+                    </TouchableOpacity>
+                </Animated.View>
+                 <Animated.View style={[styles.secondaryFab, barcodeScanStyle]}>
+                    <TouchableOpacity style={[styles.fab, styles.barcodeFab]} onPress={handleBarcodeScan} activeOpacity={0.8}>
+                        <MaterialCommunityIcons name="barcode-scan" size={22} color="white" />
                     </TouchableOpacity>
                 </Animated.View>
                 <Animated.View style={[styles.secondaryFab, aiScanStyle]}>

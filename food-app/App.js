@@ -46,6 +46,7 @@ import AuthLoadingScreen from './screens/AuthLoadingScreen';
 import ProviderTabs from './components/ProviderTabs';
 import AskQuestionScreen from './screens/AskQuestionScreen';
 import ProviderAnswerScreen from './screens/ProviderAnswerScreen';
+import BarcodeScanScreen from './screens/BarcodeScanScreen';
 
 const Stack = createStackNavigator();
 
@@ -121,6 +122,7 @@ const AppNavigator = () => {
         <Stack.Screen name="LogBloodSugarModal" component={LogBloodSugarScreen} options={{ presentation: 'transparentModal' }} />
         <Stack.Screen name="LogCalorieSugarModal" component={LogCalorieSugarScreen} options={{ presentation: 'transparentModal' }} />
         <Stack.Screen name="AiFoodScan" component={AiFoodScanScreen} options={{ presentation: 'modal' }} />
+        <Stack.Screen name="BarcodeScan" component={BarcodeScanScreen} options={{ presentation: 'modal' }} />
         <Stack.Screen name="Notifications" component={NotificationScreen} options={{ presentation: 'modal' }} />
         <Stack.Screen name="Alerts" component={AlertsScreen} options={{ presentation: 'modal' }} />
         <Stack.Screen 

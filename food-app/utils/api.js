@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
 
-const BASE_URL = 'https://api.glucobites.org/api';
+const BASE_URL = 'http://192.168.10.120:3000/api';
 
 const handlePublicFetch = async (response) => {
     const data = await response.json();
@@ -141,6 +141,10 @@ export const api = {
     scanImage: (base64) => authenticatedFetch('/ocr/aws-parse-image', { method: 'POST', body: JSON.stringify({ image: base64 }) }),
     identifyFoodFromImage: (base64) => authenticatedFetch('/ai/identify-food', { method: 'POST', body: JSON.stringify({ image: base64 }) }),
     getNutritionForFood: (foodName) => authenticatedFetch('/ai/get-nutrition', { method: 'POST', body: JSON.stringify({ foodName }) }),
+    lookupBarcode: (barcode) => authenticatedFetch('/barcode/lookupBarcode', {
+        method: 'POST',
+        body: JSON.stringify({ barcode })
+    }),
     
     // Notifications & Reminders
     getNotifications: () => authenticatedFetch('/notifications'),

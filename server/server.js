@@ -30,7 +30,7 @@ const createNotificationsRouter = require('./api/notifications.js');
 const createRemindersRouter = require('./api/reminders.js');
 const createPostsRouter = require('./api/posts.js');
 const createExerciseRouter = require('./api/exercise.js');
-
+const createBarcodeRouter = require('./api/barcodeScan.js'); 
 
 const app = express();
 const corsOptions = {
@@ -118,7 +118,7 @@ app.use('/api/ai', createAiRouter(dbPool));
 app.use('/api/notifications', createNotificationsRouter(dbPool));
 app.use('/api/reminders', createRemindersRouter(dbPool));
 app.use('/api/posts', createPostsRouter(dbPool));
-
+app.use('/api/barcode', createBarcodeRouter(dbPool));
 
 app.put('/api/profile-setup', async (req, res) => {
     const userId = req.user.userId;
