@@ -187,16 +187,31 @@ app.get('/api/profile', async (req, res) => {
     const userId = req.user.userId;
     try {
         const [users] = await dbPool.query(
-            'SELECT userID, email, first_name, last_name, dob, weight, height, gender, diabetes, isInsulin, pfpUrl, hasProfileSetup, setProvider AS isProvider, calorieGoal FROM users WHERE userID = ?', 
+            `SELECT u.userID, u.email, u.first_name, u.last_name, u.dob, u.weight, 
+                    u.height, u.gender, u.diabetes, u.isInsulin, u.pfpUrl, 
+                    u.hasProfileSetup, u.setProvider AS isProvider, u.calorieGoal,
+                    COALESCE(v.isVerified, 0) AS isHpVerified
+             FROM users u
+             LEFT JOIN verifyHP v ON u.userID = v.userID
+             WHERE u.userID = ?`, 
             [userId]
         );
+        
         if (users.length === 0) return res.status(404).json({ message: 'User not found.' });
-        res.json({ user: users[0] });
+
+        // Convert the 0 or 1 from the DB to a boolean for clean JSON
+        const user = {
+            ...users[0],
+            isHpVerified: !!users[0].isHpVerified
+        };
+
+        res.json({ user: user });
     } catch (error) {
         console.error('Profile fetch error:', error);
         res.status(500).json({ message: 'Error fetching profile.' });
     }
 });
+
 
 app.put('/api/profile', async (req, res) => {
     const userId = req.user.userId;

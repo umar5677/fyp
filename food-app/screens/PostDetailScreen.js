@@ -11,7 +11,7 @@ import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/nativ
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { api } from "../utils/api";
 import { useTheme } from "../context/ThemeContext";
 import { showMessage } from "react-native-flash-message";
@@ -34,7 +34,17 @@ const CommentItem = ({ item, colors, onToggleLike, onReport, currentUserId, onDe
             </View>
             <View style={styles.commentContent}>
                 <View style={styles.commentBubble}>
-                    <Text style={styles.commentUsername}>{item.first_name} {item.last_name}</Text>
+                    <View style={styles.commentUsernameContainer}>
+                        <Text style={styles.commentUsername}>{item.first_name} {item.last_name}</Text>
+                        {item.commenterIsHpVerified && (
+                            <MaterialCommunityIcons
+                                name="check-decagram"
+                                size={14}
+                                color="#3498db"
+                                style={styles.verifiedBadge}
+                            />
+                        )}
+                    </View>
                     <Text style={styles.commentText}>{item.commentText}</Text>
                 </View>
                 <View style={styles.commentFooter}>
@@ -299,7 +309,17 @@ export default function PostDetailScreen() {
                                     )}
                                 </View>
                                 <View>
-                                    <Text style={styles.username}>{post.first_name} {post.last_name}</Text>
+                                    <View style={styles.usernameContainer}>
+                                        <Text style={styles.username}>{post.first_name} {post.last_name}</Text>
+                                        {post.authorIsHpVerified && (
+                                            <MaterialCommunityIcons
+                                                name="check-decagram"
+                                                size={16}
+                                                color="#3498db"
+                                                style={styles.verifiedBadge}
+                                            />
+                                        )}
+                                    </View>
                                     <Text style={styles.date}>{dayjs(post.createdAt).format("MMM DD, YYYY · HH:mm")}</Text>
                                 </View>
                             </View>
@@ -381,7 +401,15 @@ const getStyles = (colors) => StyleSheet.create({
     avatarInitial: {
         fontSize: 22, color: colors.primary, fontWeight: 'bold'
     },
+    usernameContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 2,
+    },
     username: { fontWeight: 'bold', fontSize: 16, color: colors.text },
+    verifiedBadge: {
+        marginLeft: 5,
+    },
     date: { fontSize: 12, color: colors.textSecondary },
     title: { fontSize: 24, fontWeight: "bold", marginBottom: 8, color: colors.text },
     content: { fontSize: 16, color: colors.text, lineHeight: 24 },
@@ -404,7 +432,12 @@ const getStyles = (colors) => StyleSheet.create({
     },
     commentContent: { flex: 1 },
     commentBubble: { flex: 1, backgroundColor: colors.card, padding: 12, borderRadius: 12 },
-    commentUsername: { fontWeight: 'bold', color: colors.text, fontSize: 13, marginBottom: 4 },
+    commentUsernameContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    commentUsername: { fontWeight: 'bold', color: colors.text, fontSize: 13 },
     commentText: { color: colors.text, lineHeight: 20 },
     commentFooter: { flexDirection: 'row', alignItems: 'center', marginTop: 6, paddingLeft: 4 },
     commentDate: { fontSize: 11, color: colors.textSecondary },

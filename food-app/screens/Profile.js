@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'; // <-- THE FIX IS HERE
 import * as ImagePicker from 'expo-image-picker';
 import * as Animatable from 'react-native-animatable';
 import { api } from '../utils/api';
@@ -23,8 +23,23 @@ const getStyles = (colors) => StyleSheet.create({
   avatar: { width: 60, height: 60, borderRadius: 30, },
   avatarInitial: { fontSize: 24, color: '#F97316', fontWeight: 'bold', },
   profileInfoContainer: { flex: 1, },
-  name: { fontSize: 20, fontWeight: 'bold', color: colors.text, },
-  email: { fontSize: 14, color: colors.textSecondary, marginTop: 2, },
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  name: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  verifiedBadge: {
+    marginLeft: 6,
+  },
+  email: { 
+    fontSize: 14, 
+    color: colors.textSecondary, 
+    marginTop: 2, 
+  },
   editButton: { paddingVertical: 4, paddingHorizontal: 12, },
   editButtonText: { color: colors.primary, fontSize: 16, fontWeight: '600', },
   menuGroup: { backgroundColor: colors.card, borderRadius: 16, marginBottom: 24, overflow: 'hidden', },
@@ -34,13 +49,9 @@ const getStyles = (colors) => StyleSheet.create({
   chevronIcon: { color: colors.textSecondary, },
   logoutButton: { backgroundColor: colors.logoutBackground, borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', },
   logoutText: { color: colors.logoutText, fontSize: 16, fontWeight: '600', marginLeft: 8, },
-  
-  // Styles for the image viewer modal
   viewerContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
   fullscreenImage: { width: '100%', height: '100%' },
   closeButton: { position: 'absolute', top: 60, right: 20, padding: 10, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20 },
-  
-  // ** NEW STYLES for the custom Action Sheet **
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', },
   actionSheetContainer: { backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, paddingTop: 20, },
   actionButton: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, },
@@ -49,7 +60,6 @@ const getStyles = (colors) => StyleSheet.create({
   cancelButtonText: { color: colors.primary, fontSize: 18, fontWeight: '600', },
 });
 
-// ** NEW COMPONENT: A beautiful, themed action sheet for avatar options **
 const AvatarActionSheet = ({ isVisible, onClose, onView, onChange, hasProfilePic, colors }) => {
     const styles = getStyles(colors);
     return (
@@ -61,7 +71,6 @@ const AvatarActionSheet = ({ isVisible, onClose, onView, onChange, hasProfilePic
         >
             <Pressable style={styles.modalOverlay} onPress={onClose}>
                 <Animatable.View animation="fadeInUpBig" duration={400} style={styles.actionSheetContainer}>
-                    {/* Conditionally show the "View Picture" button */}
                     {hasProfilePic && (
                         <TouchableOpacity style={styles.actionButton} onPress={onView}>
                             <Ionicons name="eye-outline" size={24} color={colors.text} />
@@ -122,7 +131,7 @@ const ProfileScreen = ({ navigation }) => {
     const [cacheBuster, setCacheBuster] = useState(Date.now());
     const [isReviewModalVisible, setIsReviewModalVisible] = useState(false);
     const [isViewerVisible, setIsViewerVisible] = useState(false);
-    const [isActionSheetVisible, setIsActionSheetVisible] = useState(false); // State for the new modal
+    const [isActionSheetVisible, setIsActionSheetVisible] = useState(false); 
     const styles = getStyles(colors);
 
     useFocusEffect(
@@ -199,7 +208,6 @@ const ProfileScreen = ({ navigation }) => {
         ]);
     };
 
-    // This single handler now opens our custom action sheet
     const handleAvatarPress = () => {
         setIsActionSheetVisible(true);
     };
@@ -228,9 +236,20 @@ const ProfileScreen = ({ navigation }) => {
                     </TouchableOpacity>
 
                     <View style={styles.profileInfoContainer}>
-                        <Text style={styles.name} numberOfLines={1}>{user.first_name || ''} {user.last_name || ''}</Text>
+                        <View style={styles.nameContainer}>
+                            <Text style={styles.name} numberOfLines={1}>{user.first_name || ''} {user.last_name || ''}</Text>
+                            {user.isHpVerified && (
+                                <MaterialCommunityIcons 
+                                    name="check-decagram" 
+                                    size={20} 
+                                    color="#3498db" 
+                                    style={styles.verifiedBadge} 
+                                />
+                            )}
+                        </View>
                         <Text style={styles.email} numberOfLines={1}>{user.email}</Text>
                     </View>
+                    
                     <TouchableOpacity style={styles.editButton} onPress={() => navigation.navigate('EditProfile')}>
                         <Text style={styles.editButtonText}>Edit</Text>
                     </TouchableOpacity>

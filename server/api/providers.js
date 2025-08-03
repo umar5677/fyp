@@ -18,7 +18,7 @@ module.exports = function createProvidersRouter(dbPool) {
           END AS provType
         FROM users u
         JOIN verifyHP v ON u.userID = v.userID
-        WHERE u.setProvider = 1;
+        WHERE u.setProvider = 1 AND v.isVerified = 1;
       `;
 
       const [providers] = await dbPool.query(query);

@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
-//import useCalorieBLE from '../hooks/useCalorieBLE'; 
+import useCalorieBLE from '../hooks/useCalorieBLE'; 
 
 import SummaryCard from '../components/SummaryCard';
 import PredictedGlucoseCard from '../components/PredictedGlucoseCard';
@@ -26,7 +26,7 @@ export default function Home({ route }) {
     const styles = getStyles(colors);
     const navigation = useNavigation();
     
-    //const { connectionStatus, startScan, disconnectDevice } = useCalorieBLE();
+    const { connectionStatus, startScan, disconnectDevice } = useCalorieBLE();
 
     const { isProvider, userId } = route.params || {};
 
@@ -155,11 +155,11 @@ export default function Home({ route }) {
                             })}
                         </View>
                         
-                        {/* <BleDeviceCard 
+                        <BleDeviceCard 
                             status={connectionStatus} 
                             onScanPress={startScan} 
                             onDisconnectPress={disconnectDevice} 
-                        /> */}
+                        />
                         
                         <MiniGlucoseChart />
                         

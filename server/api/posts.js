@@ -1,4 +1,3 @@
-// fyp/server/api/posts.js
 const express = require('express');
 const multer = require('multer');
 const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
@@ -28,11 +27,13 @@ function createPostsRouter(dbPool) {
                 SELECT 
                     p.id, p.title, p.content, p.createdAt, p.likeCount, p.commentCount,
                     u.userID, u.first_name, u.last_name, u.pfpUrl,
+                    COALESCE(v.isVerified, 0) AS authorIsHpVerified,
                     GROUP_CONCAT(pi.imageUrl) as images,
                     (SELECT COUNT(*) FROM post_likes WHERE postID = p.id AND userID = ?) > 0 AS likedByUser,
                     (SELECT COUNT(*) FROM post_bookmarks WHERE postID = p.id AND userID = ?) > 0 AS bookmarkedByUser
                 FROM posts p
                 JOIN users u ON p.userID = u.userID
+                LEFT JOIN verifyHP v ON p.userID = v.userID
                 LEFT JOIN post_images pi ON p.id = pi.postID
                 GROUP BY p.id
                 ORDER BY p.createdAt DESC;
@@ -44,7 +45,8 @@ function createPostsRouter(dbPool) {
                 images: post.images ? post.images.split(',') : [],
                 likedByUser: !!post.likedByUser,
                 bookmarkedByUser: !!post.bookmarkedByUser,
-                isOwner: post.userID === currentUserID
+                isOwner: post.userID === currentUserID,
+                authorIsHpVerified: !!post.authorIsHpVerified
             }));
             res.json(formattedPosts);
         } catch (error) {
@@ -61,11 +63,13 @@ function createPostsRouter(dbPool) {
                 SELECT 
                     p.id, p.title, p.content, p.createdAt, p.likeCount, p.commentCount,
                     u.userID, u.first_name, u.last_name, u.pfpUrl,
+                    COALESCE(v.isVerified, 0) AS authorIsHpVerified,
                     GROUP_CONCAT(pi.imageUrl) as images,
                     (SELECT COUNT(*) FROM post_likes WHERE postID = p.id AND userID = ?) > 0 AS likedByUser,
                     TRUE AS bookmarkedByUser
                 FROM posts p
                 JOIN users u ON p.userID = u.userID
+                LEFT JOIN verifyHP v ON p.userID = v.userID
                 LEFT JOIN post_images pi ON p.id = pi.postID
                 JOIN post_bookmarks b ON p.id = b.postID AND b.userID = ?
                 GROUP BY p.id
@@ -78,7 +82,8 @@ function createPostsRouter(dbPool) {
                 images: post.images ? post.images.split(',') : [],
                 likedByUser: !!post.likedByUser,
                 bookmarkedByUser: !!post.bookmarkedByUser,
-                isOwner: post.userID === currentUserID
+                isOwner: post.userID === currentUserID,
+                authorIsHpVerified: !!post.authorIsHpVerified
             }));
             res.json(formattedPosts);
         } catch (error) {
@@ -87,34 +92,37 @@ function createPostsRouter(dbPool) {
         }
     });
 
+    // GET /api/posts/my-posts - Fetch the current user's own posts
     router.get('/my-posts', async (req, res) => {
-    const currentUserID = req.user.userId;
-    try {
-        const query = `
-            SELECT 
-                p.id, p.title, p.content, p.createdAt, p.likeCount, p.commentCount,
-                u.userID, u.first_name, u.last_name, u.pfpUrl,
-                GROUP_CONCAT(pi.imageUrl) as images,
-                (SELECT COUNT(*) FROM post_likes WHERE postID = p.id AND userID = ?) > 0 AS likedByUser,
-                (SELECT COUNT(*) FROM post_bookmarks WHERE postID = p.id AND userID = ?) > 0 AS bookmarkedByUser
-            FROM posts p
-            JOIN users u ON p.userID = u.userID
-            LEFT JOIN post_images pi ON p.id = pi.postID
-            WHERE p.userID = ?
-            GROUP BY p.id
-            ORDER BY p.createdAt DESC;
-        `;
-        // The currentUserID is used three times in this query
-        const [posts] = await dbPool.query(query, [currentUserID, currentUserID, currentUserID]);
+        const currentUserID = req.user.userId;
+        try {
+            const query = `
+                SELECT 
+                    p.id, p.title, p.content, p.createdAt, p.likeCount, p.commentCount,
+                    u.userID, u.first_name, u.last_name, u.pfpUrl,
+                    COALESCE(v.isVerified, 0) AS authorIsHpVerified,
+                    GROUP_CONCAT(pi.imageUrl) as images,
+                    (SELECT COUNT(*) FROM post_likes WHERE postID = p.id AND userID = ?) > 0 AS likedByUser,
+                    (SELECT COUNT(*) FROM post_bookmarks WHERE postID = p.id AND userID = ?) > 0 AS bookmarkedByUser
+                FROM posts p
+                JOIN users u ON p.userID = u.userID
+                LEFT JOIN verifyHP v ON p.userID = v.userID
+                LEFT JOIN post_images pi ON p.id = pi.postID
+                WHERE p.userID = ?
+                GROUP BY p.id
+                ORDER BY p.createdAt DESC;
+            `;
+            const [posts] = await dbPool.query(query, [currentUserID, currentUserID, currentUserID]);
 
-        const formattedPosts = posts.map(post => ({
-            ...post,
-            images: post.images ? post.images.split(',') : [],
-            likedByUser: !!post.likedByUser,
-            bookmarkedByUser: !!post.bookmarkedByUser,
-            isOwner: true // All posts from this endpoint are owned by the user
-        }));
-        res.json(formattedPosts);
+            const formattedPosts = posts.map(post => ({
+                ...post,
+                images: post.images ? post.images.split(',') : [],
+                likedByUser: !!post.likedByUser,
+                bookmarkedByUser: !!post.bookmarkedByUser,
+                isOwner: true,
+                authorIsHpVerified: !!post.authorIsHpVerified
+            }));
+            res.json(formattedPosts);
         } catch (error) {
             console.error('Error fetching user\'s own posts:', error);
             res.status(500).json({ message: 'Error fetching your posts' });
@@ -307,11 +315,13 @@ function createPostsRouter(dbPool) {
                 SELECT 
                     p.id, p.title, p.content, p.createdAt, p.likeCount, p.commentCount,
                     u.userID, u.first_name, u.last_name, u.pfpUrl,
+                    COALESCE(v.isVerified, 0) AS authorIsHpVerified,
                     GROUP_CONCAT(pi.imageUrl) as images,
                     (SELECT COUNT(*) FROM post_likes WHERE postID = p.id AND userID = ?) > 0 AS likedByUser,
                     (SELECT COUNT(*) FROM post_bookmarks WHERE postID = p.id AND userID = ?) > 0 AS bookmarkedByUser
                 FROM posts p
                 JOIN users u ON p.userID = u.userID
+                LEFT JOIN verifyHP v ON p.userID = v.userID
                 LEFT JOIN post_images pi ON p.id = pi.postID
                 WHERE p.id = ?
                 GROUP BY p.id;
@@ -326,7 +336,8 @@ function createPostsRouter(dbPool) {
                 images: post.images ? post.images.split(',') : [], 
                 likedByUser: !!post.likedByUser, 
                 bookmarkedByUser: !!post.bookmarkedByUser,
-                isOwner: post.userID === currentUserID 
+                isOwner: post.userID === currentUserID,
+                authorIsHpVerified: !!post.authorIsHpVerified
             };
             res.json(formattedPost);
         } catch (error) {
@@ -344,14 +355,20 @@ function createPostsRouter(dbPool) {
                 SELECT 
                     c.id, c.commentText, c.createdAt, c.likeCount,
                     u.userID, u.first_name, u.last_name, u.pfpUrl,
+                    COALESCE(v.isVerified, 0) AS commenterIsHpVerified,
                     (SELECT COUNT(*) FROM comment_likes WHERE userID = ? AND commentID = c.id) > 0 AS likedByUser
                 FROM post_comments c
                 JOIN users u ON c.userID = u.userID
+                LEFT JOIN verifyHP v ON c.userID = v.userID
                 WHERE c.postID = ?
                 ORDER BY c.createdAt ASC;
             `;
             const [comments] = await dbPool.query(query, [currentUserID, postId]);
-            const formattedComments = comments.map(c => ({...c, likedByUser: !!c.likedByUser}));
+            const formattedComments = comments.map(c => ({
+                ...c, 
+                likedByUser: !!c.likedByUser,
+                commenterIsHpVerified: !!c.commenterIsHpVerified
+            }));
             res.status(200).json(formattedComments);
         } catch (error) {
             console.error("Error fetching comments:", error);

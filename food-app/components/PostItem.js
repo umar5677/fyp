@@ -1,7 +1,7 @@
 // fyp/food-app/components/PostItem.js
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'; // Import MaterialCommunityIcons
 import dayjs from 'dayjs';
 import { useTheme } from '../context/ThemeContext';
 
@@ -37,7 +37,17 @@ export const PostItem = ({ item, onToggleLike, onToggleBookmark, onReport, navig
                     )}
                 </View>
                 <View style={styles.userInfo}>
-                    <Text style={styles.username}>{item.first_name} {item.last_name}</Text>
+                    <View style={styles.usernameContainer}>
+                        <Text style={styles.username}>{item.first_name} {item.last_name}</Text>
+                        {item.authorIsHpVerified && (
+                             <MaterialCommunityIcons 
+                                name="check-decagram" 
+                                size={16} 
+                                color="#3498db" 
+                                style={styles.verifiedBadge} 
+                            />
+                        )}
+                    </View>
                     <Text style={styles.date}>{dayjs(item.createdAt).format("MMM DD, YYYY · h:mm A")}</Text>
                 </View>
                 {!item.isOwner && (
@@ -91,10 +101,18 @@ const getStyles = (colors) => StyleSheet.create({
         fontSize: 20, color: colors.primary, fontWeight: 'bold'
     },
     userInfo: { flex: 1 },
+    usernameContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 2,
+    },
     username: { fontWeight: 'bold', color: colors.text, fontSize: 16 },
+    verifiedBadge: {
+        marginLeft: 5,
+    },
     date: { fontSize: 12, color: colors.textSecondary },
     content: { fontSize: 15, color: colors.text, lineHeight: 22, paddingHorizontal: 16, marginVertical: 12 },
-    postImage: { width: '100%', height: 250, backgroundColor: colors.border, marginTop: 4 },
+    postImage: { width: 'u', height: 250, backgroundColor: colors.border, marginTop: 4 },
     actionBar: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, paddingHorizontal: 20, borderTopWidth: 1, borderTopColor: colors.border },
     actionButton: { flexDirection: 'row', alignItems: 'center', padding: 8 },
     actionText: { marginLeft: 8, fontSize: 14, fontWeight: '600' },
