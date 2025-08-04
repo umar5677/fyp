@@ -1,13 +1,9 @@
-// /home/ec2-user/fyp/server/api/register.js
-
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const multer = require('multer');
-
-// Re-use the hashPassword function from your login API
 const { hashPassword } = require('./login.js');
 
 function createRegisterRouter(dbPool) {
@@ -45,6 +41,20 @@ function createRegisterRouter(dbPool) {
                 if (!certificateFile) return res.status(400).json({ message: 'A certification document is required.' });
             }
 
+            await connection.beginTransaction();
+
+            const [existingUsers] = await connection.query('SELECT userID, is_verified FROM users WHERE email = ?', [email]);
+            
+            if (existingUsers.length > 0) {
+                if (existingUsers[0].is_verified) {
+                    await connection.rollback();
+                    return res.status(409).json({ message: 'Email address is already registered.' });
+                } else {
+                    console.log(`Removing unverified user (ID: ${existingUsers[0].userID}) to allow new registration for: ${email}`);
+                    await connection.query('DELETE FROM users WHERE userID = ?', [existingUsers[0].userID]);
+                }
+            }
+
             const hashedPassword = await hashPassword(password);
             const verificationToken = crypto.randomBytes(32).toString('hex');
             const setPremium = (userType === 'Premium') ? 1 : 0;
@@ -53,8 +63,6 @@ function createRegisterRouter(dbPool) {
             const premiumExpire = (userType === 'Premium')
                 ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
                 : null;
-            
-            await connection.beginTransaction();
             
             let documentUrl = null;
             if (setProvider === 1 && certificateFile) {
@@ -88,7 +96,7 @@ function createRegisterRouter(dbPool) {
             
             await connection.commit();
             
-            const verificationLink = `https://glucobites.org/verify-email?token=${verificationToken}`; // This link should point to your website's verification page
+            const verificationLink = `https://glucobites.org/verify-email?token=${verificationToken}`;
             const mailOptions = {
                 from: `"GlucoBites" <${process.env.EMAIL_USER}>`,
                 to: email,
@@ -132,9 +140,6 @@ function createRegisterRouter(dbPool) {
         } catch (error) {
             await connection.rollback();
             console.error('Registration error:', error);
-            if (error.code === 'ER_DUP_ENTRY') {
-                return res.status(409).json({ message: 'Email address is already registered.' });
-            }
             res.status(500).json({ message: 'Server error during registration.' });
         } finally {
             if (connection) connection.release();

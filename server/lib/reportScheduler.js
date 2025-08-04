@@ -16,6 +16,27 @@ const { generateAndEmailReport } = require('./reportGenerator');
 const startScheduledReports = () => {
     console.log('Automated Task Scheduler has been started.');
 
+    // Cron job to clean up unverified users daily at midnight.
+    cron.schedule('0 0 * * *', async () => {
+        console.log('Running daily job to clean up unverified users...');
+        try {
+            const [result] = await dbPool.query(
+                `DELETE FROM users 
+                 WHERE is_verified = 0 
+                   AND token_expires_at IS NOT NULL 
+                   AND token_expires_at < UTC_TIMESTAMP()`
+            );
+            
+            if (result.affectedRows > 0) {
+                console.log(`Successfully cleaned up ${result.affectedRows} expired unverified user(s).`);
+            } else {
+                console.log('No expired unverified users to clean up today.');
+            }
+        } catch (error) {
+            console.error('CRITICAL ERROR during daily unverified user cleanup job:', error);
+        }
+    });
+
     // Cron Job to reset the weekly question count for all users.
     // This runs at 00:00 (midnight) every Sunday.
     cron.schedule('0 0 * * 0', async () => {
