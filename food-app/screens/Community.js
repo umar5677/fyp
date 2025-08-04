@@ -7,11 +7,35 @@ import {
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import dayjs from 'dayjs';
 import { api } from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
 import { showMessage } from "react-native-flash-message";
 import { PostItem } from '../components/PostItem';
+
+// --- NEW REUSABLE COMPONENT for the tab switcher ---
+const SegmentedControl = ({ activeTab, onSelect, colors }) => {
+    const styles = getStyles(colors);
+    return (
+        <View style={styles.segmentedControlContainer}>
+            <TouchableOpacity 
+                style={[styles.segmentButton, activeTab === 'all' && styles.segmentButtonActive]}
+                onPress={() => onSelect('all')}
+            >
+                <Text style={[styles.segmentButtonText, activeTab === 'all' && styles.segmentButtonTextActive]}>
+                    All Posts
+                </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+                style={[styles.segmentButton, activeTab === 'my' && styles.segmentButtonActive]}
+                onPress={() => onSelect('my')}
+            >
+                <Text style={[styles.segmentButtonText, activeTab === 'my' && styles.segmentButtonTextActive]}>
+                    My Posts
+                </Text>
+            </TouchableOpacity>
+        </View>
+    );
+};
 
 export default function CommunityScreen() {
     const navigation = useNavigation();
@@ -20,29 +44,38 @@ export default function CommunityScreen() {
 
     const [posts, setPosts] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState('all'); // State to manage which tab is selected
 
-    const fetchPosts = async () => {
+    // --- MODIFIED DATA FETCHING LOGIC ---
+    const fetchData = async () => {
         try {
-            const data = await api.getPosts();
+            let data;
+            if (activeTab === 'all') {
+                data = await api.getPosts();
+            } else {
+                data = await api.getMyPosts();
+            }
             setPosts(data);
         } catch (err) {
-            console.error("Failed to fetch posts", err);
-            Alert.alert("Error", "Could not fetch community posts.");
+            console.error(`Failed to fetch ${activeTab} posts`, err);
+            Alert.alert("Error", `Could not fetch ${activeTab === 'all' ? 'community' : 'your'} posts.`);
         } finally {
             setIsLoading(false);
         }
     };
 
+    // --- UPDATED useFocusEffect to re-fetch when tab changes ---
     useFocusEffect(useCallback(() => {
-        if (!isLoading) setIsLoading(true);
-        fetchPosts();
-    }, []));
+        setIsLoading(true);
+        fetchData();
+    }, [activeTab])); // Dependency array now includes activeTab
     
     const onRefresh = useCallback(() => {
         setIsLoading(true);
-        fetchPosts();
-    }, []);
+        fetchData();
+    }, [activeTab]); // Also add activeTab here for refresh consistency
 
+    // Handler functions remain the same as they operate on the `posts` state
     const handleToggleLike = (postId, wasLiked) => {
         setPosts(currentPosts => 
             currentPosts.map(post => {
@@ -53,9 +86,9 @@ export default function CommunityScreen() {
             })
         );
         if (wasLiked) {
-            api.unlikePost(postId).catch(() => fetchPosts());
+            api.unlikePost(postId).catch(() => fetchData());
         } else {
-            api.likePost(postId).catch(() => fetchPosts());
+            api.likePost(postId).catch(() => fetchData());
         }
     };
 
@@ -69,9 +102,9 @@ export default function CommunityScreen() {
             })
         );
         if (wasBookmarked) {
-            api.unbookmarkPost(postId).catch(() => fetchPosts());
+            api.unbookmarkPost(postId).catch(() => fetchData());
         } else {
-            api.bookmarkPost(postId).catch(() => fetchPosts());
+            api.bookmarkPost(postId).catch(() => fetchData());
         }
     };
 
@@ -87,44 +120,52 @@ export default function CommunityScreen() {
             Alert.alert("Error", error.message || "Could not report this post.");
         }
     };
-
-    if (isLoading) {
-        return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
-    }
+    
+    const renderEmptyComponent = () => (
+        <View style={styles.centerEmpty}>
+            <Ionicons name={activeTab === 'all' ? "people-outline" : "reader-outline"} size={60} color={colors.textSecondary} />
+            <Text style={styles.emptyText}>
+                {activeTab === 'all' 
+                    ? "No posts yet. Be the first to share!" 
+                    : "You haven't created any posts yet."}
+            </Text>
+        </View>
+    );
 
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
                 <View style={styles.logoContainer}>
-                    <View style={styles.logoIcon} />
                     <Text style={styles.headerTitle}>Community</Text>
                 </View>
                 <TouchableOpacity style={styles.createButton} onPress={() => navigation.navigate('AddPost')}>
                     <Ionicons name="add" size={16} color="#FFFFFF"/>
-                    <Text style={styles.createButtonText}>Create Post</Text>
+                    <Text style={styles.createButtonText}>Create</Text>
                 </TouchableOpacity>
             </View>
-            <FlatList
-                data={posts}
-                keyExtractor={(item) => item.id.toString()}
-                renderItem={({ item }) => (
-                    <PostItem 
-                        item={item} 
-                        onToggleLike={handleToggleLike} 
-                        onToggleBookmark={handleToggleBookmark} 
-                        onReport={handleReportPost} 
-                        navigation={navigation} 
-                    />
-                )}
-                contentContainerStyle={styles.list}
-                refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor={colors.primary}/>}
-                ListEmptyComponent={
-                    <View style={styles.centerEmpty}>
-                        <Ionicons name="people-outline" size={60} color={colors.textSecondary} />
-                        <Text style={styles.emptyText}>No posts yet. Be the first to share!</Text>
-                    </View>
-                }
-            />
+
+            <SegmentedControl activeTab={activeTab} onSelect={setActiveTab} colors={colors} />
+
+            {isLoading ? (
+                 <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
+            ) : (
+                <FlatList
+                    data={posts}
+                    keyExtractor={(item) => item.id.toString()}
+                    renderItem={({ item }) => (
+                        <PostItem 
+                            item={item} 
+                            onToggleLike={handleToggleLike} 
+                            onToggleBookmark={handleToggleBookmark} 
+                            onReport={handleReportPost} 
+                            navigation={navigation} 
+                        />
+                    )}
+                    contentContainerStyle={styles.list}
+                    refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor={colors.primary}/>}
+                    ListEmptyComponent={renderEmptyComponent}
+                />
+            )}
         </SafeAreaView>
     );
 }
@@ -135,8 +176,8 @@ const getStyles = (colors) => StyleSheet.create({
         backgroundColor: colors.background,
         paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
     },
-    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    centerEmpty: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 150 },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
+    centerEmpty: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: '30%', paddingHorizontal: 20 },
     header: { 
         paddingVertical: 12, 
         paddingHorizontal: 16, 
@@ -151,19 +192,12 @@ const getStyles = (colors) => StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center'
     },
-    logoIcon: {
-        width: 12,
-        height: 12,
-        borderRadius: 3,
-        backgroundColor: colors.primary,
-        marginRight: 8,
-    },
     headerTitle: { fontSize: 22, fontWeight: 'bold', color: colors.text },
     createButton: {
         backgroundColor: colors.primary,
         paddingHorizontal: 16,
         paddingVertical: 8,
-        borderRadius: 8,
+        borderRadius: 20,
         flexDirection: 'row',
         alignItems: 'center'
     },
@@ -172,6 +206,33 @@ const getStyles = (colors) => StyleSheet.create({
         fontWeight: 'bold',
         marginLeft: 4,
     },
-    list: { paddingVertical: 16 },
-    emptyText: { color: colors.textSecondary, marginTop: 16, fontSize: 16 },
+    segmentedControlContainer: {
+        flexDirection: 'row',
+        padding: 16,
+        paddingTop: 16,
+        paddingBottom: 8,
+        backgroundColor: colors.background,
+    },
+    segmentButton: {
+        flex: 1,
+        paddingVertical: 10,
+        borderRadius: 8,
+        alignItems: 'center',
+        borderBottomWidth: 2,
+        borderBottomColor: 'transparent',
+    },
+    segmentButtonActive: {
+        borderBottomColor: colors.primary,
+    },
+    segmentButtonText: {
+        fontSize: 16,
+        color: colors.textSecondary,
+        fontWeight: '500'
+    },
+    segmentButtonTextActive: {
+        color: colors.primary,
+        fontWeight: 'bold',
+    },
+    list: { paddingHorizontal: 16, paddingTop: 8 },
+    emptyText: { color: colors.textSecondary, marginTop: 16, fontSize: 16, textAlign: 'center' },
 });
