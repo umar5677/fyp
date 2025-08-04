@@ -111,7 +111,7 @@ const startScheduledReports = () => {
 
             // Define the date range for the entire previous month.
             const endDate = new Date();
-            endDate.setDate(0); // This correctly goes to the last day of the previous month.
+            endDate.setDate(0); // Last day of the previous month
             const startDate = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
 
             // Process and email a report for each user.

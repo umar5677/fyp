@@ -24,8 +24,6 @@ const LoadingOverlay = ({ visible, text, colors }) => {
         </Modal>
     );
 };
-
-// --- NEW COMPONENT: The scanning viewfinder and animated line ---
 const ScannerOverlay = ({ colors }) => {
     const styles = getStyles(colors);
     const scanAnimation = useRef(new Animated.Value(0)).current;
@@ -161,7 +159,6 @@ export default function BarcodeScanScreen() {
                     barcodeScannerSettings={{ barcodeTypes: ["ean13", "upc_a", "ean8", "upc_e"] }}
                 />
 
-                {/* Only show the overlay when actively scanning */}
                 {!scanned && <ScannerOverlay colors={colors} />}
 
                 {scanned && !isLoading && productInfo && (
@@ -229,7 +226,6 @@ export default function BarcodeScanScreen() {
     );
 }
 
-// --- FULLY REVAMPED STYLESHEET ---
 const getStyles = (colors) => StyleSheet.create({
     safeArea: { 
         flex: 1, 

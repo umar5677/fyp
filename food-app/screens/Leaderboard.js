@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 
 
-// --- Reusable Utility Components ---
+// Reusable Utility Components
 const SegmentedControl = ({ selectedOption, onSelect, colors }) => {
     const styles = getStyles(colors);
     return (
@@ -47,7 +47,7 @@ const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate, colors }) 
 };
 
 
-// --- UI Components ---
+// UI Components
 const PodiumItem = ({ user, rank, delay }) => {
     const { colors } = useTheme(); const styles = getStyles(colors);
     const size = rank === 1 ? 90 : 70;
@@ -103,7 +103,6 @@ const LeaderboardItem = ({ item, rank, currentUserID, colors }) => {
     );
 };
 
-// --- Main Screen ---
 export default function LeaderboardScreen() {
     const { colors, theme } = useTheme(); const styles = getStyles(colors); const insets = useSafeAreaInsets();
     const [users, setUsers] = useState([]);

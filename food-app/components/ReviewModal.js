@@ -60,8 +60,8 @@ export const ReviewModal = ({ isVisible, onClose }) => {
         try {
             const response = await api.submitReview({ rating, reviewText });
             Alert.alert("Feedback Submitted", response.message);
-            onClose(); // Close the modal on success
-            setRating(0); // Reset state for next time it's opened
+            onClose(); 
+            setRating(0);
             setReviewText('');
         } catch (error) {
             Alert.alert("Error", error.message || "Could not submit your feedback.");
@@ -118,7 +118,6 @@ export const ReviewModal = ({ isVisible, onClose }) => {
     );
 };
 
-// Styles for all components in this file
 const getStyles = (colors) => StyleSheet.create({
     modalOverlay: {
         flex: 1,

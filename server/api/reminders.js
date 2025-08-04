@@ -20,7 +20,6 @@ function createRemindersRouter(dbPool) {
 
     // POST a new reminder for the logged-in user
     router.post('/', async (req, res) => {
-        // Now accepts notificationIDs from the client
         const { label, time, repeatDays, notificationIDs } = req.body;
         if (!label || !time) {
             return res.status(400).json({ message: 'Label and time are required.' });

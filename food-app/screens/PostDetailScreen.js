@@ -64,12 +64,22 @@ const CommentItem = ({ item, colors, onToggleLike, onReport, currentUserId, onDe
                     {isOwnComment ? (
                         <TouchableOpacity style={styles.flagButton} onPress={onDelete}>
                             <Ionicons name="trash-outline" size={14} color={colors.logoutText} />
-                        </TouchableOpacity>
-                    ) : (
-                        <TouchableOpacity style={styles.flagButton} onPress={onReport}>
-                            <Ionicons name="flag-outline" size={14} color={colors.textSecondary} />
-                        </TouchableOpacity>
-                    )}
+                                </TouchableOpacity>
+                            ) : (
+                                <TouchableOpacity
+                                    style={styles.flagButton}
+                                    onPress={onReport}
+                                    // Disable the button if already reported
+                                    disabled={item.reportedByUser}
+                                >
+                                    <Ionicons 
+                                        name={item.reportedByUser ? "flag" : "flag-outline"}
+                                        size={14}
+                                        // Change color based on the reported status
+                                        color={item.reportedByUser ? colors.logoutText : colors.textSecondary}
+                                    />
+                                </TouchableOpacity>
+                            )}
                 </View>
             </View>
         </View>

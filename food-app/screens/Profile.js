@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'; // <-- THE FIX IS HERE
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Animatable from 'react-native-animatable';
 import { api } from '../utils/api';

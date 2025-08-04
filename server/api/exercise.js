@@ -5,7 +5,7 @@ const authenticateToken = require('../lib/authMiddleware.js');
 function createExerciseRouter(dbPool) {
     const router = express.Router();
 
-    // --- Unauthenticated Endpoint for Direct IoT Devices (e.g., Wi-Fi Pi) ---
+    // Unauthenticated Endpoint for Direct IoT Devices
     router.post('/log/iot', async (req, res) => {
         const deviceToken = req.headers['x-device-token'];
         const { calories } = req.body;
@@ -36,7 +36,7 @@ function createExerciseRouter(dbPool) {
         }
     });
 
-    // --- Authenticated Endpoints for the Mobile App ---
+    // Authenticated Endpoints for the Mobile App
     
     // POST /api/exercise/log
     router.post('/log', authenticateToken, async (req, res) => {

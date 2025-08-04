@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { Svg, Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { useTheme } from '../context/ThemeContext';
+import * as Haptics from 'expo-haptics';
 
 const ProgressRing = ({ progress = 0, size = 140, colors }) => {
     const strokeWidth = 18;
@@ -43,9 +44,16 @@ const ProgressRing = ({ progress = 0, size = 140, colors }) => {
     );
 };
 
-export default function SummaryCard({ summary, isLoading }) {
+export default function SummaryCard({ summary, isLoading, onPress }) {
     const { colors } = useTheme(); 
     const styles = getStyles(colors);
+
+    const handlePress = () => {
+        if (onPress) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onPress();
+        }
+    };
 
     if (isLoading || !summary) {
         return (
@@ -59,7 +67,7 @@ export default function SummaryCard({ summary, isLoading }) {
     const progress = summary.goal > 0 ? Math.min(summary.food / summary.goal, 1) : 0; 
 
     return (
-        <View style={styles.card}>
+        <TouchableOpacity style={styles.card} onPress={handlePress} activeOpacity={0.8}>
             <Text style={styles.title}>Calorie Consumed</Text>
             
             <View style={styles.ringContainer}>
@@ -86,7 +94,7 @@ export default function SummaryCard({ summary, isLoading }) {
                     <Text style={styles.detailText}>Left: {remaining.toLocaleString()}</Text>
                 </View>
             </View>
-        </View>
+        </TouchableOpacity>
     );
 }
 

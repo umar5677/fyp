@@ -244,7 +244,7 @@ export default function RemindersScreen({ navigation }) {
 }
 
 const getStyles = (colors) => StyleSheet.create({
-    safeArea: { flex: 1, backgroundColor: colors.background, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0, }, // <--- MODIFIED HERE
+    safeArea: { flex: 1, backgroundColor: colors.background, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0, },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.card },
     headerButton: { padding: 5 },
     title: { color: colors.text, fontSize: 20, fontWeight: 'bold' },

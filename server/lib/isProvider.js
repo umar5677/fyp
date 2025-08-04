@@ -10,5 +10,4 @@ const isProvider = (req, res, next) => {
     }
 };
 
-// You only need to export it once
 module.exports = isProvider;

@@ -19,18 +19,34 @@ function createPostsRouter(dbPool) {
         storage: multerS3({ s3, bucket: process.env.S3_POSTS_BUCKET, metadata: (req, file, cb) => cb(null, { fieldName: file.fieldname }), key: (req, file, cb) => { const userId = req.user.userId; const fullPath = `community-posts/${userId}/${Date.now()}_${file.originalname}`; cb(null, fullPath); } })
     });
 
+    // Helper function to create the common SELECT fields for posts
+    const addSharedPostFields = (currentUserID) => `
+        p.id, p.title, p.content, p.createdAt, p.likeCount, p.commentCount,
+        u.userID, u.first_name, u.last_name, u.pfpUrl,
+        COALESCE(v.isVerified, 0) AS authorIsHpVerified,
+        GROUP_CONCAT(pi.imageUrl) as images,
+        (SELECT COUNT(*) FROM post_likes WHERE postID = p.id AND userID = ${currentUserID}) > 0 AS likedByUser,
+        (SELECT COUNT(*) FROM post_bookmarks WHERE postID = p.id AND userID = ${currentUserID}) > 0 AS bookmarkedByUser,
+        (SELECT COUNT(*) FROM post_reports WHERE postID = p.id AND reportingUserID = ${currentUserID}) > 0 AS reportedByUser
+    `;
+
+    // Helper function to format post data consistently
+    const formatPost = (post, currentUserID) => ({
+        ...post,
+        images: post.images ? post.images.split(',') : [],
+        likedByUser: !!post.likedByUser,
+        bookmarkedByUser: !!post.bookmarkedByUser,
+        reportedByUser: !!post.reportedByUser,
+        authorIsHpVerified: !!post.authorIsHpVerified,
+        isOwner: post.userID === currentUserID
+    });
+
     // GET /api/posts - Fetch the main community feed
     router.get('/', async (req, res) => {
         const currentUserID = req.user.userId;
         try {
             const query = `
-                SELECT 
-                    p.id, p.title, p.content, p.createdAt, p.likeCount, p.commentCount,
-                    u.userID, u.first_name, u.last_name, u.pfpUrl,
-                    COALESCE(v.isVerified, 0) AS authorIsHpVerified,
-                    GROUP_CONCAT(pi.imageUrl) as images,
-                    (SELECT COUNT(*) FROM post_likes WHERE postID = p.id AND userID = ?) > 0 AS likedByUser,
-                    (SELECT COUNT(*) FROM post_bookmarks WHERE postID = p.id AND userID = ?) > 0 AS bookmarkedByUser
+                SELECT ${addSharedPostFields(currentUserID)}
                 FROM posts p
                 JOIN users u ON p.userID = u.userID
                 LEFT JOIN verifyHP v ON p.userID = v.userID
@@ -38,17 +54,8 @@ function createPostsRouter(dbPool) {
                 GROUP BY p.id
                 ORDER BY p.createdAt DESC;
             `;
-            const [posts] = await dbPool.query(query, [currentUserID, currentUserID]);
-
-            const formattedPosts = posts.map(post => ({
-                ...post,
-                images: post.images ? post.images.split(',') : [],
-                likedByUser: !!post.likedByUser,
-                bookmarkedByUser: !!post.bookmarkedByUser,
-                isOwner: post.userID === currentUserID,
-                authorIsHpVerified: !!post.authorIsHpVerified
-            }));
-            res.json(formattedPosts);
+            const [posts] = await dbPool.query(query);
+            res.json(posts.map(post => formatPost(post, currentUserID)));
         } catch (error) {
             console.error('Error fetching posts:', error);
             res.status(500).json({ message: 'Error fetching posts' });
@@ -60,13 +67,7 @@ function createPostsRouter(dbPool) {
         const currentUserID = req.user.userId;
         try {
             const query = `
-                SELECT 
-                    p.id, p.title, p.content, p.createdAt, p.likeCount, p.commentCount,
-                    u.userID, u.first_name, u.last_name, u.pfpUrl,
-                    COALESCE(v.isVerified, 0) AS authorIsHpVerified,
-                    GROUP_CONCAT(pi.imageUrl) as images,
-                    (SELECT COUNT(*) FROM post_likes WHERE postID = p.id AND userID = ?) > 0 AS likedByUser,
-                    TRUE AS bookmarkedByUser
+                SELECT ${addSharedPostFields(currentUserID)}
                 FROM posts p
                 JOIN users u ON p.userID = u.userID
                 LEFT JOIN verifyHP v ON p.userID = v.userID
@@ -75,17 +76,8 @@ function createPostsRouter(dbPool) {
                 GROUP BY p.id
                 ORDER BY b.createdAt DESC;
             `;
-            const [posts] = await dbPool.query(query, [currentUserID, currentUserID]);
-
-            const formattedPosts = posts.map(post => ({
-                ...post,
-                images: post.images ? post.images.split(',') : [],
-                likedByUser: !!post.likedByUser,
-                bookmarkedByUser: !!post.bookmarkedByUser,
-                isOwner: post.userID === currentUserID,
-                authorIsHpVerified: !!post.authorIsHpVerified
-            }));
-            res.json(formattedPosts);
+            const [posts] = await dbPool.query(query, [currentUserID]);
+            res.json(posts.map(post => ({ ...formatPost(post, currentUserID), bookmarkedByUser: true })));
         } catch (error) {
             console.error('Error fetching bookmarked posts:', error);
             res.status(500).json({ message: 'Error fetching bookmarked posts' });
@@ -97,13 +89,7 @@ function createPostsRouter(dbPool) {
         const currentUserID = req.user.userId;
         try {
             const query = `
-                SELECT 
-                    p.id, p.title, p.content, p.createdAt, p.likeCount, p.commentCount,
-                    u.userID, u.first_name, u.last_name, u.pfpUrl,
-                    COALESCE(v.isVerified, 0) AS authorIsHpVerified,
-                    GROUP_CONCAT(pi.imageUrl) as images,
-                    (SELECT COUNT(*) FROM post_likes WHERE postID = p.id AND userID = ?) > 0 AS likedByUser,
-                    (SELECT COUNT(*) FROM post_bookmarks WHERE postID = p.id AND userID = ?) > 0 AS bookmarkedByUser
+                SELECT ${addSharedPostFields(currentUserID)}
                 FROM posts p
                 JOIN users u ON p.userID = u.userID
                 LEFT JOIN verifyHP v ON p.userID = v.userID
@@ -112,17 +98,8 @@ function createPostsRouter(dbPool) {
                 GROUP BY p.id
                 ORDER BY p.createdAt DESC;
             `;
-            const [posts] = await dbPool.query(query, [currentUserID, currentUserID, currentUserID]);
-
-            const formattedPosts = posts.map(post => ({
-                ...post,
-                images: post.images ? post.images.split(',') : [],
-                likedByUser: !!post.likedByUser,
-                bookmarkedByUser: !!post.bookmarkedByUser,
-                isOwner: true,
-                authorIsHpVerified: !!post.authorIsHpVerified
-            }));
-            res.json(formattedPosts);
+            const [posts] = await dbPool.query(query, [currentUserID]);
+            res.json(posts.map(post => ({...formatPost(post, currentUserID), isOwner: true})));
         } catch (error) {
             console.error('Error fetching user\'s own posts:', error);
             res.status(500).json({ message: 'Error fetching your posts' });
@@ -313,12 +290,7 @@ function createPostsRouter(dbPool) {
         try {
             const query = `
                 SELECT 
-                    p.id, p.title, p.content, p.createdAt, p.likeCount, p.commentCount,
-                    u.userID, u.first_name, u.last_name, u.pfpUrl,
-                    COALESCE(v.isVerified, 0) AS authorIsHpVerified,
-                    GROUP_CONCAT(pi.imageUrl) as images,
-                    (SELECT COUNT(*) FROM post_likes WHERE postID = p.id AND userID = ?) > 0 AS likedByUser,
-                    (SELECT COUNT(*) FROM post_bookmarks WHERE postID = p.id AND userID = ?) > 0 AS bookmarkedByUser
+                    ${addSharedPostFields(currentUserID)}
                 FROM posts p
                 JOIN users u ON p.userID = u.userID
                 LEFT JOIN verifyHP v ON p.userID = v.userID
@@ -326,20 +298,11 @@ function createPostsRouter(dbPool) {
                 WHERE p.id = ?
                 GROUP BY p.id;
             `;
-            const [posts] = await dbPool.query(query, [currentUserID, currentUserID, postId]);
+            const [posts] = await dbPool.query(query, [postId]);
             if (posts.length === 0) {
                 return res.status(404).json({ message: "Post not found." });
             }
-            const post = posts[0];
-            const formattedPost = { 
-                ...post, 
-                images: post.images ? post.images.split(',') : [], 
-                likedByUser: !!post.likedByUser, 
-                bookmarkedByUser: !!post.bookmarkedByUser,
-                isOwner: post.userID === currentUserID,
-                authorIsHpVerified: !!post.authorIsHpVerified
-            };
-            res.json(formattedPost);
+            res.json(formatPost(posts[0], currentUserID));
         } catch (error) {
             console.error('Error fetching post details:', error);
             res.status(500).json({ message: 'Error fetching post details' });
@@ -356,17 +319,19 @@ function createPostsRouter(dbPool) {
                     c.id, c.commentText, c.createdAt, c.likeCount,
                     u.userID, u.first_name, u.last_name, u.pfpUrl,
                     COALESCE(v.isVerified, 0) AS commenterIsHpVerified,
-                    (SELECT COUNT(*) FROM comment_likes WHERE userID = ? AND commentID = c.id) > 0 AS likedByUser
+                    (SELECT COUNT(*) FROM comment_likes WHERE userID = ? AND commentID = c.id) > 0 AS likedByUser,
+                    (SELECT COUNT(*) FROM comment_reports WHERE commentID = c.id AND reportingUserID = ?) > 0 AS reportedByUser
                 FROM post_comments c
                 JOIN users u ON c.userID = u.userID
                 LEFT JOIN verifyHP v ON c.userID = v.userID
                 WHERE c.postID = ?
                 ORDER BY c.createdAt ASC;
             `;
-            const [comments] = await dbPool.query(query, [currentUserID, postId]);
+            const [comments] = await dbPool.query(query, [currentUserID, currentUserID, postId]);
             const formattedComments = comments.map(c => ({
                 ...c, 
                 likedByUser: !!c.likedByUser,
+                reportedByUser: !!c.reportedByUser,
                 commenterIsHpVerified: !!c.commenterIsHpVerified
             }));
             res.status(200).json(formattedComments);
@@ -471,7 +436,6 @@ function createPostsRouter(dbPool) {
         try {
             await connection.beginTransaction();
 
-            // First, find the post ID for updating the count and verify ownership
             const [comments] = await connection.query('SELECT userID, postID FROM post_comments WHERE id = ?', [commentId]);
             if (comments.length === 0) {
                 await connection.rollback();
@@ -481,16 +445,12 @@ function createPostsRouter(dbPool) {
             const comment = comments[0];
             const postId = comment.postID;
 
-            // Security check: ensure the user making the request is the owner of the comment
             if (comment.userID !== userId) {
                 await connection.rollback();
                 return res.status(403).json({ message: 'Forbidden: You are not the owner of this comment.' });
             }
             
-            // Delete the comment itself
             await connection.query('DELETE FROM post_comments WHERE id = ?', [commentId]);
-
-            // After deleting, update the commentCount on the parent post
             await connection.query('UPDATE posts SET commentCount = (SELECT COUNT(*) FROM post_comments WHERE postID = ?) WHERE id = ?', [postId, postId]);
             
             await connection.commit();

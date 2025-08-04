@@ -49,7 +49,6 @@ export default function AskQuestionScreen() {
         });
     }, [colors, navigation]);
     
-    // ** THIS FIXES THE useFocusEffect ERROR **
     useFocusEffect(
       useCallback(() => {
         const loadData = async () => {

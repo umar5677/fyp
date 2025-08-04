@@ -17,7 +17,6 @@ function createProviderRouter(dbPool) {
     router.get('/questions', async (req, res) => {
         const providerId = req.user.userId;
         try {
-            // Find pending questions assigned to this provider that they have not deleted
             const [questions] = await dbPool.query(`
                 SELECT 
                     q.questionID, q.questionText, q.createdAt,
@@ -47,7 +46,6 @@ function createProviderRouter(dbPool) {
         const providerId = req.user.userId;
 
         try {
-            // Selects questions answered by this provider that they have not deleted
             const [questions] = await dbPool.query(`
                 SELECT 
                     q.questionID, q.questionText, q.answerText, q.createdAt, q.answeredAt,

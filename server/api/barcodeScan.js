@@ -63,8 +63,7 @@ function createBarcodeRouter(dbPool) {
             res.json({ success: true, product: productInfo });
 
         } catch (err) {
-            // Handle cases where the API call itself fails (e.g., network error)
-            // or if the barcode is invalid, which might result in a 404 from the API
+            // Handle cases where the API call itself fails
             if (err.response && err.response.status === 404) {
                  return res.status(404).json({ success: false, message: 'Product not found.' });
             }

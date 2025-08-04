@@ -1,4 +1,3 @@
-// food-app/components/MiniGlucoseChart.js
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
@@ -41,6 +40,10 @@ const getStyles = (colors) => StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
     },
+    viewMoreButton: { // Style for the touchable area around the text
+        paddingVertical: 4,
+        paddingHorizontal: 2,
+    },
     viewMoreText: {
         color: colors.primary,
         fontSize: 14,
@@ -70,7 +73,6 @@ const getStyles = (colors) => StyleSheet.create({
 
 export default function MiniGlucoseChart() {
     const { colors } = useTheme();
-    // Now this call works because getStyles is defined above
     const styles = getStyles(colors);
     const navigation = useNavigation();
     const [chartData, setChartData] = useState(null);
@@ -192,16 +194,18 @@ export default function MiniGlucoseChart() {
     };
 
     return (
-        <TouchableOpacity 
-            style={styles.card} 
-            onPress={() => navigation.navigate('FullGlucoseChart')}
-            activeOpacity={0.8}
-        >
+        <View style={styles.card}>
             <View style={styles.cardHeader}>
                 <Text style={styles.title}>Today's Glucose</Text>
-                <Text style={styles.viewMoreText}>View More →</Text>
+                <TouchableOpacity 
+                    style={styles.viewMoreButton}
+                    onPress={() => navigation.navigate('FullGlucoseChart')}
+                    activeOpacity={0.7}
+                >
+                    <Text style={styles.viewMoreText}>View More →</Text>
+                </TouchableOpacity>
             </View>
             {renderContent()}
-        </TouchableOpacity>
+        </View>
     );
 }

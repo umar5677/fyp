@@ -2,7 +2,6 @@ const crypto = require('crypto');
 
 const ALGORITHM = 'aes-256-gcm';
 
-// The key must be a 32-byte buffer.
 const KEY = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
 
 // The Initialization Vector (IV) must be 16 bytes for this algorithm.
@@ -42,7 +41,6 @@ function decrypt(encryptedData) {
         return decrypted;
     } catch (error) {
         console.error("Decryption failed for a message:", error.message);
-        // If decryption fails (e.g., key change, corrupted data),
         return '[Message cannot be decrypted]';
     }
 }

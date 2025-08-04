@@ -33,7 +33,7 @@ async function authenticatedFetch(endpoint, options = {}) {
         const refreshToken = await SecureStore.getItemAsync('refreshToken');
         if (!refreshToken) {
             Alert.alert("Session Expired", "Please log in again.");
-            // Ideally, you would navigate to the login screen here
+            // navigate to the login screen here
             throw new Error("Session Expired");
         }
         try {
@@ -83,7 +83,7 @@ async function authenticatedFetch(endpoint, options = {}) {
 }
 
 export const api = {
-    // --- Public Routes (No Token Required) ---
+    //  Public Routes (No Token Required) 
     login: (credentials) => fetch(`${BASE_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

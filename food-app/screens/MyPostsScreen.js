@@ -45,7 +45,6 @@ export default function MyPostsScreen() {
         setIsRefreshing(true);
     }, []);
 
-    // The handler functions can remain largely the same, but they now update the `myPosts` state
     const handleToggleLike = (postId, wasLiked) => {
         setMyPosts(currentPosts => 
             currentPosts.map(post => {

@@ -12,7 +12,6 @@ import { useTheme } from '../context/ThemeContext';
 import { showMessage } from "react-native-flash-message";
 import { PostItem } from '../components/PostItem';
 
-// --- NEW REUSABLE COMPONENT for the tab switcher ---
 const SegmentedControl = ({ activeTab, onSelect, colors }) => {
     const styles = getStyles(colors);
     return (
@@ -46,7 +45,6 @@ export default function CommunityScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('all'); // State to manage which tab is selected
 
-    // --- MODIFIED DATA FETCHING LOGIC ---
     const fetchData = async () => {
         try {
             let data;
@@ -64,7 +62,6 @@ export default function CommunityScreen() {
         }
     };
 
-    // --- UPDATED useFocusEffect to re-fetch when tab changes ---
     useFocusEffect(useCallback(() => {
         setIsLoading(true);
         fetchData();

@@ -51,8 +51,18 @@ export const PostItem = ({ item, onToggleLike, onToggleBookmark, onReport, navig
                     <Text style={styles.date}>{dayjs(item.createdAt).format("MMM DD, YYYY · h:mm A")}</Text>
                 </View>
                 {!item.isOwner && (
-                    <TouchableOpacity onPress={handleFlagPress} style={styles.flagIconButton}>
-                        <Ionicons name="flag-outline" size={22} color={colors.textSecondary} />
+                    <TouchableOpacity
+                        onPress={handleFlagPress}
+                        style={styles.flagIconButton}
+                        // Disable the button visually and functionally if already reported
+                        disabled={item.reportedByUser} 
+                    >
+                        <Ionicons 
+                            name={item.reportedByUser ? "flag" : "flag-outline"} 
+                            size={22} 
+                            // Change color based on the reported status
+                            color={item.reportedByUser ? colors.logoutText : colors.textSecondary} 
+                        />
                     </TouchableOpacity>
                 )}
             </View>

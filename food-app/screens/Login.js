@@ -13,7 +13,7 @@ import {
   Platform
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { api } from '../utils/api'; // Correctly import the centralized api utility
+import { api } from '../utils/api';
 
 const Login = ({ navigation }) => {
     const [email, setEmail] = useState('');
@@ -177,7 +177,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         fontSize: 16,
     },
-    // This style is now used by the new TouchableOpacity
     signupLink: {
         color: '#F97316',
         fontWeight: 'bold',

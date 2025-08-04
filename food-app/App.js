@@ -77,7 +77,7 @@ const AppNavigator = () => {
                     options={{ 
                         headerShown: true,
                         title: 'Forgot Password',
-                        headerStyle: { backgroundColor: colors.card }, // Ensure it's themable
+                        headerStyle: { backgroundColor: colors.card },
                         headerTintColor: colors.text,
                      }} 
                 />

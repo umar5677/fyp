@@ -3,7 +3,6 @@ const { RekognitionClient, DetectTextCommand } = require('@aws-sdk/client-rekogn
 const router = express.Router();
 
 // Initialize the Rekognition client directly within this module.
-// It will reuse the credentials and region from the environment variables.
 const rekognitionClient = new RekognitionClient({
     region: process.env.AWS_REGION,
     credentials: {

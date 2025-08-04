@@ -82,7 +82,6 @@ const SpeedDialButton = ({ navigation, userId }) => {
   };
 
   return (
-    // This container just centers the main button and acts as a relative
     <View style={styles.container}>
       <Animated.View style={[styles.secondaryButtonContainer, bloodSugarStyle]}>
         <TouchableOpacity style={[styles.secondaryButton, styles.bloodSugarButton]} onPress={() => handleActionPress('bloodSugar')} activeOpacity={1}>

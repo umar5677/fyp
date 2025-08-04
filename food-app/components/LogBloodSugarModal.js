@@ -13,8 +13,6 @@ import { useTheme } from '../context/ThemeContext';
 
 const TAG_OPTIONS = ['Fasting', 'Pre-Meal', 'Post-Meal'];
 
-// --- Internal Components ---
-
 const TagSelector = ({ selectedTag, onSelectTag, colors }) => {
     const styles = getStyles(colors);
     return (
@@ -132,7 +130,6 @@ const EditModal = ({ modalVisible, setModalVisible, log, onSave, onDelete, onSca
                                     <Ionicons name="image-outline" size={20} color={colors.primary} /><Text style={styles.methodButtonText}>Upload</Text>
                                 </TouchableOpacity>
                             </View>
-                            {/* This is the full-width button that was causing issues */}
                             <TouchableOpacity style={[styles.methodButton, styles.fullWidthButton]} onPress={handleSyncFromDevice}>
                                 <Ionicons name="bluetooth" size={20} color={colors.primary} /><Text style={styles.methodButtonText}>Sync Device</Text>
                             </TouchableOpacity>
@@ -149,8 +146,6 @@ const EditModal = ({ modalVisible, setModalVisible, log, onSave, onDelete, onSca
     );
 };
 
-
-// --- Main Exported Component ---
 export default function LogBloodSugarModal({ log, onSave, onDelete, onScan, onAddNew, onSyncDevice, clearSelectedLog }) {
     const { colors } = useTheme();
     const styles = getStyles(colors);
@@ -195,7 +190,6 @@ export default function LogBloodSugarModal({ log, onSave, onDelete, onScan, onAd
     );
 }
 
-// --- Styles ---
 const getStyles = (colors) => StyleSheet.create({
     fabContainer: { position: 'absolute', bottom: 35, right: 25, alignItems: 'center' },
     fab: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', elevation: 6, shadowColor: '#000', shadowRadius: 4, shadowOpacity: 0.3, shadowOffset: { height: 3, width: 0 } },

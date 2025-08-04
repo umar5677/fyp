@@ -304,14 +304,13 @@ const getStyles = (colors) => StyleSheet.create({
         marginTop: 12,
         textAlign: 'right',
     },
-    // --- STYLES FOR THE DELETE BUTTON ---
     deleteButton: {
         marginTop: 20,
         paddingVertical: 12,
         borderRadius: 10,
-        backgroundColor: colors.logoutBackground, // Uses theme's danger/logout color
+        backgroundColor: colors.logoutBackground, 
         alignItems: 'center',
-        marginHorizontal: 10, // Gives it some side padding
+        marginHorizontal: 10,
     },
     deleteButtonText: {
         color: colors.logoutText,
