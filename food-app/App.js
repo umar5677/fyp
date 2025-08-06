@@ -14,6 +14,7 @@ import { ThemeProvider, useTheme } from './context/ThemeContext';
 import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 import ProviderHistoryScreen from './screens/ProviderHistoryScreen';
 import BookmarkedPostsScreen from './screens/BookmarkedPostsScreen';
+import { api } from './utils/api';
 
 // Font Imports
 import {
@@ -219,10 +220,26 @@ export default function App() {
   }
 
   useEffect(() => {
+    const notificationReceivedSubscription = Notifications.addNotificationReceivedListener(async (notification) => {
+        const { type, message } = notification.request.content.data;
+        
+        if (type === 'reminder' && message) {
+            try {
+                await api.addNotification({ message: message, type: 'info' });
+            } catch (error) {
+                console.error("Failed to save reminder as an in-app notification:", error);
+            }
+        }
+    });
+      
     const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
       console.log('Notification tapped!', response.notification.request.content.data);
     });
-    return () => responseSubscription.remove();
+      
+    return () => {
+        notificationReceivedSubscription.remove();
+        responseSubscription.remove();
+    };
   }, []);
 
   if (!fontsLoaded && !fontError) {

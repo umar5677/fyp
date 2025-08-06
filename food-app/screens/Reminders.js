@@ -1,9 +1,8 @@
-// fyp/food-app/screens/Reminders.js
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, Switch, TouchableOpacity,
   Modal, TextInput, Platform, StyleSheet, SafeAreaView, Alert,
-  StatusBar // <--- ADDED: Import StatusBar here
+  StatusBar
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -71,7 +70,12 @@ export default function RemindersScreen({ navigation }) {
             for (const day of repeatDays) {
                 const trigger = { weekday: dayMap[day], hour, minute, repeats: true };
                 const id = await Notifications.scheduleNotificationAsync({
-                    content: { title: "GlucoBites Reminder", body: label, sound: 'default' },
+                    content: {
+                        title: "GlucoBites Reminder",
+                        body: label,
+                        sound: 'default',
+                        data: { type: 'reminder', message: label }
+                    },
                     trigger,
                 });
                 notificationIDs.push(id);
@@ -83,7 +87,12 @@ export default function RemindersScreen({ navigation }) {
                 triggerDate.setDate(triggerDate.getDate() + 1);
             }
             const id = await Notifications.scheduleNotificationAsync({
-                content: { title: "GlucoBites Reminder", body: label, sound: 'default' },
+                content: {
+                    title: "GlucoBites Reminder",
+                    body: label,
+                    sound: 'default',
+                    data: { type: 'reminder', message: label }
+                },
                 trigger: triggerDate,
             });
             notificationIDs.push(id);
@@ -110,7 +119,7 @@ export default function RemindersScreen({ navigation }) {
                 await cancelNotification(reminder.notificationIDs);
                 await api.updateReminder(id, { ...reminder, isEnabled: false, notificationIDs: [] });
             }
-            await loadReminders(); // Refresh the whole list to ensure sync
+            await loadReminders();
         } catch (error) {
             Alert.alert("Error", "Could not update the reminder.");
             loadReminders();
