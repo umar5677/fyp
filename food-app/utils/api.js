@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
 
-const BASE_URL = 'https://api.glucobites.org/api';
+const BASE_URL = 'http://192.168.10.120:3000/api';
 
 const handlePublicFetch = async (response) => {
     const data = await response.json();
@@ -167,6 +167,7 @@ export const api = {
     deletePost: (postId) => authenticatedFetch(`/posts/${postId}`, { method: 'DELETE' }),
     likePost: (postId) => authenticatedFetch(`/posts/${postId}/like`, { method: 'POST' }),
     reportPost: (postId) => authenticatedFetch(`/posts/${postId}/report`, { method: 'POST' }),
+    unreportPost: (postId) => authenticatedFetch(`/posts/${postId}/report`, { method: 'DELETE' }),
     bookmarkPost: (postId) => authenticatedFetch(`/posts/${postId}/bookmark`, { method: 'POST' }),
     unbookmarkPost: (postId) => authenticatedFetch(`/posts/${postId}/bookmark`, { method: 'DELETE' }),
     getBookmarkedPosts: () => authenticatedFetch('/posts/bookmarked'),
@@ -176,6 +177,7 @@ export const api = {
     likeComment: (commentId) => authenticatedFetch(`/posts/comments/${commentId}/like`, { method: 'POST' }),
     unlikeComment: (commentId) => authenticatedFetch(`/posts/comments/${commentId}/like`, { method: 'DELETE' }),
     reportComment: (commentId) => authenticatedFetch(`/posts/comments/${commentId}/report`, { method: 'POST' }),
+    unreportComment: (commentId) => authenticatedFetch(`/posts/comments/${commentId}/report`, { method: 'DELETE' }),
     deleteComment: (commentId) => authenticatedFetch(`/posts/comments/${commentId}`, { method: 'DELETE' }),
 
     // Settings, Providers & Reports

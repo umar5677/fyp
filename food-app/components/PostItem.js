@@ -1,30 +1,13 @@
-// fyp/food-app/components/PostItem.js
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'; // Import MaterialCommunityIcons
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 import { useTheme } from '../context/ThemeContext';
 
-// Note the "export const" - this is a NAMED export, which is what we want.
-export const PostItem = ({ item, onToggleLike, onToggleBookmark, onReport, navigation }) => {
+export const PostItem = ({ item, onToggleLike, onToggleBookmark, onToggleReport, navigation }) => {
     const { colors } = useTheme();
     const styles = getStyles(colors);
     const authorInitial = item.first_name ? item.first_name[0].toUpperCase() : '?';
-
-    const handleFlagPress = () => {
-        Alert.alert(
-            "Report Post",
-            `Are you sure you want to report this post by ${item.first_name} ${item.last_name}?`,
-            [
-                { text: "Cancel", style: "cancel" },
-                { 
-                    text: "Report", 
-                    style: "destructive", 
-                    onPress: () => onReport(item.id) 
-                }
-            ]
-        );
-    };
 
     return (
         <View style={styles.card}>
@@ -52,15 +35,12 @@ export const PostItem = ({ item, onToggleLike, onToggleBookmark, onReport, navig
                 </View>
                 {!item.isOwner && (
                     <TouchableOpacity
-                        onPress={handleFlagPress}
+                        onPress={() => onToggleReport(item.id, item.reportedByUser)}
                         style={styles.flagIconButton}
-                        // Disable the button visually and functionally if already reported
-                        disabled={item.reportedByUser} 
                     >
                         <Ionicons 
                             name={item.reportedByUser ? "flag" : "flag-outline"} 
                             size={22} 
-                            // Change color based on the reported status
                             color={item.reportedByUser ? colors.logoutText : colors.textSecondary} 
                         />
                     </TouchableOpacity>
@@ -122,7 +102,7 @@ const getStyles = (colors) => StyleSheet.create({
     },
     date: { fontSize: 12, color: colors.textSecondary },
     content: { fontSize: 15, color: colors.text, lineHeight: 22, paddingHorizontal: 16, marginVertical: 12 },
-    postImage: { width: 'u', height: 250, backgroundColor: colors.border, marginTop: 4 },
+    postImage: { width: '100%', height: 250, backgroundColor: colors.border, marginTop: 4 },
     actionBar: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, paddingHorizontal: 20, borderTopWidth: 1, borderTopColor: colors.border },
     actionButton: { flexDirection: 'row', alignItems: 'center', padding: 8 },
     actionText: { marginLeft: 8, fontSize: 14, fontWeight: '600' },

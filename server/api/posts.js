@@ -283,6 +283,22 @@ function createPostsRouter(dbPool) {
         }
     });
 
+    // DELETE /api/posts/:postId/report - Un-report a post
+    router.delete('/:postId/report', async (req, res) => {
+        const { postId } = req.params;
+        const reportingUserId = req.user.userId;
+        try {
+            await dbPool.query(
+                'DELETE FROM post_reports WHERE postID = ? AND reportingUserID = ?',
+                [postId, reportingUserId]
+            );
+            res.status(200).json({ success: true, message: 'Your report has been retracted.' });
+        } catch (error) {
+            console.error(`Error un-reporting post ${postId} by user ${reportingUserId}:`, error);
+            res.status(500).json({ message: "An error occurred while retracting the report." });
+        }
+    });
+
     // GET /api/posts/:postId - Get details for a single post
     router.get('/:postId', async (req, res) => {
         const { postId } = req.params;
@@ -425,6 +441,22 @@ function createPostsRouter(dbPool) {
         } catch (error) {
             console.error(`Error reporting comment ${commentId} by user ${reportingUserId}:`, error);
             res.status(500).json({ message: "Failed to report comment." });
+        }
+    });
+
+    // DELETE /api/posts/comments/:commentId/report - Un-report a comment
+    router.delete('/comments/:commentId/report', async (req, res) => {
+        const { commentId } = req.params;
+        const reportingUserId = req.user.userId;
+        try {
+            await dbPool.query(
+                'DELETE FROM comment_reports WHERE commentID = ? AND reportingUserID = ?',
+                [commentId, reportingUserId]
+            );
+            res.status(200).json({ success: true, message: 'Your report has been retracted.' });
+        } catch (error) {
+            console.error(`Error un-reporting comment ${commentId} by user ${reportingUserId}:`, error);
+            res.status(500).json({ message: "An error occurred while retracting the report." });
         }
     });
 

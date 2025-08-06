@@ -1,4 +1,3 @@
-// fyp/food-app/screens/PostDetailScreen.js
 import React, { useState, useCallback, useEffect } from "react";
 import { 
     View, Text, Image, StyleSheet, SafeAreaView,
@@ -18,7 +17,7 @@ import { showMessage } from "react-native-flash-message";
 
 dayjs.extend(relativeTime);
 
-const CommentItem = ({ item, colors, onToggleLike, onReport, currentUserId, onDelete }) => {
+const CommentItem = ({ item, colors, onToggleLike, onToggleReport, currentUserId, onDelete }) => {
     const styles = getStyles(colors);
     const isOwnComment = item.userID === currentUserId;
     const commenterInitial = item.first_name ? item.first_name[0].toUpperCase() : '?';
@@ -64,22 +63,19 @@ const CommentItem = ({ item, colors, onToggleLike, onReport, currentUserId, onDe
                     {isOwnComment ? (
                         <TouchableOpacity style={styles.flagButton} onPress={onDelete}>
                             <Ionicons name="trash-outline" size={14} color={colors.logoutText} />
-                                </TouchableOpacity>
-                            ) : (
-                                <TouchableOpacity
-                                    style={styles.flagButton}
-                                    onPress={onReport}
-                                    // Disable the button if already reported
-                                    disabled={item.reportedByUser}
-                                >
-                                    <Ionicons 
-                                        name={item.reportedByUser ? "flag" : "flag-outline"}
-                                        size={14}
-                                        // Change color based on the reported status
-                                        color={item.reportedByUser ? colors.logoutText : colors.textSecondary}
-                                    />
-                                </TouchableOpacity>
-                            )}
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity 
+                            style={styles.flagButton} 
+                            onPress={() => onToggleReport(item.id, item.reportedByUser)}
+                        >
+                            <Ionicons 
+                                name={item.reportedByUser ? "flag" : "flag-outline"}
+                                size={14}
+                                color={item.reportedByUser ? colors.logoutText : colors.textSecondary}
+                            />
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
         </View>
@@ -254,22 +250,38 @@ export default function PostDetailScreen() {
         }
     };
 
-    const handleReportComment = (commentId) => {
-        Alert.alert( "Report Comment", "Are you sure you want to report this comment for review?",
-            [
-                { text: "Cancel", style: "cancel" },
-                { text: "Report", style: "destructive",
-                    onPress: async () => {
-                        try {
-                            const response = await api.reportComment(commentId);
-                            showMessage({ message: response.message, type: "success", icon: "success" });
-                        } catch (error) {
-                            Alert.alert("Error", error.message || "Could not report this comment.");
-                        }
-                    },
+    const handleToggleReportComment = (commentId, wasReported) => {
+        const action = wasReported ? "un-report" : "report";
+        const confirmationTitle = wasReported ? "Retract Report" : "Report Comment";
+        const confirmationMessage = wasReported
+            ? "Are you sure you want to retract your report for this comment?"
+            : `Are you sure you want to ${action} this comment for review?`;
+
+        Alert.alert(confirmationTitle, confirmationMessage, [
+            { text: "Cancel", style: "cancel" },
+            { 
+                text: wasReported ? "Retract" : "Report", 
+                style: "destructive",
+                onPress: async () => {
+                    setComments(currentComments => 
+                        currentComments.map(comment =>
+                            comment.id === commentId ? { ...comment, reportedByUser: !wasReported } : comment
+                        )
+                    );
+
+                    try {
+                        const response = wasReported 
+                            ? await api.unreportComment(commentId)
+                            : await api.reportComment(commentId);
+                            
+                        showMessage({ message: response.message, type: "success" });
+                    } catch (error) {
+                        Alert.alert("Error", error.message || `Could not ${action} this comment.`);
+                        fetchData();
+                    }
                 },
-            ]
-        );
+            },
+        ]);
     };
 
     const openImageViewer = (imageUri) => {
@@ -303,7 +315,7 @@ export default function PostDetailScreen() {
                             item={item} 
                             colors={colors}
                             onToggleLike={() => handleToggleCommentLike(item.id, item.likedByUser)}
-                            onReport={() => handleReportComment(item.id)}
+                            onToggleReport={() => handleToggleReportComment(item.id, item.reportedByUser)}
                             currentUserId={currentUser.userID}
                             onDelete={() => handleDeleteComment(item.id)}
                         />

@@ -43,7 +43,7 @@ export default function CommunityScreen() {
 
     const [posts, setPosts] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('all'); // State to manage which tab is selected
+    const [activeTab, setActiveTab] = useState('all');
 
     const fetchData = async () => {
         try {
@@ -65,14 +65,13 @@ export default function CommunityScreen() {
     useFocusEffect(useCallback(() => {
         setIsLoading(true);
         fetchData();
-    }, [activeTab])); // Dependency array now includes activeTab
+    }, [activeTab]));
     
     const onRefresh = useCallback(() => {
         setIsLoading(true);
         fetchData();
-    }, [activeTab]); // Also add activeTab here for refresh consistency
+    }, [activeTab]);
 
-    // Handler functions remain the same as they operate on the `posts` state
     const handleToggleLike = (postId, wasLiked) => {
         setPosts(currentPosts => 
             currentPosts.map(post => {
@@ -105,17 +104,38 @@ export default function CommunityScreen() {
         }
     };
 
-    const handleReportPost = async (postId) => {
-        try {
-            const response = await api.reportPost(postId);
-            showMessage({
-                message: response.message,
-                type: 'success',
-                icon: 'success'
-            });
-        } catch (error) {
-            Alert.alert("Error", error.message || "Could not report this post.");
-        }
+    const handleToggleReportPost = (postId, wasReported) => {
+        const action = wasReported ? "un-report" : "report";
+        const confirmationTitle = wasReported ? "Retract Report" : "Report Post";
+        const confirmationMessage = wasReported 
+            ? "Are you sure you want to retract your report for this post?"
+            : `Are you sure you want to ${action} this post?`;
+    
+        Alert.alert(confirmationTitle, confirmationMessage, [
+            { text: "Cancel", style: "cancel" },
+            { 
+                text: wasReported ? "Retract" : "Report", 
+                style: "destructive", 
+                onPress: async () => {
+                    setPosts(currentPosts => 
+                        currentPosts.map(post => 
+                            post.id === postId ? { ...post, reportedByUser: !wasReported } : post
+                        )
+                    );
+    
+                    try {
+                        const response = wasReported 
+                            ? await api.unreportPost(postId) 
+                            : await api.reportPost(postId);
+                            
+                        showMessage({ message: response.message, type: "success" });
+                    } catch (error) {
+                        Alert.alert("Error", error.message || `Could not ${action} this post.`);
+                        fetchData(); 
+                    }
+                }
+            }
+        ]);
     };
     
     const renderEmptyComponent = () => (
@@ -154,7 +174,7 @@ export default function CommunityScreen() {
                             item={item} 
                             onToggleLike={handleToggleLike} 
                             onToggleBookmark={handleToggleBookmark} 
-                            onReport={handleReportPost} 
+                            onToggleReport={handleToggleReportPost} 
                             navigation={navigation} 
                         />
                     )}
