@@ -66,34 +66,49 @@ export default function RemindersScreen({ navigation }) {
         const notificationIDs = [];
 
         if (repeatDays.length > 0) {
-            const dayMap = { 'Sun': 1, 'Mon': 2, 'Tue': 3, 'Wed': 4, 'Thu': 5, 'Fri': 6, 'Sat': 7 };
-            for (const day of repeatDays) {
-                const trigger = { weekday: dayMap[day], hour, minute, repeats: true };
-                const id = await Notifications.scheduleNotificationAsync({
-                    content: {
-                        title: "GlucoBites Reminder",
-                        body: label,
-                        sound: 'default',
-                        data: { type: 'reminder', message: label }
-                    },
-                    trigger,
-                });
-                notificationIDs.push(id);
+            const dayMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+            const selectedDays = repeatDays.map(day => dayMap[day]);
+            
+            for (let i = 0; i < 60; i++) {
+                const checkDate = new Date();
+                checkDate.setDate(checkDate.getDate() + i);
+
+                if (selectedDays.includes(checkDate.getDay())) {
+                    let triggerDate = new Date(checkDate);
+                    triggerDate.setHours(hour, minute, 1, 0);
+
+                    if (triggerDate > new Date()) {
+                        const id = await Notifications.scheduleNotificationAsync({
+                            content: {
+                                title: "GlucoBites Reminder",
+                                body: label,
+                                sound: 'default',
+                                data: { type: 'reminder', message: label }
+                            },
+                            // --- THE FIX IS HERE ---
+                            trigger: { type: 'date', date: triggerDate },
+                        });
+                        notificationIDs.push(id);
+                    }
+                }
             }
         } else {
             let triggerDate = new Date();
-            triggerDate.setHours(hour, minute, 0, 0);
-            if (triggerDate < new Date()) { // If time is in the past, schedule for tomorrow
+            triggerDate.setHours(hour, minute, 1, 0); 
+            
+            if (triggerDate < new Date()) {
                 triggerDate.setDate(triggerDate.getDate() + 1);
             }
+            
             const id = await Notifications.scheduleNotificationAsync({
-                content: {
-                    title: "GlucoBites Reminder",
-                    body: label,
+                content: { 
+                    title: "GlucoBites Reminder", 
+                    body: label, 
                     sound: 'default',
                     data: { type: 'reminder', message: label }
                 },
-                trigger: triggerDate,
+                // --- AND THE FIX IS HERE ---
+                trigger: { type: 'date', date: triggerDate },
             });
             notificationIDs.push(id);
         }
@@ -101,6 +116,7 @@ export default function RemindersScreen({ navigation }) {
     };
 
     const cancelNotification = async (notificationIDs = []) => {
+        await Notifications.cancelAllScheduledNotificationsAsync();
         for (const id of notificationIDs) {
             await Notifications.cancelScheduledNotificationAsync(id);
         }
@@ -109,16 +125,19 @@ export default function RemindersScreen({ navigation }) {
     const toggleReminder = async (id, reminder) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         const newIsEnabled = !reminder.isEnabled;
+
+        if (reminder.notificationIDs && reminder.notificationIDs.length > 0) {
+            await cancelNotification(reminder.notificationIDs);
+        }
+
         setReminders(reminders.map(r => r.reminderID === id ? { ...r, isEnabled: newIsEnabled } : r));
 
         try {
+            let newIDs = [];
             if (newIsEnabled) {
-                const newIDs = await scheduleNotification(reminder.time, reminder.label, reminder.repeatDays);
-                await api.updateReminder(id, { ...reminder, isEnabled: true, notificationIDs: newIDs });
-            } else {
-                await cancelNotification(reminder.notificationIDs);
-                await api.updateReminder(id, { ...reminder, isEnabled: false, notificationIDs: [] });
+                newIDs = await scheduleNotification(reminder.time, reminder.label, reminder.repeatDays);
             }
+            await api.updateReminder(id, { ...reminder, isEnabled: newIsEnabled, notificationIDs: newIDs });
             await loadReminders();
         } catch (error) {
             Alert.alert("Error", "Could not update the reminder.");
@@ -140,9 +159,9 @@ export default function RemindersScreen({ navigation }) {
             const newNotificationIDs = await scheduleNotification(timeStr, newLabel.trim(), newRepeat);
 
             if (editingReminder) {
-                await api.updateReminder(editingReminder.reminderID, { ...editingReminder, label: newLabel.trim(), time: timeStr, repeatDays: newRepeat, notificationIDs: newNotificationIDs });
+                await api.updateReminder(editingReminder.reminderID, { ...editingReminder, label: newLabel.trim(), time: timeStr, repeatDays: newRepeat, notificationIDs: newNotificationIDs, isEnabled: true });
             } else {
-                await api.addReminder({ label: newLabel.trim(), time: timeStr, repeatDays: newRepeat, notificationIDs: newNotificationIDs });
+                await api.addReminder({ label: newLabel.trim(), time: timeStr, repeatDays: newRepeat, notificationIDs: newNotificationIDs, isEnabled: true });
             }
             resetModal();
             loadReminders();
@@ -154,7 +173,9 @@ export default function RemindersScreen({ navigation }) {
     const handleDelete = () => {
         const deleteReminderAsync = async () => {
             try {
-                await cancelNotification(editingReminder.notificationIDs);
+                if (editingReminder.notificationIDs) {
+                    await cancelNotification(editingReminder.notificationIDs);
+                }
                 await api.deleteReminder(editingReminder.reminderID);
                 resetModal();
                 loadReminders();
@@ -183,7 +204,7 @@ export default function RemindersScreen({ navigation }) {
     };
 
     const formatRepeatDays = (repeat = []) => {
-        if (repeat.length === 0) return 'Once';
+        if (!repeat || repeat.length === 0) return 'Once';
         if (repeat.length === 7) return 'Every day';
         return repeat.join(', ');
     };
@@ -267,7 +288,7 @@ const getStyles = (colors) => StyleSheet.create({
     reminderTextDisabled: { color: colors.textSecondary },
     emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, marginTop: '20%'},
     emptyText: { marginTop: 16, fontSize: 18, fontWeight: '600', color: colors.textSecondary },
-    emptySubText: { marginTop: 8, color: colors.border, fontSize: 14, textAlign: 'center' },
+    emptySubText: { marginTop: 8, color: colors.textSecondary, fontSize: 14, textAlign: 'center' },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
     modalContent: { backgroundColor: colors.card, padding: 20, borderRadius: 16, width: '100%' },
     modalTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', color: colors.text },

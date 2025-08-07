@@ -36,7 +36,7 @@ export default function AddPostScreen() {
         let result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: true,
-            quality: 0.7,
+            quality: 1.0,
         });
 
         if (!result.canceled) {

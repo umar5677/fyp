@@ -1,6 +1,6 @@
 // screens/Leaderboard.js
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator, SafeAreaView, TouchableOpacity, RefreshControl, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, SafeAreaView, TouchableOpacity, RefreshControl, Alert, Modal } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
@@ -10,7 +10,7 @@ import { Calendar } from 'react-native-calendars';
 import moment from 'moment';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-
+import { Avatar } from '../components/Avatar'; // Import the new reusable Avatar component
 
 // Reusable Utility Components
 const SegmentedControl = ({ selectedOption, onSelect, colors }) => {
@@ -46,7 +46,6 @@ const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate, colors }) 
     return (<Modal visible={isVisible} transparent={true} animationType="fade"><TouchableOpacity style={styles.calendarBackdrop} onPress={onClose} activeOpacity={1}><View style={[styles.calendarModalContainer, { backgroundColor: colors.card }]}><Calendar current={moment(initialDate).format('YYYY-MM-DD')} maxDate={today} onDayPress={(day) => { const newDate = new Date(day.timestamp); newDate.setMinutes(newDate.getMinutes() + newDate.getTimezoneOffset()); onDayPress(newDate); }} theme={calendarTheme} /></View></TouchableOpacity></Modal>);
 };
 
-
 // UI Components
 const PodiumItem = ({ user, rank, delay }) => {
     const { colors } = useTheme(); const styles = getStyles(colors);
@@ -55,8 +54,8 @@ const PodiumItem = ({ user, rank, delay }) => {
     const medalColor = rank === 1 ? '#FFD700' : rank === 2 ? '#C0C0C0' : '#CD7F32';
     return (
         <Animatable.View animation="bounceIn" duration={800} delay={delay} style={[styles.podiumItem, { marginTop: rank === 1 ? 0 : 20 }]}>
-            <View>
-                <Image source={{ uri: user.avatar }} style={[styles.podiumAvatar, { width: size, height: size, borderRadius: size / 2 }]} />
+            <View style={styles.podiumAvatarContainer}>
+                <Avatar source={user.avatar} name={user.name} size={size} />
                 <MaterialCommunityIcons name={medalIcon} size={30} color={medalColor} style={styles.podiumMedal} />
             </View>
             <Text style={styles.podiumName} numberOfLines={1}>{user.name}</Text>
@@ -66,7 +65,7 @@ const PodiumItem = ({ user, rank, delay }) => {
 };
 
 const Podium = ({ topThree }) => {
-    const styles = getStyles({}).podiumContainer; // Get styles without theme for layout
+    const styles = getStyles({}).podiumContainer;
     const rank2 = topThree.find((u, i) => i === 1);
     const rank1 = topThree.find((u, i) => i === 0);
     const rank3 = topThree.find((u, i) => i === 2);
@@ -84,7 +83,9 @@ const UserRankCard = ({ user, rank, colors }) => {
     return (
         <Animatable.View animation="fadeInUp" duration={500} delay={500} style={styles.userRankCard}>
             <Text style={styles.userRankText}>{rank > 0 ? rank : '--'}</Text>
-            <Image source={{ uri: user.avatar }} style={styles.avatar} />
+            <View style={styles.avatarWrapper}>
+                <Avatar source={user.avatar} name="You" size={48} />
+            </View>
             <Text style={styles.name} numberOfLines={1}>You</Text>
             <View style={styles.caloriesBox}><Text style={styles.caloriesText}>{user.calories || 0} kcal</Text></View>
         </Animatable.View>
@@ -96,7 +97,9 @@ const LeaderboardItem = ({ item, rank, currentUserID, colors }) => {
     return (
         <View style={[styles.listItem, isCurrentUser && styles.youRowFull]}>
             <View style={styles.rankCol}><Text style={[styles.rankText, isCurrentUser && styles.youText]}>{rank}</Text></View>
-            <Image source={{ uri: item.avatar }} style={styles.avatar} />
+            <View style={styles.avatarWrapper}>
+                <Avatar source={item.avatar} name={item.name} size={48} />
+            </View>
             <Text style={[styles.name, isCurrentUser && styles.youText]} numberOfLines={1}>{isCurrentUser ? "You" : item.name}</Text>
             <View style={styles.caloriesBox}><Text style={styles.caloriesText}>{item.calories} kcal</Text></View>
         </View>
@@ -118,72 +121,76 @@ export default function LeaderboardScreen() {
         try {
             const [profileRes, leaderboardUsers] = await Promise.all([
                 api.getProfile(),
-                api.getLeaderboard(fetchPeriod, fetchDate.toISOString())
+                api.getLeaderboard(fetchPeriod, fetchDate) // Pass date object directly
             ]);
             setCurrentUser(profileRes.user); setUsers(leaderboardUsers);
         } catch (error) { console.error('Error fetching leaderboard data:', error); Alert.alert("Error", "Could not load leaderboard data.");
         } finally { setIsLoading(false); setIsRefreshing(false); }
     }, [isRefreshing]);
 
-    useFocusEffect(useCallback(() => { fetchLeaderboard(period, displayDate); }, [period, displayDate, fetchLeaderboard]));
-    const onRefresh = useCallback(() => setIsRefreshing(true), []);
+    useFocusEffect(useCallback(() => { fetchLeaderboard(period, displayDate); }, [period, displayDate]));
+    
+    const onRefresh = useCallback(() => {
+        setIsRefreshing(true);
+        // This will trigger the useFocusEffect to re-fetch with the same period and date
+    }, []);
     
     const isFutureNavigationDisabled = moment(displayDate).endOf(period.toLowerCase()).isSameOrAfter(moment(), 'day');
+    
     const changeDate = (amount) => {
         if (amount > 0 && isFutureNavigationDisabled) return;
         const newDate = moment(displayDate);
         if (period === 'Day') newDate.add(amount, 'days'); else if (period === 'Week') newDate.add(amount, 'weeks'); else if (period === 'Month') newDate.add(amount, 'months');
         setDisplayDate(newDate.toDate());
     };
+    
     const onDaySelectFromCalendar = (date) => { setDisplayDate(date); setIsCalendarVisible(false); };
     
     const topThree = users.slice(0, 3);
     const remainingUsers = users.slice(3);
-    const currentUserData = users.find(u => u.userID === currentUser?.userID) || { avatar: currentUser?.pfpUrl, calories: 0 };
+    const currentUserData = users.find(u => u.userID === currentUser?.userID) || { avatar: currentUser?.pfpUrl, name: `${currentUser?.first_name} ${currentUser?.last_name}`, calories: 0 };
     const currentUserRank = users.findIndex(u => u.userID === currentUser?.userID) + 1;
 
     return (
         <SafeAreaView style={styles.container}>
             <CalendarModal isVisible={isCalendarVisible} onClose={() => setIsCalendarVisible(false)} onDayPress={onDaySelectFromCalendar} initialDate={displayDate} colors={colors} />
             
-            {isLoading && !isRefreshing ? (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={colors.primary} />
-                </View>
-            ) : (
-                <FlatList
-                    data={remainingUsers}
-                    keyExtractor={(item) => item.userID.toString()}
-                    renderItem={({ item, index }) => <LeaderboardItem item={item} rank={index + 4} currentUserID={currentUser?.userID} colors={colors}/>}
-                    contentContainerStyle={{ paddingBottom: 100 }}
-                    refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-                    ListHeaderComponent={
-                        <>
-                            <LinearGradient colors={theme === 'dark' ? ['#1E293B', '#111827'] : [colors.primary, '#F9A825']} style={[styles.header, { paddingTop: insets.top }]}>
-                                <Text style={styles.headerTitle}>🏆 Leaderboard</Text>
-                                <DateNavigator date={displayDate} onDateChange={changeDate} period={period} onOpenCalendar={() => setIsCalendarVisible(true)} colors={{ ...colors, text: '#FFF', border: 'rgba(255,255,255,0.3)' }} isFutureDisabled={isFutureNavigationDisabled} />
-                                <SegmentedControl options={['Day', 'Week', 'Month']} selectedOption={period} onSelect={setPeriod} colors={{ ...colors, background: 'rgba(0,0,0,0.2)', card: '#fff', textSecondary: '#FDE68A', primary: '#1E293B' }} />
-                            </LinearGradient>
+            <FlatList
+                data={remainingUsers}
+                keyExtractor={(item) => item.userID.toString()}
+                renderItem={({ item, index }) => <LeaderboardItem item={item} rank={index + 4} currentUserID={currentUser?.userID} colors={colors}/>}
+                contentContainerStyle={{ paddingBottom: 100 }}
+                refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+                ListHeaderComponent={
+                    <>
+                        <LinearGradient colors={theme === 'dark' ? ['#1E293B', '#111827'] : [colors.primary, '#F9A825']} style={[styles.header, { paddingTop: insets.top }]}>
+                            <Text style={styles.headerTitle}>🏆 Leaderboard</Text>
+                            <DateNavigator date={displayDate} onDateChange={changeDate} period={period} onOpenCalendar={() => setIsCalendarVisible(true)} colors={{ ...colors, text: '#FFF', border: 'rgba(255,255,255,0.3)' }} isFutureDisabled={isFutureNavigationDisabled} />
+                            <SegmentedControl options={['Day', 'Week', 'Month']} selectedOption={period} onSelect={setPeriod} colors={{ ...colors, background: 'rgba(0,0,0,0.2)', card: '#fff', textSecondary: '#FDE68A', primary: '#1E293B' }} />
+                        </LinearGradient>
 
-                            {users.length > 0 ? (
-                                <>
-                                    <Podium topThree={topThree} />
-                                    <View style={styles.listContainer}>
-                                        <UserRankCard user={currentUserData} rank={currentUserRank} colors={colors} />
-                                        {remainingUsers.length > 0 && <Text style={styles.listTitle}>All Rankings</Text>}
-                                    </View>
-                                </>
-                            ) : (
-                                <View style={styles.emptyContainer}>
-                                    <Ionicons name="trophy-outline" size={60} color={colors.textSecondary} />
-                                    <Text style={styles.emptyText}>No rankings found.</Text>
-                                    <Text style={styles.emptySubText}>There is no exercise data logged for this period.</Text>
+                        {isLoading && !isRefreshing ? (
+                            <View style={styles.loadingContainer}>
+                                <ActivityIndicator size="large" color={colors.primary} />
+                            </View>
+                        ) : users.length > 0 ? (
+                            <>
+                                <Podium topThree={topThree} />
+                                <View style={styles.listContainer}>
+                                    <UserRankCard user={currentUserData} rank={currentUserRank} colors={colors} />
+                                    {remainingUsers.length > 0 && <Text style={styles.listTitle}>All Rankings</Text>}
                                 </View>
-                            )}
-                        </>
-                    }
-                />
-            )}
+                            </>
+                        ) : (
+                            <View style={styles.emptyContainer}>
+                                <Ionicons name="trophy-outline" size={60} color={colors.textSecondary} />
+                                <Text style={styles.emptyText}>No rankings found.</Text>
+                                <Text style={styles.emptySubText}>There is no exercise data logged for this period.</Text>
+                            </View>
+                        )}
+                    </>
+                }
+            />
         </SafeAreaView>
     );
 }
@@ -191,10 +198,9 @@ export default function LeaderboardScreen() {
 // Styles
 const getStyles = (colors) => StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
-    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 50 },
     header: { paddingBottom: 20 },
     headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#FFF', textAlign: 'center', marginVertical: 10, textShadowColor: 'rgba(0,0,0,0.2)', textShadowOffset: {width: 1, height: 1}, textShadowRadius: 2 },
-    controlsContainer: { backgroundColor: colors.card, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, },
     segmentedControlContainer: { flexDirection: 'row', borderRadius: 12, overflow: 'hidden', padding: 4, marginHorizontal: 16 },
     segment: { flex: 1, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
     segmentActive: { backgroundColor: '#fff', shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 5 },
@@ -205,18 +211,26 @@ const getStyles = (colors) => StyleSheet.create({
     dateNavigatorText: { fontSize: 16, fontWeight: 'bold', color: '#FFF' },
     podiumContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-end', paddingHorizontal: 16, marginTop: -30, marginBottom: 20, },
     podiumItem: { alignItems: 'center', flex: 1 },
-    podiumAvatar: { borderWidth: 4, borderColor: 'white' },
+    podiumAvatarContainer: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4, },
+        shadowOpacity: 0.2,
+        shadowRadius: 5,
+        elevation: 10,
+        backgroundColor: colors.card,
+        borderRadius: 90,
+    },
     podiumMedal: { position: 'absolute', bottom: 0, right: 0, backgroundColor: 'rgba(255,255,255,0.8)', borderRadius: 15, padding: 2 },
     podiumName: { fontWeight: 'bold', color: colors.text, marginTop: 8, fontSize: 14, textAlign: 'center' },
     podiumCalories: { color: colors.primary, fontWeight: 'bold', fontSize: 13, marginTop: 2 },
     listContainer: { paddingHorizontal: 16 },
     listTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text, marginTop: 16, marginBottom: 8 },
-    userRankCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary, borderRadius: 12, padding: 12, marginVertical: 6, },
-    userRankText: { fontSize: 16, fontWeight: 'bold', color: '#FFF', width: 40, textAlign: 'center' },
+    userRankCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 12, padding: 12, marginVertical: 6, borderWidth: 1, borderColor: colors.primary },
+    userRankText: { fontSize: 16, fontWeight: 'bold', color: colors.text, width: 40, textAlign: 'center' },
     listItem: { flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: colors.card, borderRadius: 12, marginVertical: 6 },
     rankCol: { width: 40, alignItems: 'center' },
     rankText: { fontSize: 16, fontWeight: 'bold', color: colors.textSecondary },
-    avatar: { width: 48, height: 48, borderRadius: 24, marginHorizontal: 12, borderWidth: 1, borderColor: colors.border, },
+    avatarWrapper: { marginHorizontal: 12, },
     name: { flex: 1, fontSize: 16, fontWeight: '600', color: colors.text, },
     caloriesBox: { backgroundColor: colors.background, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
     caloriesText: { fontWeight: 'bold', color: colors.text, fontSize: 14 },

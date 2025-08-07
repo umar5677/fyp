@@ -107,21 +107,24 @@ function createExerciseRouter(dbPool) {
     
     // GET /api/exercise/leaderboard
     router.get('/leaderboard', authenticateToken, async (req, res) => {
-        const { period = 'Day' } = req.query; 
+        const { period = 'Day', date } = req.query; // Added date query param
+        const targetDate = date ? new Date(date) : new Date();
 
         let dateFilterSql = '';
         switch (period) {
             case 'Week':
-                dateFilterSql = 'AND YEARWEEK(el.timestamp, 1) = YEARWEEK(CURDATE(), 1)';
+                dateFilterSql = `AND YEARWEEK(el.timestamp, 1) = YEARWEEK(?, 1)`;
                 break;
             case 'Month':
-                dateFilterSql = 'AND YEAR(el.timestamp) = YEAR(CURDATE()) AND MONTH(el.timestamp) = MONTH(CURDATE())';
+                dateFilterSql = `AND YEAR(el.timestamp) = YEAR(?) AND MONTH(el.timestamp) = MONTH(?)`;
                 break;
             case 'Day':
             default:
-                dateFilterSql = 'AND DATE(el.timestamp) = CURDATE()';
+                dateFilterSql = `AND DATE(el.timestamp) = DATE(?)`;
                 break;
         }
+
+        const queryParams = period === 'Month' ? [targetDate, targetDate] : [targetDate];
 
         try {
             const query = `
@@ -139,12 +142,12 @@ function createExerciseRouter(dbPool) {
                 LIMIT 20;
             `;
 
-            const [leaderboardData] = await dbPool.query(query);
+            const [leaderboardData] = await dbPool.query(query, queryParams);
             
             const formattedLeaderboard = leaderboardData.map(user => ({
                 userID: user.userID,
                 name: `${user.first_name} ${user.last_name}`,
-                avatar: user.pfpUrl || `https://i.pravatar.cc/150?u=${user.userID}`,
+                avatar: user.pfpUrl, // No fallback to Pravatar, just send the pfpUrl or null
                 calories: Math.round(user.totalCalories),
             }));
 
