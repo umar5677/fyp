@@ -10,7 +10,7 @@ import { Calendar } from 'react-native-calendars';
 import moment from 'moment';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Avatar } from '../components/Avatar'; // Import the new reusable Avatar component
+import { Avatar } from '../components/Avatar';
 
 // Reusable Utility Components
 const SegmentedControl = ({ selectedOption, onSelect, colors }) => {
@@ -45,6 +45,7 @@ const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate, colors }) 
     const calendarTheme = { calendarBackground: colors.card, textSectionTitleColor: colors.textSecondary, dayTextColor: colors.text, todayTextColor: colors.primary, selectedDayBackgroundColor: colors.primary, selectedDayTextColor: '#FFFFFF', monthTextColor: colors.text, indicatorColor: colors.primary, arrowColor: colors.primary, 'stylesheet.calendar.header': { week: { marginTop: 5, flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.border } } };
     return (<Modal visible={isVisible} transparent={true} animationType="fade"><TouchableOpacity style={styles.calendarBackdrop} onPress={onClose} activeOpacity={1}><View style={[styles.calendarModalContainer, { backgroundColor: colors.card }]}><Calendar current={moment(initialDate).format('YYYY-MM-DD')} maxDate={today} onDayPress={(day) => { const newDate = new Date(day.timestamp); newDate.setMinutes(newDate.getMinutes() + newDate.getTimezoneOffset()); onDayPress(newDate); }} theme={calendarTheme} /></View></TouchableOpacity></Modal>);
 };
+
 
 // UI Components
 const PodiumItem = ({ user, rank, delay }) => {
@@ -84,23 +85,26 @@ const UserRankCard = ({ user, rank, colors }) => {
         <Animatable.View animation="fadeInUp" duration={500} delay={500} style={styles.userRankCard}>
             <Text style={styles.userRankText}>{rank > 0 ? rank : '--'}</Text>
             <View style={styles.avatarWrapper}>
-                <Avatar source={user.avatar} name="You" size={48} />
+                {/* Use the user's name for the Avatar fallback */}
+                <Avatar source={user.avatar} name={user.name} size={48} />
             </View>
-            <Text style={styles.name} numberOfLines={1}>You</Text>
+            {/* Display the user's actual name */}
+            <Text style={styles.name} numberOfLines={1}>{user.name}</Text>
             <View style={styles.caloriesBox}><Text style={styles.caloriesText}>{user.calories || 0} kcal</Text></View>
         </Animatable.View>
     );
 }
 
 const LeaderboardItem = ({ item, rank, currentUserID, colors }) => {
-    const styles = getStyles(colors); const isCurrentUser = item.userID === currentUserID;
+    const styles = getStyles(colors);
     return (
-        <View style={[styles.listItem, isCurrentUser && styles.youRowFull]}>
-            <View style={styles.rankCol}><Text style={[styles.rankText, isCurrentUser && styles.youText]}>{rank}</Text></View>
+        <View style={styles.listItem}>
+            <View style={styles.rankCol}><Text style={styles.rankText}>{rank}</Text></View>
             <View style={styles.avatarWrapper}>
                 <Avatar source={item.avatar} name={item.name} size={48} />
             </View>
-            <Text style={[styles.name, isCurrentUser && styles.youText]} numberOfLines={1}>{isCurrentUser ? "You" : item.name}</Text>
+            {/* The logic to check for the current user is now removed from here */}
+            <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
             <View style={styles.caloriesBox}><Text style={styles.caloriesText}>{item.calories} kcal</Text></View>
         </View>
     );
@@ -121,7 +125,7 @@ export default function LeaderboardScreen() {
         try {
             const [profileRes, leaderboardUsers] = await Promise.all([
                 api.getProfile(),
-                api.getLeaderboard(fetchPeriod, fetchDate) // Pass date object directly
+                api.getLeaderboard(fetchPeriod, fetchDate)
             ]);
             setCurrentUser(profileRes.user); setUsers(leaderboardUsers);
         } catch (error) { console.error('Error fetching leaderboard data:', error); Alert.alert("Error", "Could not load leaderboard data.");
@@ -132,7 +136,6 @@ export default function LeaderboardScreen() {
     
     const onRefresh = useCallback(() => {
         setIsRefreshing(true);
-        // This will trigger the useFocusEffect to re-fetch with the same period and date
     }, []);
     
     const isFutureNavigationDisabled = moment(displayDate).endOf(period.toLowerCase()).isSameOrAfter(moment(), 'day');
@@ -147,10 +150,20 @@ export default function LeaderboardScreen() {
     const onDaySelectFromCalendar = (date) => { setDisplayDate(date); setIsCalendarVisible(false); };
     
     const topThree = users.slice(0, 3);
-    const remainingUsers = users.slice(3);
-    const currentUserData = users.find(u => u.userID === currentUser?.userID) || { avatar: currentUser?.pfpUrl, name: `${currentUser?.first_name} ${currentUser?.last_name}`, calories: 0 };
-    const currentUserRank = users.findIndex(u => u.userID === currentUser?.userID) + 1;
+    // Find the current user's data *within* the leaderboard list.
+    const currentUserInList = users.find(u => u.userID === currentUser?.userID);
+    const currentUserRank = currentUserInList ? users.findIndex(u => u.userID === currentUser?.userID) + 1 : 0;
+    
+    // Create the data for the user's own rank card. Use their profile data as a fallback.
+    const currentUserDataForCard = currentUserInList || { 
+        avatar: currentUser?.pfpUrl, 
+        name: `${currentUser?.first_name || ''} ${currentUser?.last_name || ''}`.trim(), 
+        calories: 0 
+    };
 
+    // Filter out the current user from the main list if they appear outside the top 3.
+    const remainingUsers = users.slice(3).filter(u => u.userID !== currentUser?.userID);
+    
     return (
         <SafeAreaView style={styles.container}>
             <CalendarModal isVisible={isCalendarVisible} onClose={() => setIsCalendarVisible(false)} onDayPress={onDaySelectFromCalendar} initialDate={displayDate} colors={colors} />
@@ -177,7 +190,7 @@ export default function LeaderboardScreen() {
                             <>
                                 <Podium topThree={topThree} />
                                 <View style={styles.listContainer}>
-                                    <UserRankCard user={currentUserData} rank={currentUserRank} colors={colors} />
+                                    <UserRankCard user={currentUserDataForCard} rank={currentUserRank} colors={colors} />
                                     {remainingUsers.length > 0 && <Text style={styles.listTitle}>All Rankings</Text>}
                                 </View>
                             </>
@@ -218,7 +231,7 @@ const getStyles = (colors) => StyleSheet.create({
         shadowRadius: 5,
         elevation: 10,
         backgroundColor: colors.card,
-        borderRadius: 90,
+        borderRadius: 90, // Large enough to cover the biggest avatar
     },
     podiumMedal: { position: 'absolute', bottom: 0, right: 0, backgroundColor: 'rgba(255,255,255,0.8)', borderRadius: 15, padding: 2 },
     podiumName: { fontWeight: 'bold', color: colors.text, marginTop: 8, fontSize: 14, textAlign: 'center' },
