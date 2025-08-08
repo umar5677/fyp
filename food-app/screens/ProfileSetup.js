@@ -1,4 +1,3 @@
-// food-app/screens/ProfileSetup.js
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Platform, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -33,10 +32,11 @@ export default function ProfileSetupScreen({ navigation }) {
     const [height, setHeight] = useState('');
     const [gender, setGender] = useState(null);
     const [diabetesType, setDiabetesType] = useState(null);
-    const [isInsulin, setIsInsulin] = useState(false); // State for the switch
+    const [isInsulin, setIsInsulin] = useState(false);
     const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isFetchingName, setIsFetchingName] = useState(true);
+    const [hasConsented, setHasConsented] = useState(false); // State for the consent checkbox
 
     useFocusEffect(
         useCallback(() => {
@@ -68,6 +68,11 @@ export default function ProfileSetupScreen({ navigation }) {
             return;
         }
 
+        if (!hasConsented) {
+            Alert.alert('Consent Required', 'You must consent to data usage to continue.');
+            return;
+        }
+
         setIsLoading(true);
         try {
             const formattedDob = dob.toISOString().split('T')[0];
@@ -77,7 +82,7 @@ export default function ProfileSetupScreen({ navigation }) {
                 height, 
                 diabetesType, 
                 gender,
-                isInsulin // Send isInsulin state to the API
+                isInsulin
             });
             navigation.replace('MainApp');
         } catch (error) {
@@ -102,14 +107,13 @@ export default function ProfileSetupScreen({ navigation }) {
 
                 <Animatable.View animation="fadeInUp" delay={400} style={styles.card}>
                     <Text style={styles.fieldHeader}>Personal Details</Text>
-
+                    {/* Date of Birth, Weight, Height inputs are unchanged */}
                     <TouchableOpacity style={styles.inputContainer} onPress={() => setDatePickerVisibility(true)}>
                         <Ionicons name="calendar-outline" size={20} color="#6B7280" style={styles.icon}/>
                         <Text style={[styles.inputText, { color: dob ? '#111827' : '#9CA3AF'}]}>
                             {dob ? dob.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Date of Birth'}
                         </Text>
                     </TouchableOpacity>
-
                     <View style={styles.inputRow}>
                         <View style={styles.inputContainer}>
                             <Ionicons name="barbell-outline" size={20} color="#6B7280" style={styles.icon}/>
@@ -125,19 +129,18 @@ export default function ProfileSetupScreen({ navigation }) {
 
                 <Animatable.View animation="fadeInUp" delay={500} style={styles.card}>
                     <Text style={styles.fieldHeader}>Health Information</Text>
+                    {/* Gender, Diabetes Type, Insulin Switch are unchanged */}
                     <Text style={styles.label}>Gender</Text>
                     <View style={styles.radioGroup}>
                         <RadioButton label="Male" selected={gender === 'Male'} onSelect={() => setGender('Male')} />
                         <RadioButton label="Female" selected={gender === 'Female'} onSelect={() => setGender('Female')} />
                     </View>
-                    
                     <Text style={styles.label}>Diabetes Type</Text>
                     <View style={styles.radioGroup}>
                         <RadioButton label="Type 1" selected={diabetesType === 1} onSelect={() => setDiabetesType(1)} />
                         <RadioButton label="Type 2" selected={diabetesType === 2} onSelect={() => setDiabetesType(2)} />
                         <RadioButton label="None" selected={diabetesType === 0} onSelect={() => setDiabetesType(0)} />
                     </View>
-
                     <View style={styles.switchContainer}>
                         <Text style={styles.label}>Are you using insulin?</Text>
                         <Switch
@@ -147,6 +150,17 @@ export default function ProfileSetupScreen({ navigation }) {
                             thumbColor={isInsulin ? PRIMARY_COLOR : '#f4f3f4'}
                         />
                     </View>
+                </Animatable.View>
+
+                <Animatable.View animation="fadeInUp" delay={550} style={styles.consentContainer}>
+                    <TouchableOpacity onPress={() => setHasConsented(!hasConsented)} style={styles.checkbox}>
+                        <Ionicons 
+                            name={hasConsented ? "checkbox" : "square-outline"} 
+                            size={24} 
+                            color={hasConsented ? PRIMARY_COLOR : "#6B7280"}
+                        />
+                    </TouchableOpacity>
+                    <Text style={styles.consentText}>I consent to GlucoBites using my data to provide personalized insights and features.</Text>
                 </Animatable.View>
 
                 {isLoading ? (
@@ -226,4 +240,19 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginTop: 10,
     },
+    consentContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 10,
+        paddingHorizontal: 10,
+    },
+    checkbox: {
+        marginRight: 12,
+    },
+    consentText: {
+        flex: 1,
+        fontSize: 14,
+        color: '#4B5563',
+        lineHeight: 20,
+    }
 });
