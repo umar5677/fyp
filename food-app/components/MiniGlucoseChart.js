@@ -4,10 +4,10 @@ import { LineChart } from 'react-native-chart-kit';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { api } from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
+import { Ionicons } from '@expo/vector-icons';
 
 const screenWidth = Dimensions.get('window').width;
 
-// Helper to format the time label
 const formatTimeLabel = (dateString) => {
     return new Date(dateString).toLocaleTimeString('en-US', {
         hour: 'numeric',
@@ -35,12 +35,19 @@ const getStyles = (colors) => StyleSheet.create({
         alignItems: 'center',
         marginBottom: 10,
     },
+    titleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    titleIcon: {
+        marginRight: 8,
+    },
     title: {
         color: colors.text,
         fontSize: 18,
         fontWeight: 'bold',
     },
-    viewMoreButton: { // Style for the touchable area around the text
+    viewMoreButton: {
         paddingVertical: 4,
         paddingHorizontal: 2,
     },
@@ -69,7 +76,6 @@ const getStyles = (colors) => StyleSheet.create({
         lineHeight: 20,
     },
 });
-
 
 export default function MiniGlucoseChart() {
     const { colors } = useTheme();
@@ -196,7 +202,10 @@ export default function MiniGlucoseChart() {
     return (
         <View style={styles.card}>
             <View style={styles.cardHeader}>
-                <Text style={styles.title}>Today's Glucose</Text>
+                <View style={styles.titleContainer}>
+                    <Ionicons name="pulse" size={24} color={colors.primary} style={styles.titleIcon} />
+                    <Text style={styles.title}>Today's Glucose</Text>
+                </View>
                 <TouchableOpacity 
                     style={styles.viewMoreButton}
                     onPress={() => navigation.navigate('FullGlucoseChart')}

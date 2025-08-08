@@ -68,7 +68,7 @@ const getStyles = (colors) => StyleSheet.create({
     segment: { flex: 1, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
     segmentActive: { backgroundColor: colors.card, borderRadius: 8, margin: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 3 },
     segmentText: { fontWeight: '600', color: colors.textSecondary, fontSize: 14 },
-    segmentTextActive: { color: '#42A5F5', fontWeight: 'bold' },
+    segmentTextActive: { color: '#FB923C', fontWeight: 'bold' },
     dateNavigatorContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 5, marginBottom: 8 },
     arrowButton: { padding: 8 },
     dateNavigatorText: { fontSize: 20, fontWeight: 'bold', color: colors.text },
