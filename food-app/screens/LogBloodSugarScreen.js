@@ -27,20 +27,19 @@ const STATUS_COLORS = {
 
 const getBloodSugarStatus = (amount, tag, thresholds) => {
     const numAmount = parseFloat(amount);
-    if (isNaN(numAmount)) return { level: 'N/A', color: STATUS_COLORS.default, isAlert: false };
-    if (numAmount >= thresholds.veryHighThreshold) return { level: 'Very High', color: STATUS_COLORS.veryHigh, isAlert: true };
-    if (numAmount < thresholds.lowThreshold) return { level: 'Low', color: STATUS_COLORS.low, isAlert: true };
+    if (isNaN(numAmount)) return { level: 'N/A', color: STATUS_COLORS.default, isAlert: false, type: 'default' };
+    if (numAmount >= thresholds.veryHighThreshold) return { level: 'Very High', color: STATUS_COLORS.veryHigh, isAlert: true, type: 'danger' };
+    if (numAmount < thresholds.lowThreshold) return { level: 'Low', color: STATUS_COLORS.low, isAlert: true, type: 'info' };
+    
     const isFastingContext = tag === 'Fasting' || tag === 'Pre-Meal';
     if (isFastingContext) {
-        if (numAmount >= thresholds.highFastingThreshold) return { level: 'High', color: STATUS_COLORS.high, isAlert: true };
-        if (numAmount >= thresholds.lowThreshold) return { level: 'Normal', color: STATUS_COLORS.normal, isAlert: false };
+        if (numAmount >= thresholds.highFastingThreshold) return { level: 'High', color: STATUS_COLORS.high, isAlert: true, type: 'warning' };
     } else if (tag === 'Post-Meal') {
-        if (numAmount >= thresholds.highPostMealThreshold) return { level: 'High', color: STATUS_COLORS.high, isAlert: true };
-        if (numAmount >= thresholds.lowThreshold) return { level: 'Normal', color: STATUS_COLORS.normal, isAlert: false };
+        if (numAmount >= thresholds.highPostMealThreshold) return { level: 'High', color: STATUS_COLORS.high, isAlert: true, type: 'warning' };
     }
-    return { level: 'Check Tag', color: STATUS_COLORS.default, isAlert: false };
-};
 
+    return { level: 'Normal', color: STATUS_COLORS.normal, isAlert: false, type: 'success' };
+};
 
 const getStyles = (colors) => StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -254,33 +253,33 @@ export default function LogBloodSugarScreen({ navigation }) {
     }, [timePeriod, displayDate]));
 
     const createPersistentAlert = async (status, amount) => {
-    if (!status.isAlert) return; 
+        if (!status.isAlert) return; 
 
-    try {
-        const newNotification = { 
-            message: `${status.level} Glucose Detected: ${amount} mg/dL`, 
-            type: 'alert' 
-        };
+        try {
+            const newNotification = { 
+                message: `${status.level} Glucose Detected: ${amount} mg/dL`, 
+                type: 'alert' 
+            };
 
-        await api.addNotification(newNotification);
+            await api.addNotification(newNotification);
 
-        await Notifications.scheduleNotificationAsync({
-            content: {
-                title: "Abnormal Glucose Reading",
-                body: newNotification.message,
-            },
-            trigger: null, // deliver immediately
-        });
-        
-        const existingNotifications = await AsyncStorage.getItem('notifications');
-        const notifications = existingNotifications ? JSON.parse(existingNotifications) : [];
-        notifications.unshift({ ...newNotification, id: Date.now().toString() }); // Add a temp id for local use
-        await AsyncStorage.setItem('notifications', JSON.stringify(notifications));
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: "Abnormal Glucose Reading",
+                    body: newNotification.message,
+                },
+                trigger: null,
+            });
+            
+            const existingNotifications = await AsyncStorage.getItem('notifications');
+            const notifications = existingNotifications ? JSON.parse(existingNotifications) : [];
+            notifications.unshift({ ...newNotification, id: Date.now().toString() });
+            await AsyncStorage.setItem('notifications', JSON.stringify(notifications));
 
-    } catch (error) { 
-        console.error("Failed to create and save persistent alert:", error); 
-    }
-};
+        } catch (error) { 
+            console.error("Failed to create and save persistent alert:", error); 
+        }
+    };
     
     const handleSave = async (logId, amount, date, tag) => {
         try {
@@ -288,15 +287,24 @@ export default function LogBloodSugarScreen({ navigation }) {
             
             if (logId) {
                 await api.updateLog(logId, { amount, tag });
-                showMessage({ message: "Log Updated", description: `Reading changed to ${amount} mg/dL.`, type: "info" });
+                showMessage({ 
+                    message: "Log Updated", 
+                    description: `Reading changed to ${amount} mg/dL.`, 
+                    type: "info" 
+                });
             } else {
                 await api.addLog({ amount, type: 3, date: date.toISOString(), tag });
-                if (!status.isAlert) {
-                     showMessage({ message: "Log Saved", description: `Your reading of ${amount} mg/dL is within normal range.`, type: "success", icon: "success" });
-                }
+                showMessage({
+                    message: `Reading Saved: ${status.level}`,
+                    description: `Your reading of ${amount} mg/dL is considered ${status.level}.`,
+                    type: status.type,
+                    icon: status.type
+                });
             }
             await createPersistentAlert(status, amount);
-        } catch (e) { Alert.alert('Error', 'An unexpected error occurred while saving.'); }
+        } catch (e) { 
+            Alert.alert('Error', 'An unexpected error occurred while saving.'); 
+        }
         loadDependencies();
     };
     
@@ -342,11 +350,15 @@ export default function LogBloodSugarScreen({ navigation }) {
                 tag: data.tag
             });
 
-            
             const status = getBloodSugarStatus(data.glucose, data.tag, thresholds);
             await createPersistentAlert(status, data.glucose);
 
-            showMessage({ message: "Glucose Log Added Successfully!", type: "success", icon: "success" });
+            showMessage({ 
+                message: `Glucose Log Added: ${status.level}`, 
+                type: status.type, 
+                icon: status.type 
+            });
+
             loadDependencies();
             return data; 
 
