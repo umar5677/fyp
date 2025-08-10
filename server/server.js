@@ -12,6 +12,7 @@ const multerS3 = require('multer-s3');
 const { startScheduledReports } = require('./lib/reportScheduler.js');
 
 // Routers
+const createAdminRouter = require('./api/adminRoutes.js'); // Import the new admin router
 const createVerifyEmailChangeRouter = require('./api/verifyEmailChange.js');
 const createPasswordResetRouter = require('./api/passwordReset.js');
 const createVerifyEmailRouter = require('./api/verifyEmail.js');
@@ -38,6 +39,7 @@ const corsOptions = {
     origin: [
         'https://glucobites.org',
         'https://www.glucobites.org',
+        'http://localhost:3000', // Allow the local admin site
     ]
 };
 app.use(cors(corsOptions));
@@ -66,7 +68,11 @@ const upload = multer({
     })
 });
 
-// PUBLIC ROUTES
+// --- ADMIN PANEL & PUBLIC APP ROUTES ---
+// Mount the new, separated admin router
+app.use('/admin', createAdminRouter(dbPool));
+
+// PUBLIC ROUTES for the Mobile App
 app.use('/api/profile/verify-email-change', createVerifyEmailChangeRouter(dbPool));
 app.use('/api/verify-email', createVerifyEmailRouter(dbPool));
 app.use('/api/register', createRegisterRouter(dbPool));
@@ -93,7 +99,8 @@ app.post('/api/token', (req, res) => {
 });
 
 
-// PROTECTED ROUTES
+// --- PROTECTED MOBILE APP ROUTES ---
+// All routes after this point require a valid JWT from the mobile app
 app.use(authenticateToken);
 
 app.post('/api/upload/profile-picture', upload.single('photo'), async (req, res) => {
@@ -131,7 +138,7 @@ app.put('/api/profile-setup', async (req, res) => {
     }
 
     try {
-        let calorieGoal = 2000; // Default fallback value
+        let calorieGoal = 2000;
         const age = new Date().getFullYear() - new Date(dob).getFullYear();
 
         if (gender === 'Male' && weight > 0 && height > 0 && age > 0) {
@@ -198,8 +205,7 @@ app.get('/api/profile', async (req, res) => {
         );
         
         if (users.length === 0) return res.status(404).json({ message: 'User not found.' });
-
-        // Convert the 0 or 1 from the DB to a boolean for clean JSON
+        
         const user = {
             ...users[0],
             isHpVerified: !!users[0].isHpVerified
@@ -232,7 +238,7 @@ app.put('/api/profile', async (req, res) => {
             }
 
             const token = crypto.randomBytes(32).toString('hex');
-            const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+            const expires = new Date(Date.now() + 60 * 60 * 1000);
 
             await dbPool.query(
                 'UPDATE users SET new_email_pending = ?, email_change_token = ?, email_change_token_expires = ? WHERE userID = ?',

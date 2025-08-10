@@ -57,7 +57,9 @@ const Login = ({ navigation }) => {
         } catch (error) {
             console.error('Login screen error:', error);
             // The `error.message` will contain whatever the server responded with.
-             if (error.message.includes('verify your email')) {
+             if (error.message.includes('suspended')) {
+                 Alert.alert('Account Suspended', error.message);
+            } else if (error.message.includes('verify your email')) {
                  Alert.alert('Email Not Verified', 'Please verify your email address before logging in.');
             } else if (error.message.toLowerCase().includes('invalid')) {
                 Alert.alert('Login Failed', 'Invalid email or password.');

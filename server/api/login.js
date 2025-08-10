@@ -14,8 +14,8 @@ async function comparePassword(plainPassword, hashedPassword) {
 
 async function authenticateUser(email, password, dbPool) {
     try {
-        // Fetches the setProvider flag in addition to existing user data
-        const [users] = await dbPool.query('SELECT userID, email, password, is_verified, hasProfileSetup, setProvider FROM users WHERE email = ?', [email]);
+        // Fetches isSuspended flag along with other user data
+        const [users] = await dbPool.query('SELECT userID, email, password, is_verified, hasProfileSetup, setProvider, isSuspended FROM users WHERE email = ?', [email]);
         
         if (users.length === 0) {
             return { success: false, code: 'INVALID_CREDENTIALS', message: 'User not found.' };
@@ -32,12 +32,16 @@ async function authenticateUser(email, password, dbPool) {
             return { success: false, code: 'EMAIL_NOT_VERIFIED', message: 'Please verify your email address before logging in.' };
         }
         
+        if (user.isSuspended) {
+            return { success: false, code: 'ACCOUNT_SUSPENDED', message: 'You have been suspended by admin. Please contact glucobites.org@gmail.com' };
+        }
+        
         // Returns the user's role (isProvider) and setup status
         return { success: true, user: { 
             userId: user.userID, 
             email: user.email, 
             hasProfileSetup: user.hasProfileSetup,
-            isProvider: user.setProvider === 1 // Convert DB value to a boolean
+            isProvider: user.setProvider === 1
         } };
 
     } catch (error) {
@@ -62,6 +66,9 @@ function createLoginRouter(dbPool) {
                 if (authResult.code === 'EMAIL_NOT_VERIFIED') {
                     return res.status(401).json({ code: authResult.code, message: authResult.message });
                 }
+                if (authResult.code === 'ACCOUNT_SUSPENDED') {
+                    return res.status(403).json({ code: authResult.code, message: authResult.message });
+                }
                 return res.status(401).json({ code: 'INVALID_CREDENTIALS', message: 'Invalid email or password.' });
             }
 
@@ -82,7 +89,7 @@ function createLoginRouter(dbPool) {
                 accessToken: accessToken,
                 refreshToken: refreshToken,
                 hasProfileSetup: authResult.user.hasProfileSetup,
-                isProvider: authResult.user.isProvider, // Sends the provider flag to the mobile app
+                isProvider: authResult.user.isProvider, 
             });
 
         } catch (error) {
