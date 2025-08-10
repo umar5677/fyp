@@ -1,5 +1,6 @@
 require('dotenv').config();
 const crypto = require('crypto');
+const bcrypt = require('bcrypt');
 const { sendEmail } = require('./lib/emailSender.js');
 const express = require('express');
 const cors = require('cors');
@@ -35,14 +36,24 @@ const createBarcodeRouter = require('./api/barcodeScan.js');
 const createLogsRouter = require('./api/logs.js');
 
 const app = express();
+
+const allowedOrigins = [
+    'https://glucobites.org',
+    'https://www.glucobites.org',
+    'http://localhost:3000',
+    'http://localhost:5173', 
+];
+
 const corsOptions = {
-    origin: [
-        'https://glucobites.org',
-        'https://www.glucobites.org',
-        'http://localhost:3000',
-        'http://localhost:5173',
-    ]
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    }
 };
+
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 
@@ -69,9 +80,7 @@ const upload = multer({
     })
 });
 
-
 // --- ADMIN & PUBLIC ROUTES ---
-// These routes do NOT require JWT authentication
 app.use('/admin', createAdminRouter(dbPool));
 app.use('/api/profile/verify-email-change', createVerifyEmailChangeRouter(dbPool));
 app.use('/api/verify-email', createVerifyEmailRouter(dbPool));
@@ -99,15 +108,12 @@ app.post('/api/token', (req, res) => {
 });
 
 
-// --- PROTECTED ROUTES ---
-// THE FIX: Apply the authenticateToken middleware HERE. 
-// Any route defined below this line will be protected.
+// --- PROTECTED MOBILE APP ROUTES ---
 app.use('/api', authenticateToken);
-
 
 // MOUNT FULLY-PROTECTED ROUTERS
 app.use('/api/user-settings', createUserSettingsRoutes(dbPool));
-app.post('/api/generate-report', createGenerateReportRoute(dbPool)); // Should this be GET? POST is fine.
+app.use('/api/generate-report', createGenerateReportRoute(dbPool));
 app.use('/api/providers', createProvidersRouter(dbPool));
 app.use('/api/ocr', createOcrRouter(dbPool));
 app.use('/api/predictions', createPredictionsRouter(dbPool));
@@ -120,7 +126,6 @@ app.use('/api/posts', createPostsRouter(dbPool));
 app.use('/api/barcode', createBarcodeRouter(dbPool));
 app.use('/api/logs', createLogsRouter(dbPool));
 
-// MOUNT OTHER PROTECTED ROUTES DIRECTLY
 app.post('/api/upload/profile-picture', upload.single('photo'), async (req, res) => {
     if (!req.file) return res.status(400).send('No file uploaded.');
     const imageUrl = req.file.location;
@@ -131,7 +136,6 @@ app.post('/api/upload/profile-picture', upload.single('photo'), async (req, res)
         res.status(500).json({ success: false, message: 'File uploaded, but failed to save link.' });
     }
 });
-
 
 app.put('/api/profile-setup', async (req, res) => {
     const userId = req.user.userId;
