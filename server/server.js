@@ -12,6 +12,7 @@ const multerS3 = require('multer-s3');
 const { startScheduledReports } = require('./lib/reportScheduler.js');
 
 // Routers
+const createAdminRouter = require('./api/adminRoutes.js');
 const createVerifyEmailChangeRouter = require('./api/verifyEmailChange.js');
 const createPasswordResetRouter = require('./api/passwordReset.js');
 const createVerifyEmailRouter = require('./api/verifyEmail.js');
@@ -38,6 +39,8 @@ const corsOptions = {
     origin: [
         'https://glucobites.org',
         'https://www.glucobites.org',
+        'http://localhost:3000',
+        'http://localhost:5173',
     ]
 };
 app.use(cors(corsOptions));
@@ -66,7 +69,10 @@ const upload = multer({
     })
 });
 
-// PUBLIC ROUTES
+
+// --- ADMIN & PUBLIC ROUTES ---
+// These routes do NOT require JWT authentication
+app.use('/admin', createAdminRouter(dbPool));
 app.use('/api/profile/verify-email-change', createVerifyEmailChangeRouter(dbPool));
 app.use('/api/verify-email', createVerifyEmailRouter(dbPool));
 app.use('/api/register', createRegisterRouter(dbPool));
@@ -93,23 +99,15 @@ app.post('/api/token', (req, res) => {
 });
 
 
-// PROTECTED ROUTES
-app.use(authenticateToken);
+// --- PROTECTED ROUTES ---
+// THE FIX: Apply the authenticateToken middleware HERE. 
+// Any route defined below this line will be protected.
+app.use('/api', authenticateToken);
 
-app.post('/api/upload/profile-picture', upload.single('photo'), async (req, res) => {
-    if (!req.file) return res.status(400).send('No file uploaded.');
-    const imageUrl = req.file.location;
-    try {
-        await dbPool.query('UPDATE users SET pfpUrl = ? WHERE userID = ?', [imageUrl, req.user.userId]);
-        res.status(200).json({ success: true, imageUrl });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'File uploaded, but failed to save link.' });
-    }
-});
 
 // MOUNT FULLY-PROTECTED ROUTERS
 app.use('/api/user-settings', createUserSettingsRoutes(dbPool));
-app.post('/api/generate-report', createGenerateReportRoute(dbPool));
+app.post('/api/generate-report', createGenerateReportRoute(dbPool)); // Should this be GET? POST is fine.
 app.use('/api/providers', createProvidersRouter(dbPool));
 app.use('/api/ocr', createOcrRouter(dbPool));
 app.use('/api/predictions', createPredictionsRouter(dbPool));
@@ -122,6 +120,19 @@ app.use('/api/posts', createPostsRouter(dbPool));
 app.use('/api/barcode', createBarcodeRouter(dbPool));
 app.use('/api/logs', createLogsRouter(dbPool));
 
+// MOUNT OTHER PROTECTED ROUTES DIRECTLY
+app.post('/api/upload/profile-picture', upload.single('photo'), async (req, res) => {
+    if (!req.file) return res.status(400).send('No file uploaded.');
+    const imageUrl = req.file.location;
+    try {
+        await dbPool.query('UPDATE users SET pfpUrl = ? WHERE userID = ?', [imageUrl, req.user.userId]);
+        res.status(200).json({ success: true, imageUrl });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'File uploaded, but failed to save link.' });
+    }
+});
+
+
 app.put('/api/profile-setup', async (req, res) => {
     const userId = req.user.userId;
     const { dob, weight, height, diabetesType, gender, isInsulin } = req.body;
@@ -131,7 +142,7 @@ app.put('/api/profile-setup', async (req, res) => {
     }
 
     try {
-        let calorieGoal = 2000; // Default fallback value
+        let calorieGoal = 2000;
         const age = new Date().getFullYear() - new Date(dob).getFullYear();
 
         if (gender === 'Male' && weight > 0 && height > 0 && age > 0) {
@@ -198,8 +209,7 @@ app.get('/api/profile', async (req, res) => {
         );
         
         if (users.length === 0) return res.status(404).json({ message: 'User not found.' });
-
-        // Convert the 0 or 1 from the DB to a boolean for clean JSON
+        
         const user = {
             ...users[0],
             isHpVerified: !!users[0].isHpVerified
@@ -217,41 +227,28 @@ app.put('/api/profile', async (req, res) => {
     const userId = req.user.userId;
     const updates = req.body;
     const newEmail = updates.email ? updates.email.trim() : undefined;
-
     try {
         const [users] = await dbPool.query('SELECT email FROM users WHERE userID = ?', [userId]);
-        if (users.length === 0) {
-            return res.status(404).json({ message: 'User not found.' });
-        }
+        if (users.length === 0) return res.status(404).json({ message: 'User not found.' });
+        
         const currentUserEmail = users[0].email;
-
         if (newEmail && newEmail !== currentUserEmail) {
             const [existingEmail] = await dbPool.query('SELECT userID FROM users WHERE email = ?', [newEmail]);
-            if (existingEmail.length > 0) {
-                return res.status(409).json({ message: 'This email address is already in use.' });
-            }
-
+            if (existingEmail.length > 0) return res.status(409).json({ message: 'This email address is already in use.' });
+            
             const token = crypto.randomBytes(32).toString('hex');
-            const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-            await dbPool.query(
-                'UPDATE users SET new_email_pending = ?, email_change_token = ?, email_change_token_expires = ? WHERE userID = ?',
-                [newEmail, token, expires, userId]
-            );
-
+            const expires = new Date(Date.now() + 60 * 60 * 1000);
+            await dbPool.query( 'UPDATE users SET new_email_pending = ?, email_change_token = ?, email_change_token_expires = ? WHERE userID = ?', [newEmail, token, expires, userId] );
             const verificationLink = `https://glucobites.org/verify-email-change?token=${token}`;
             const emailSubject = 'Please Verify Your New GlucoBites Email Address';
             const emailText = `Hello,\n\nYou requested to change the email address for your GlucoBites account. Please click the link below to confirm this change:\n\n${verificationLink}\n\nThis link will expire in one hour. If you did not request this change, please ignore this email.\n\nThanks,\nThe GlucoBites Team`;
-            
             await sendEmail(newEmail, emailSubject, emailText);
-
             delete updates.email;
         }
 
         let queryFields = [];
         let queryParams = [];
         const allowedFields = ['first_name', 'last_name', 'dob', 'height', 'weight', 'gender', 'diabetes', 'isInsulin', 'calorieGoal'];
-
         Object.keys(updates).forEach(key => {
             if (allowedFields.includes(key) && updates[key] !== undefined) {
                 queryFields.push(`${key} = ?`);
@@ -270,7 +267,6 @@ app.put('/api/profile', async (req, res) => {
         } else {
             res.status(200).json({ message: "Profile updated successfully." });
         }
-
     } catch (error) {
         console.error("Profile update error:", error);
         res.status(500).json({ message: "Error updating profile." });
