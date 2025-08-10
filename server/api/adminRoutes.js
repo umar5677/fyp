@@ -1,5 +1,5 @@
 const express = require('express');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 function createAdminRouter(db) {
     const router = express.Router();
@@ -13,18 +13,21 @@ function createAdminRouter(db) {
             const sql = 'SELECT * FROM admins WHERE username = ?';
             const [rows] = await db.execute(sql, [username]);
             if (rows.length === 0) {
-                return res.status(401).json({ message: 'Invalid username or password.' });
+                console.error(`Admin Login Attempt Failed: Username "${username}" not found.`);
+                return res.status(401).json({ message: 'Invalid credentials' });
             }
             const user = rows[0];
             const isMatch = await bcrypt.compare(password, user.password);
             if (isMatch) {
+                console.log(`Admin Login Success: User "${username}" successfully authenticated.`);
                 res.status(200).json({ message: 'Login successful.' });
             } else {
-                res.status(401).json({ message: 'Invalid username or password.' });
+                console.error(`Admin Login Attempt Failed: Invalid password for username "${username}".`);
+                res.status(401).json({ message: 'Invalid credentials' });
             }
         } catch (error) {
-            console.error('Login Error:', error);
-            res.status(500).json({ message: 'Server error during login.' });
+            console.error('CRITICAL ADMIN LOGIN ERROR:', error);
+            res.status(500).json({ message: 'Server error during login process.' });
         }
     });
 
