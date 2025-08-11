@@ -121,17 +121,20 @@ function createAdminRouter(db) {
 
             await connection.commit();
 
+            let responseMessage = 'Application and user provider status updated successfully.';
+
             if (newStatus === 1 && hpEmail) {
                 try {
                     const verifyEmailCommand = new VerifyEmailIdentityCommand({ EmailAddress: hpEmail });
                     await sesClient.send(verifyEmailCommand);
-                    console.log(`Successfully sent SES verification request to ${hpEmail}`);
+                    console.log(`Successfully initiated SES verification for ${hpEmail}`);
                 } catch (sesError) {
-                    console.error(`Failed to send SES verification email to ${hpEmail}:`, sesError);
+                    console.error(`CRITICAL: Database update succeeded, but failed to send SES verification email to ${hpEmail}. Please verify this email manually in the AWS SES Console. Error:`, sesError);
+                    responseMessage += ' However, the automated verification email could not be sent. Please check the server logs and verify the email manually in AWS SES.';
                 }
             }
 
-            res.status(200).json({ message: 'Application and user provider status updated successfully.' });
+            res.status(200).json({ message: responseMessage });
         } catch (error) {
             if (connection) await connection.rollback();
             console.error('Error during verification transaction:', error);
