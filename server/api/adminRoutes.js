@@ -252,17 +252,62 @@ function createAdminRouter(db) {
         }
     });
 
+    // --- MODIFIED ADMIN COMMENT DELETION ROUTE ---
     router.delete('/comments/:id', async (req, res) => {
-        const { id } = req.params;
+        const { id: commentId } = req.params;
+        let connection;
+
         try {
-            const [result] = await db.execute('DELETE FROM post_comments WHERE id = ?', [id]);
-            if (result.affectedRows === 0) {
+            connection = await db.getConnection();
+            await connection.beginTransaction();
+
+            // Step 1: Find the comment to get its parent postID
+            const [comments] = await connection.execute(
+                'SELECT postID FROM post_comments WHERE id = ?',
+                [commentId]
+            );
+
+            if (comments.length === 0) {
+                await connection.rollback();
+                connection.release();
                 return res.status(404).json({ message: 'Comment not found.' });
             }
-            res.status(200).json({ message: 'Comment deleted successfully.' });
+            
+            const postId = comments[0].postID;
+
+            // Step 2: Delete the comment from the 'post_comments' table
+            const [deleteResult] = await connection.execute(
+                'DELETE FROM post_comments WHERE id = ?',
+                [commentId]
+            );
+
+            if (deleteResult.affectedRows === 0) {
+                // This should not happen if the previous check passed, but it's good practice
+                throw new Error('Comment deletion failed after finding the comment.');
+            }
+
+            // Step 3: Decrement the commentCount in the 'posts' table
+            await connection.execute(
+                'UPDATE posts SET commentCount = GREATEST(0, commentCount - 1) WHERE id = ?',
+                [postId]
+            );
+
+            // Step 4: Commit the transaction if all steps were successful
+            await connection.commit();
+            res.status(200).json({ message: 'Comment deleted successfully by admin.' });
+
         } catch (error) {
-            console.error('Error deleting comment:', error);
+            // If any error occurred, roll back all changes
+            if (connection) {
+                await connection.rollback();
+            }
+            console.error('Error deleting comment by admin:', error);
             res.status(500).json({ message: 'Server error while deleting comment.' });
+        } finally {
+            // Always release the connection
+            if (connection) {
+                connection.release();
+            }
         }
     });
 

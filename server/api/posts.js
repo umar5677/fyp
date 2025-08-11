@@ -147,6 +147,7 @@ function createPostsRouter(dbPool) {
             const [ownerCheck] = await connection.query('SELECT userID FROM posts WHERE id = ?', [postId]);
             if (ownerCheck.length === 0 || ownerCheck[0].userID !== userId) {
                 await connection.rollback();
+                connection.release();
                 return res.status(403).json({ message: 'Forbidden: You do not own this post.' });
             }
             await connection.query('UPDATE posts SET title = ?, content = ? WHERE id = ?', [title, content, postId]);
@@ -190,6 +191,7 @@ function createPostsRouter(dbPool) {
             const [ownerCheck] = await connection.query('SELECT userID FROM posts WHERE id = ?', [postId]);
             if (ownerCheck.length === 0 || ownerCheck[0].userID !== userId) {
                 await connection.rollback();
+                connection.release();
                 return res.status(403).json({ message: 'Forbidden: You do not own this post.' });
             }
             const [images] = await connection.query('SELECT imageUrl FROM post_images WHERE postID = ?', [postId]);
@@ -460,9 +462,12 @@ function createPostsRouter(dbPool) {
         }
     });
 
+    // --- MODIFIED ROUTE ---
+    // DELETE a comment, accessible by the owner or an admin
     router.delete('/comments/:commentId', async (req, res) => {
         const { commentId } = req.params;
-        const userId = req.user.userId;
+        // Assuming your auth middleware provides isAdmin flag
+        const { userId, isAdmin } = req.user; 
         const connection = await dbPool.getConnection();
         
         try {
@@ -478,16 +483,18 @@ function createPostsRouter(dbPool) {
             const comment = comments[0];
             const postId = comment.postID;
 
-            if (comment.userID !== userId) {
+            // --- FIX IS HERE: Allow admin to delete ---
+            // Authorize the deletion: user must be the comment owner OR an admin
+            if (comment.userID !== userId && !isAdmin) {
                 await connection.rollback();
                 connection.release();
-                return res.status(403).json({ message: 'Forbidden: You are not the owner of this comment.' });
+                return res.status(403).json({ message: 'You are not authorized to delete this comment.' });
             }
             
-            //Delete the comment.
+            // Delete the comment.
             await connection.query('DELETE FROM post_comments WHERE id = ?', [commentId]);
             
-            //  Reliably decrement the count in the `posts` table by 1.
+            // Reliably decrement the count in the `posts` table by 1.
             await connection.query(
                 'UPDATE posts SET commentCount = GREATEST(0, commentCount - 1) WHERE id = ?', 
                 [postId]
