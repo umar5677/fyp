@@ -1,4 +1,3 @@
-// fyp/server/lib/reportGenerator.js
 const path = require('path');
 const PDFDocument = require('pdfkit');
 const moment = require('moment');
@@ -9,7 +8,6 @@ const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
 const CONTENT_BOTTOM_MARGIN = PAGE_HEIGHT - MARGIN - 20;
 
-// Initialize SES client
 const ses = new SESClient({
   region: process.env.AWS_REGION,
   credentials: {
@@ -35,7 +33,6 @@ function drawTable(doc, title, headers, colPositions, colWidths, data, threshold
     drawTableHeader();
 
     for (const row of data) {
-        // Measure the required height for the current row
         let maxHeight = 0;
         doc.font('Roboto-Regular').fontSize(10);
         row.values.forEach((cellText, i) => {
@@ -52,7 +49,7 @@ function drawTable(doc, title, headers, colPositions, colWidths, data, threshold
             drawTableHeader();
         }
 
-        const yBefore = doc.y; // Get Y position before drawing
+        const yBefore = doc.y;
         
         let textColor = '#000';
         if (thresholds && row.rawValue !== undefined) {
@@ -64,10 +61,8 @@ function drawTable(doc, title, headers, colPositions, colWidths, data, threshold
         }
 
         doc.font('Roboto-Regular').fontSize(10).fillColor(textColor);
-        // Draw all cells, ensuring they start at the same Y coordinate
         row.values.forEach((text, i) => doc.text(text, colPositions[i], yBefore, { width: colWidths[i] }));
         doc.fillColor('#000');
-        // Manually set the cursor after the tallest cell in the row
         doc.y = yBefore + maxHeight + 5;
     }
     doc.moveDown(2); 
@@ -80,8 +75,12 @@ async function generatePdfBuffer(user, startDate, endDate, dbPool, isAutomated =
         if (userRows.length === 0) throw new Error('User not found.');
         const patient = userRows[0];
         
-        const [thresholdRows] = await dbPool.query('SELECT lowThreshold, highFastingThreshold, highPostMealThreshold, veryHighThreshold FROM user_thresholds WHERE userID = ?', [userId]);
-        const thresholds = thresholdRows.length > 0 ? thresholdRows[0] : {};
+        const thresholds = { 
+            lowThreshold: 70, 
+            highFastingThreshold: 100, 
+            highPostMealThreshold: 140, 
+            veryHighThreshold: 180 
+        };
 
         const [logRows] = await dbPool.query('SELECT type, amount, date, tag, foodName FROM dataLogs WHERE userID = ? AND type IN (1, 2, 3) AND date BETWEEN ? AND ? ORDER BY date DESC', [userId, startDate, endDate]);
         const glucoseData = logRows.filter(r => r.type === 3).map(r => ({ rawValue: parseFloat(r.amount), tag: r.tag, values: [`${parseFloat(r.amount).toFixed(1)} mg/dL`, new Date(r.date).toLocaleString(), r.tag || 'N/A']}));
@@ -92,7 +91,6 @@ async function generatePdfBuffer(user, startDate, endDate, dbPool, isAutomated =
         const reportTypeString = isAutomated ? 'Automated Health Report' : 'Health Report';
         const filename = `${patientName.replace(/\s+/g, '_')}_${moment(startDate).format('YYYY-MM-DD')}.pdf`;
 
-        // Define table column layouts
         const tableLayout = {
             headers: ['Amount', 'Date', 'Tag/Food'],
             colPositions: [MARGIN, MARGIN + 120, MARGIN + 320],
@@ -107,7 +105,6 @@ async function generatePdfBuffer(user, startDate, endDate, dbPool, isAutomated =
             doc.on('data', buffer => buffers.push(buffer));
             doc.on('end', () => resolve(Buffer.concat(buffers)));
 
-            //  Build PDF Content
             doc.font('Roboto-Bold').text(`Patient: ${patientName}`);
             doc.text(`Period: ${moment(startDate).format('LL')} - ${moment(endDate).format('LL')}`).moveDown(2);
             doc.font('Roboto-Bold').fontSize(12).text('Patient Information', { underline: true }).moveDown();
@@ -115,7 +112,7 @@ async function generatePdfBuffer(user, startDate, endDate, dbPool, isAutomated =
             doc.text(`Weight: ${patient.weight ? `${patient.weight} kg` : 'N/A'}`);
             doc.text(`Height: ${patient.height ? `${patient.height} cm` : 'N/A'}`);
             doc.text(`Gender: ${patient.gender || 'N/A'}`);
-            doc.text(`Diabetes Type: ${patient.diabetes === 1 ? 'Type 1' : 'Type 2'}`);
+            doc.text(`Diabetes Type: ${patient.diabetes === 1 ? 'Type 1' : (patient.diabetes === 2 ? 'Type 2' : 'N/A')}`);
             doc.text(`Using Insulin: ${patient.isInsulin ? 'Yes' : 'No'}`).moveDown(2);
 
             if (glucoseData.length > 0) drawTable(doc, 'Blood Glucose Logs', tableLayout.headers, tableLayout.colPositions, tableLayout.colWidths, glucoseData, thresholds);

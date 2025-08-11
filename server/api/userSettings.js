@@ -2,48 +2,6 @@ const express = require('express');
 const router = express.Router();
 
 module.exports = function createUserSettingsRoutes(dbPool) {
-  // GET the user's thresholds
-  router.get('/thresholds', async (req, res) => {
-    try {
-      const userId = req.user.userId;
-      const [rows] = await dbPool.query('SELECT lowThreshold, highFastingThreshold, highPostMealThreshold, veryHighThreshold FROM user_thresholds WHERE userID = ?', [userId]);
-
-      if (rows.length > 0) {
-        res.json(rows[0]);
-      } else {
-        res.json({ lowThreshold: 70, highFastingThreshold: 100, highPostMealThreshold: 140, veryHighThreshold: 180 });
-      }
-    } catch (err) {
-      console.error('Error fetching user thresholds:', err);
-      res.status(500).json({ message: 'Failed to get user thresholds.' });
-    }
-  });
-
-  // SAVE the user's thresholds
-  router.post('/thresholds', async (req, res) => {
-    try {
-      const { lowThreshold, highFastingThreshold, highPostMealThreshold, veryHighThreshold } = req.body;
-      const userId = req.user.userId;
-
-      if (!lowThreshold || !highFastingThreshold || !highPostMealThreshold || !veryHighThreshold) {
-        return res.status(400).json({ message: 'All threshold fields are required.' });
-      }
-      
-      const query = `
-        INSERT INTO user_thresholds (userID, lowThreshold, highFastingThreshold, highPostMealThreshold, veryHighThreshold)
-        VALUES (?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-          lowThreshold = VALUES(lowThreshold), highFastingThreshold = VALUES(highFastingThreshold),
-          highPostMealThreshold = VALUES(highPostMealThreshold), veryHighThreshold = VALUES(veryHighThreshold);
-      `;
-      await dbPool.query(query, [userId, lowThreshold, highFastingThreshold, highPostMealThreshold, veryHighThreshold]);
-
-      res.status(200).json({ message: 'Thresholds saved successfully.' });
-    } catch (err) {
-      console.error('Error saving user thresholds:', err);
-      res.status(500).json({ message: 'Failed to save user thresholds.' });
-    }
-  });
 
   // GET the user's preferred provider
   router.get('/provider', async (req, res) => {

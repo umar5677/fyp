@@ -26,9 +26,6 @@ const getStyles = (colors) => StyleSheet.create({
     sectionTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 15 },
     subSectionTitle: { fontSize: 16, fontWeight: '600', color: colors.text, marginTop: 15, marginBottom: 10 },
     descriptionText: { fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginBottom: 15, textAlign: 'left' },
-    thresholdItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.border },
-    triggerText: { fontSize: 16, color: colors.textSecondary },
-    thresholdInput: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12, width: 80, textAlign: 'center', fontSize: 16, backgroundColor: colors.background, color: colors.text },
     actionButton: { backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 10, marginTop: 10, alignItems: 'center', minHeight: 48, justifyContent: 'center' },
     actionButtonText: { color: 'white', textAlign: 'center', fontWeight: 'bold', fontSize: 16 },
     checkbox: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
@@ -56,6 +53,23 @@ const getStyles = (colors) => StyleSheet.create({
     frequencyButtonActive: { backgroundColor: colors.primary, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 3 },
     frequencyButtonText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
     frequencyButtonTextActive: { color: '#FFFFFF' },
+    remarkContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.background,
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 20,
+        borderLeftWidth: 4,
+        borderLeftColor: colors.primary,
+    },
+    remarkText: {
+        flex: 1, 
+        marginLeft: 10,
+        fontSize: 13,
+        color: colors.textSecondary,
+        lineHeight: 18,
+    },
 });
 
 const displayCategories = ['Doctor', 'Nutritionist/Dietitian', 'Exercise Physiologist'];
@@ -98,7 +112,6 @@ export default function AlertsScreen({ navigation }) {
     const { colors } = useTheme();
     const styles = getStyles(colors);
 
-    const [thresholds, setThresholds] = useState({ lowThreshold: '70', highFastingThreshold: '100', highPostMealThreshold: '140', veryHighThreshold: '180' });
     const [currentStep, setCurrentStep] = useState('main');
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [selectedProvider, setSelectedProvider] = useState(null);
@@ -110,25 +123,26 @@ export default function AlertsScreen({ navigation }) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [showCalendarFor, setShowCalendarFor] = useState(null);
     const [automatedReportFrequency, setAutomatedReportFrequency] = useState('Disabled');
-    const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+    const [isLoading, setIsLoading] = useState(true);
     const [providersByCat, setProvidersByCat] = useState({});
 
     useEffect(() => {
         const loadInitialData = async () => {
-            setIsLoadingSettings(true);
+            setIsLoading(true);
             try {
-                const [thresholdData, providerData, prefData, allProviders] = await Promise.all([
-                    api.getUserThresholds(), api.getPreferredProvider(), api.getReportPreference(), api.getProviders()
+                const [providerData, prefData, allProviders] = await Promise.all([
+                    api.getPreferredProvider(), 
+                    api.getReportPreference(), 
+                    api.getProviders()
                 ]);
-                const stringData = Object.keys(thresholdData).reduce((acc, key) => { acc[key] = String(thresholdData[key]); return acc; }, {});
-                setThresholds(stringData);
+                
                 if (providerData.name) { setSelectedProvider(providerData); }
                 if (prefData.frequency) { setAutomatedReportFrequency(prefData.frequency); }
                 setProvidersByCat(allProviders);
             } catch (error) {
                 Alert.alert("Error", "Could not load your saved settings.");
             } finally {
-                setIsLoadingSettings(false);
+                setIsLoading(false);
             }
         };
         loadInitialData();
@@ -143,19 +157,6 @@ export default function AlertsScreen({ navigation }) {
             else setEndDate(selectedDate);
         }
         setShowCalendarFor(null);
-    };
-    
-    const handleSaveThresholds = async () => {
-        const values = Object.values(thresholds).map(parseFloat);
-        if (values.some(isNaN)) return Alert.alert('Invalid Input', 'All fields must be valid numbers.');
-        const [low, highFasting, highPostMeal, veryHigh] = values;
-        if (!(low < highFasting && highFasting < veryHigh && highPostMeal < veryHigh)) return Alert.alert('Logical Error', 'Please ensure thresholds are in a logical order.');
-        try {
-            const result = await api.saveUserThresholds(thresholds);
-            Alert.alert('Success', result.message);
-        } catch (error) {
-            Alert.alert('Error', error.message);
-        }
     };
     
     const handleReportAction = async (actionType) => {
@@ -209,19 +210,6 @@ export default function AlertsScreen({ navigation }) {
 
     const renderMainStep = () => (
         <Animatable.View animation="fadeInUp" duration={500}>
-            <View style={styles.card}>
-                <Text style={styles.sectionTitle}>🔔 Alert Triggers</Text>
-                <Text style={styles.descriptionText}>Receive a notification when your readings go outside these limits.</Text>
-                {Object.entries({ 'Low Glucose': 'lowThreshold', 'High (Fasting)': 'highFastingThreshold', 'High (Post-Meal)': 'highPostMealThreshold', 'Very High Glucose': 'veryHighThreshold' }).map(([label, key], index) => (
-                    <View style={[styles.thresholdItem, index === 0 && {borderTopWidth: 0}]} key={key}>
-                        <Text style={styles.triggerText}>{label}</Text>
-                        <TextInput style={styles.thresholdInput} keyboardType="numeric" value={thresholds[key]} onChangeText={v => setThresholds(p => ({ ...p, [key]: v }))} placeholderTextColor={colors.textSecondary}/>
-                    </View>
-                ))}
-                <TouchableOpacity onPress={handleSaveThresholds} style={styles.actionButton}>
-                    <Text style={styles.actionButtonText}>Save Thresholds</Text>
-                </TouchableOpacity>
-            </View>
             <View style={styles.card}>
                 <Text style={styles.sectionTitle}>🗓️ Automated Email Reports</Text>
                 <Text style={styles.descriptionText}>Automatically send a report to your preferred provider.</Text>
@@ -303,8 +291,18 @@ export default function AlertsScreen({ navigation }) {
             <Text style={styles.sectionTitle}>Enter Provider Manually</Text>
             <TextInput placeholder="Provider's Name" style={styles.manualInput} value={customProvider.name} onChangeText={v => setCustomProvider(p => ({ ...p, name: v }))} placeholderTextColor={colors.textSecondary} />
             <TextInput placeholder="Provider's Email" keyboardType="email-address" autoCapitalize="none" style={styles.manualInput} value={customProvider.email} onChangeText={v => setCustomProvider(p => ({ ...p, email: v }))} placeholderTextColor={colors.textSecondary} />
+            
+            <View style={styles.remarkContainer}>
+                <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
+                <Text style={styles.remarkText}>
+                    Please ensure your provider has registered in our app and is a fully verified healthcare provider by our admin.
+                </Text>
+            </View>
             <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#10B981' }]} onPress={() => {
-                if (!customProvider.name || !customProvider.email) return Alert.alert('Missing Info', 'Please provide both a name and an email.');
+                if (!customProvider.name || !customProvider.email.includes('@')) {
+                    Alert.alert('Invalid Info', 'Please provide a valid name and email address.');
+                    return;
+                }
                 setSelectedProvider({ name: customProvider.name, email: customProvider.email });
                 setCurrentStep('main');
             }}>
@@ -314,7 +312,7 @@ export default function AlertsScreen({ navigation }) {
     );
 
     const renderContent = () => {
-        if (isLoadingSettings) return <View style={styles.loadingContainer}><ActivityIndicator size="large" color={colors.primary} /></View>;
+        if (isLoading) return <View style={styles.loadingContainer}><ActivityIndicator size="large" color={colors.primary} /></View>;
         switch (currentStep) {
             case 'categories': return renderCategoriesStep();
             case 'providers': return renderProvidersStep();

@@ -209,6 +209,26 @@ function createAdminRouter(db) {
             res.status(500).json({ message: 'Server error while deleting post.' });
         }
     });
+    
+    router.get('/posts/:postId/comments', async (req, res) => {
+        const { postId } = req.params;
+        try {
+            const sql = `
+                SELECT 
+                    c.id, c.commentText, c.createdAt, 
+                    u.email as authorEmail, u.first_name, u.last_name
+                FROM post_comments c
+                JOIN users u ON c.userID = u.userID
+                WHERE c.postID = ?
+                ORDER BY c.createdAt ASC;
+            `;
+            const [comments] = await db.execute(sql, [postId]);
+            res.status(200).json(comments);
+        } catch (error) {
+            console.error(`Error fetching comments for post ${postId}:`, error);
+            res.status(500).json({ message: 'Server error fetching comments.' });
+        }
+    });
 
     router.get('/comments/reported', async (req, res) => {
         try {
