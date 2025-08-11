@@ -471,6 +471,7 @@ function createPostsRouter(dbPool) {
             const [comments] = await connection.query('SELECT userID, postID FROM post_comments WHERE id = ?', [commentId]);
             if (comments.length === 0) {
                 await connection.rollback();
+                connection.release();
                 return res.status(404).json({ message: 'Comment not found.' });
             }
 
@@ -479,11 +480,18 @@ function createPostsRouter(dbPool) {
 
             if (comment.userID !== userId) {
                 await connection.rollback();
+                connection.release();
                 return res.status(403).json({ message: 'Forbidden: You are not the owner of this comment.' });
             }
             
+            //Delete the comment.
             await connection.query('DELETE FROM post_comments WHERE id = ?', [commentId]);
-            await connection.query('UPDATE posts SET commentCount = (SELECT COUNT(*) FROM post_comments WHERE postID = ?) WHERE id = ?', [postId, postId]);
+            
+            //  Reliably decrement the count in the `posts` table by 1.
+            await connection.query(
+                'UPDATE posts SET commentCount = GREATEST(0, commentCount - 1) WHERE id = ?', 
+                [postId]
+            );
             
             await connection.commit();
             res.status(200).json({ success: true, message: 'Comment deleted successfully.' });
@@ -493,7 +501,9 @@ function createPostsRouter(dbPool) {
             console.error("Error deleting comment:", error);
             res.status(500).json({ message: "Failed to delete comment." });
         } finally {
-            connection.release();
+            if (connection) {
+                connection.release();
+            }
         }
     });
 

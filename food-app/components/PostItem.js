@@ -62,7 +62,7 @@ export const PostItem = ({ item, onToggleLike, onToggleBookmark, onToggleReport,
                 <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate("PostDetail", { postId: item.id })}>
                     <Ionicons name={"chatbubble-outline"} size={24} color={colors.textSecondary} />
                     <Text style={[styles.actionText, { color: colors.textSecondary }]}>
-                        {item.commentCount > 0 ? item.commentCount : ''}
+                        {item.commentCount ?? 0}
                     </Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionButton} onPress={() => onToggleBookmark(item.id, item.bookmarkedByUser)}>
