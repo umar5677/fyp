@@ -1,5 +1,8 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const { SESClient, VerifyEmailIdentityCommand } = require('@aws-sdk/client-ses');
+
+const sesClient = new SESClient({ region: process.env.AWS_REGION });
 
 function createAdminRouter(db) {
     const router = express.Router();
@@ -99,16 +102,35 @@ function createAdminRouter(db) {
         try {
             connection = await db.getConnection();
             await connection.beginTransaction();
-            const [appRows] = await connection.execute('SELECT userID FROM verifyHP WHERE verifyID = ?', [verifyID]);
+
+            const [appRows] = await connection.execute(
+                'SELECT v.userID, u.email FROM verifyHP v JOIN users u ON v.userID = u.userID WHERE v.verifyID = ?', 
+                [verifyID]
+            );
+
             if (appRows.length === 0) {
                 await connection.rollback();
                 connection.release();
                 return res.status(404).json({ message: 'Verification application not found.' });
             }
-            const { userID } = appRows[0];
+            
+            const { userID, email: hpEmail } = appRows[0];
+
             await connection.execute('UPDATE verifyHP SET isVerified = ? WHERE verifyID = ?', [newStatus, verifyID]);
             await connection.execute('UPDATE users SET setProvider = ? WHERE userID = ?', [newStatus, userID]);
+
             await connection.commit();
+
+            if (newStatus === 1 && hpEmail) {
+                try {
+                    const verifyEmailCommand = new VerifyEmailIdentityCommand({ EmailAddress: hpEmail });
+                    await sesClient.send(verifyEmailCommand);
+                    console.log(`Successfully sent SES verification request to ${hpEmail}`);
+                } catch (sesError) {
+                    console.error(`Failed to send SES verification email to ${hpEmail}:`, sesError);
+                }
+            }
+
             res.status(200).json({ message: 'Application and user provider status updated successfully.' });
         } catch (error) {
             if (connection) await connection.rollback();

@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
 
-const BASE_URL = 'http://192.168.10.120:3000/api';
+const BASE_URL = 'https://api.glucobites.org/api';
 
 const handlePublicFetch = async (response) => {
     const data = await response.json();
