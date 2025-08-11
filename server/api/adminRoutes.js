@@ -1,8 +1,5 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const { SESClient, VerifyEmailIdentityCommand } = require('@aws-sdk/client-ses');
-
-const sesClient = new SESClient({ region: process.env.AWS_REGION });
 
 function createAdminRouter(db) {
     const router = express.Router();
@@ -102,39 +99,17 @@ function createAdminRouter(db) {
         try {
             connection = await db.getConnection();
             await connection.beginTransaction();
-
-            const [appRows] = await connection.execute(
-                'SELECT v.userID, u.email FROM verifyHP v JOIN users u ON v.userID = u.userID WHERE v.verifyID = ?', 
-                [verifyID]
-            );
-
+            const [appRows] = await connection.execute('SELECT userID FROM verifyHP WHERE verifyID = ?', [verifyID]);
             if (appRows.length === 0) {
                 await connection.rollback();
                 connection.release();
                 return res.status(404).json({ message: 'Verification application not found.' });
             }
-            
-            const { userID, email: hpEmail } = appRows[0];
-
+            const { userID } = appRows[0];
             await connection.execute('UPDATE verifyHP SET isVerified = ? WHERE verifyID = ?', [newStatus, verifyID]);
             await connection.execute('UPDATE users SET setProvider = ? WHERE userID = ?', [newStatus, userID]);
-
             await connection.commit();
-
-            let responseMessage = 'Application and user provider status updated successfully.';
-
-            if (newStatus === 1 && hpEmail) {
-                try {
-                    const verifyEmailCommand = new VerifyEmailIdentityCommand({ EmailAddress: hpEmail });
-                    await sesClient.send(verifyEmailCommand);
-                    console.log(`Successfully initiated SES verification for ${hpEmail}`);
-                } catch (sesError) {
-                    console.error(`CRITICAL: Database update succeeded, but failed to send SES verification email to ${hpEmail}. Please verify this email manually in the AWS SES Console. Error:`, sesError);
-                    responseMessage += ' However, the automated verification email could not be sent. Please check the server logs and verify the email manually in AWS SES.';
-                }
-            }
-
-            res.status(200).json({ message: responseMessage });
+            res.status(200).json({ message: 'Application and user provider status updated successfully.' });
         } catch (error) {
             if (connection) await connection.rollback();
             console.error('Error during verification transaction:', error);
