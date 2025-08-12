@@ -1,13 +1,17 @@
 const express = require('express');
 const axios = require('axios');
 
-// The public API endpoint for looking up products by barcode
+// API endpoint for Open Food Facts
 const OPEN_FOOD_FACTS_API_URL = 'https://world.openfoodfacts.org/api/v2/product';
+
+// Nutritionix API credentials and endpoint
+const NUTRITIONIX_API_URL = 'https://trackapi.nutritionix.com/v2/search/item';
+const NUTRITIONIX_APP_ID = process.env.NUTRITIONIX_APP_ID;
+const NUTRITIONIX_APP_KEY = process.env.NUTRITIONIX_APP_KEY;
 
 function createBarcodeRouter(dbPool) {
     const router = express.Router();
 
-    // Middleware to check for premium status (copied from your ai.js)
     router.use(async (req, res, next) => {
         if (!req.user || !req.user.userId) {
             return res.status(401).json({ message: 'Authentication required.' });
@@ -30,7 +34,6 @@ function createBarcodeRouter(dbPool) {
         }
     });
 
-    // Endpoint to get product info from a barcode
     router.post('/lookupBarcode', async (req, res) => {
         const { barcode } = req.body;
         if (!barcode) {
@@ -38,37 +41,60 @@ function createBarcodeRouter(dbPool) {
         }
 
         try {
-            // Construct the request URL for the Open Food Facts API
             const apiUrl = `${OPEN_FOOD_FACTS_API_URL}/${barcode}.json`;
             const response = await axios.get(apiUrl);
 
-            // Check if the product was found
-            if (response.data.status !== 1 || !response.data.product) {
-                return res.status(404).json({ success: false, message: 'Product not found.' });
+            if (response.data.status === 1 && response.data.product) {
+                const product = response.data.product;
+                const nutriments = product.nutriments || {};
+
+                const productInfo = {
+                    productName: product.product_name || 'N/A',
+                    calories: nutriments['energy-kcal_100g'] || 0,
+                    sugar: nutriments.sugars_100g || 0,
+                    servingSize: product.serving_size || 'N/A'
+                };
+                
+                console.log(`Barcode ${barcode} found in Open Food Facts.`);
+                return res.json({ success: true, product: productInfo });
             }
-
-            const product = response.data.product;
-            const nutriments = product.nutriments || {}; // Use empty object as default to prevent errors
-
-            // Extract the required information
-            const productInfo = {
-                productName: product.product_name || 'N/A',
-                // Calories are often stored per 100g
-                calories: nutriments['energy-kcal_100g'] || 0,
-                // Sugar content is also per 100g
-                sugar: nutriments.sugars_100g || 0,
-                servingSize: product.serving_size || 'N/A'
-            };
-
-            res.json({ success: true, product: productInfo });
-
         } catch (err) {
-            // Handle cases where the API call itself fails
-            if (err.response && err.response.status === 404) {
-                 return res.status(404).json({ success: false, message: 'Product not found.' });
+            console.log(`Barcode ${barcode} not found in Open Food Facts. Trying Nutritionix...`);
+        }
+
+        try {
+            if (!NUTRITIONIX_APP_ID || !NUTRITIONIX_APP_KEY) {
+                throw new Error("Nutritionix API credentials are not configured on the server.");
             }
-            console.error('Open Food Facts API error:', err.message);
-            res.status(500).json({ success: false, message: 'Could not retrieve product information from the external API.' });
+
+            const response = await axios.get(NUTRITIONIX_API_URL, {
+                headers: {
+                    'x-app-id': NUTRITIONIX_APP_ID,
+                    'x-app-key': NUTRITIONIX_APP_KEY,
+                },
+                params: {
+                    upc: barcode,
+                },
+            });
+
+            if (response.data.foods && response.data.foods.length > 0) {
+                const food = response.data.foods[0];
+                
+                const productInfo = {
+                    productName: food.food_name || 'N/A',
+                    calories: food.nf_calories || 0,
+                    sugar: food.nf_sugars || 0,
+                    servingSize: `${food.serving_qty || 1} ${food.serving_unit || 'serving'}`
+                };
+
+                console.log(`Barcode ${barcode} found in Nutritionix.`);
+                return res.json({ success: true, product: productInfo });
+            } else {
+                return res.status(404).json({ success: false, message: 'Product not found in any database.' });
+            }
+        } catch (err) {
+            console.error('Nutritionix API error:', err.message);
+            return res.status(404).json({ success: false, message: 'Product not found.' });
         }
     });
     
