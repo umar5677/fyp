@@ -15,12 +15,10 @@ function createLogsRouter(dbPool) {
         let query = `SELECT logID, type, amount, date, tag, foodName FROM dataLogs WHERE userID = ? AND type IN (?)`;
         const queryParams = [userId, typeArray];
 
-        if (period === 'day' && startDate && endDate) {
+        // Apply date filtering whenever startDate and endDate are provided, regardless of the period.
+        if (startDate && endDate) {
             query += ` AND date >= ? AND date < ?`;
             queryParams.push(startDate, endDate);
-        } else if (period === 'all' && limit) {
-        } else if (period !== 'all') {
-            console.warn(`Date filtering for period '${period}' is not fully implemented with timezone correction.`);
         }
 
         query += ` ORDER BY date DESC`;
