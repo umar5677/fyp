@@ -1,9 +1,7 @@
-// fyp/food-app/screens/LogCalorieSugarScreen.js
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Alert,
-  KeyboardAvoidingView, Platform, FlatList, Modal, ActivityIndicator, SafeAreaView,
+  KeyboardAvoidingView, Platform, SectionList, Modal, ActivityIndicator, SafeAreaView,
   Animated, Pressable
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -39,6 +37,17 @@ const getStyles = (colors) => StyleSheet.create({
     emptyContainer: { alignItems: 'center', marginTop: 60, paddingHorizontal: 40 },
     emptyText: { fontSize: 20, fontWeight: '600', color: '#ADB5BD', marginTop: 16 },
     emptySubtext: { fontSize: 15, color: '#CED4DA', marginTop: 8, textAlign: 'center' },
+    dateHeaderText: { 
+        fontSize: 16, 
+        fontWeight: 'bold', 
+        color: colors.text, 
+        marginHorizontal: 16, 
+        marginTop: 20, 
+        marginBottom: 8,
+        paddingBottom: 4,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+    },
     logItemCard: { flexDirection: 'row', backgroundColor: colors.card, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, marginVertical: 6, marginHorizontal: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2, alignItems: 'center', justifyContent: 'space-between' },
     logItemTimestamp: { alignItems: 'center', justifyContent: 'center', marginRight: 16, borderRightWidth: 1, borderRightColor: colors.border, paddingRight: 16, minWidth: 70 },
     logItemTimeText: { color: colors.textSecondary, fontWeight: '600', fontSize: 16 },
@@ -222,7 +231,7 @@ export default function LogCalorieSugarScreen({ navigation }) {
     const styles = getStyles(colors);
 
     const [history, setHistory] = useState([]);
-    const [groupedHistory, setGroupedHistory] = useState([]);
+    const [sectionedHistory, setSectionedHistory] = useState([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [editingLogs, setEditingLogs] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -277,21 +286,38 @@ export default function LogCalorieSugarScreen({ navigation }) {
             ]);
 
             setIsPremiumUser(qnaStatus.is_premium || false);
-            
             setHistory(data || []);
-            const tempGroups = {};
+
+            const mealGroups = {};
             (data || []).forEach(log => {
-                const groupKey = log.date + (log.foodName || '');
-                if (tempGroups[groupKey]) {
-                    tempGroups[groupKey].push(log);
-                } else {
-                    tempGroups[groupKey] = [log];
+                const groupKey = log.date + (log.foodName || ''); // Group by exact timestamp + food name
+                if (!mealGroups[groupKey]) {
+                    mealGroups[groupKey] = { timestamp: log.date, logs: [] };
                 }
+                mealGroups[groupKey].logs.push(log);
             });
-            const finalGrouped = Object.values(tempGroups).map(logs => ({
-                timestamp: logs[0].date, logs: logs.sort((a, b) => a.type - b.type),
-            })).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-            setGroupedHistory(finalGrouped);
+
+            // Group the combined "meal" entries by day
+            const dayGroups = {};
+            Object.values(mealGroups).forEach(meal => {
+                const mealDate = new Date(meal.timestamp);
+                const dayKey = mealDate.toDateString(); 
+                if (!dayGroups[dayKey]) {
+                    dayGroups[dayKey] = [];
+                }
+                dayGroups[dayKey].push(meal);
+            });
+
+            const finalSections = Object.keys(dayGroups)
+                .map(dayKey => ({
+                    title: dayKey,
+                    data: dayGroups[dayKey].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)),
+                }))
+                .sort((a, b) => new Date(b.title) - new Date(a.title)); // Sort the days themselves
+
+            setSectionedHistory(finalSections);
+
+
         } catch (err) { 
             Alert.alert('Error', 'Failed to load screen data.'); 
             console.error("Error loading calorie/sugar data:", err);
@@ -412,16 +438,22 @@ export default function LogCalorieSugarScreen({ navigation }) {
                     <SegmentedControl options={['day', 'week', 'month']} selectedOption={timePeriod} onSelect={(p) => { setTimePeriod(p); setDisplayDate(new Date()); }} colors={colors} />
                 </View>
             </Animatable.View>
-            <FlatList
-                data={groupedHistory}
-                keyExtractor={(item) => item.timestamp}
+            <SectionList
+                sections={sectionedHistory}
+                keyExtractor={(item, index) => item.timestamp + index}
                 renderItem={({ item, index }) => (
                     <FoodLogItem item={item} onEdit={handleEditGroup} index={index} colors={colors}/>
+                )}
+                renderSectionHeader={({ section: { title } }) => (
+                    <Text style={styles.dateHeaderText}>
+                        {new Date(title).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                    </Text>
                 )}
                 ListEmptyComponent={<Animatable.View animation="fadeIn" delay={300} style={styles.emptyContainer}>{isLoading ? <ActivityIndicator size="large" color={colors.primary} /> : (<><Ionicons name="fast-food-outline" size={60} color="#CED4DA" /><Text style={styles.emptyText}>Nothing Logged Yet</Text><Text style={styles.emptySubtext}>Tap the '+' button to add an entry.</Text></>)}</Animatable.View>}
                 contentContainerStyle={{ paddingBottom: 120, paddingTop: 10 }}
                 onRefresh={() => loadData(timePeriod, displayDate)}
                 refreshing={isLoading}
+                stickySectionHeadersEnabled={false}
             />
             <View style={styles.fabContainer}>
                 <Animated.View style={[styles.secondaryFab, manualAddStyle]}>
