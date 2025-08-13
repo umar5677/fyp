@@ -17,7 +17,7 @@ import * as Notifications from 'expo-notifications';
 import { api } from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
 import LogBloodSugarModal from '../components/LogBloodSugarModal';
-import useDeviceSyncBLE from '../hooks/useDeviceSyncBLE'; 
+import useDeviceSyncBLE from '../hooks/useDeviceSyncBLE';
 
 const THRESHOLD_KEYS = ['lowThreshold', 'highFastingThreshold', 'highPostMealThreshold', 'veryHighThreshold'];
 
@@ -43,16 +43,16 @@ const getBloodSugarStatus = (amount, tag, thresholds) => {
 
 const getStyles = (colors) => StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
-    header: { 
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', 
+    header: {
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
         paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 20 : 10, paddingBottom: 5,
     },
     headerTitle: { fontSize: 32, fontWeight: 'bold', color: colors.text },
     doneButton: { padding: 5 },
-    lastReadingCard: { 
+    lastReadingCard: {
         backgroundColor: colors.card, paddingVertical: 15, paddingHorizontal: 20,
         borderRadius: 16, marginHorizontal: 16, marginVertical: 8,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, 
+        shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1,
         shadowRadius: 5, elevation: 3, alignItems: 'center'
     },
     cardTitle: { fontSize: 16, fontWeight: '600', color: colors.textSecondary },
@@ -187,15 +187,15 @@ const CalendarModal = ({ isVisible, onClose, onDayPress, initialDate, colors }) 
         <Modal visible={isVisible} transparent={true} animationType="fade">
             <TouchableOpacity style={styles.calendarBackdrop} onPress={onClose} />
             <View style={[styles.calendarModalContainer, { backgroundColor: colors.card }]}>
-                <Calendar 
-                    current={initialDate.toISOString().split('T')[0]} 
-                    maxDate={today} 
-                    onDayPress={(day) => { 
-                        const newDate = new Date(day.timestamp); 
-                        newDate.setMinutes(newDate.getMinutes() + newDate.getTimezoneOffset()); 
-                        onDayPress(newDate); 
-                        onClose(); 
-                    }} 
+                <Calendar
+                    current={initialDate.toISOString().split('T')[0]}
+                    maxDate={today}
+                    onDayPress={(day) => {
+                        const newDate = new Date(day.timestamp);
+                        newDate.setMinutes(newDate.getMinutes() + newDate.getTimezoneOffset());
+                        onDayPress(newDate);
+                        onClose();
+                    }}
                     theme={calendarTheme}
                 />
             </View>
@@ -225,11 +225,45 @@ export default function LogBloodSugarScreen({ navigation }) {
         setIsLoading(true);
         setIsLoadingLastReading(true);
         try {
-            const historyData = api.getHistory([3], timePeriod, displayDate.toISOString());
-            const lastReadingData = api.getHistory([3], 'all', null, 1);
+            const targetDate = new Date(displayDate);
+            let startDate, endDate;
+
+            switch (timePeriod) {
+                case 'week':
+                    const firstDayOfWeek = new Date(targetDate.setDate(targetDate.getDate() - targetDate.getDay()));
+                    firstDayOfWeek.setHours(0, 0, 0, 0);
+                    startDate = firstDayOfWeek.toISOString();
+                    
+                    const lastDayOfWeek = new Date(firstDayOfWeek);
+                    lastDayOfWeek.setDate(lastDayOfWeek.getDate() + 7);
+                    endDate = lastDayOfWeek.toISOString();
+                    break;
+                
+                case 'month':
+                    const firstDayOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+                    firstDayOfMonth.setHours(0, 0, 0, 0);
+                    startDate = firstDayOfMonth.toISOString();
+                    
+                    const firstDayOfNextMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 1);
+                    endDate = firstDayOfNextMonth.toISOString();
+                    break;
+
+                case 'day':
+                default:
+                    targetDate.setHours(0, 0, 0, 0);
+                    startDate = targetDate.toISOString();
+                    
+                    const endOfDay = new Date(targetDate);
+                    endOfDay.setDate(endOfDay.getDate() + 1);
+                    endDate = endOfDay.toISOString();
+                    break;
+            }
+            
+            const historyPromise = api.getHistory([3], timePeriod, startDate, endDate);
+            const lastReadingData = api.getHistory([3], 'all', null, null, 1);
             const thresholdData = AsyncStorage.multiGet(THRESHOLD_KEYS);
 
-            const [historyResult, lastReadingResult, thresholdResult] = await Promise.all([historyData, lastReadingData, thresholdData]);
+            const [historyResult, lastReadingResult, thresholdResult] = await Promise.all([historyPromise, lastReadingData, thresholdData]);
 
             setHistory(historyResult);
             setLastReading(lastReadingResult.length > 0 ? lastReadingResult[0] : null);
@@ -253,12 +287,12 @@ export default function LogBloodSugarScreen({ navigation }) {
     }, [timePeriod, displayDate]));
 
     const createPersistentAlert = async (status, amount) => {
-        if (!status.isAlert) return; 
+        if (!status.isAlert) return;
 
         try {
-            const newNotification = { 
-                message: `${status.level} Glucose Detected: ${amount} mg/dL`, 
-                type: 'alert' 
+            const newNotification = {
+                message: `${status.level} Glucose Detected: ${amount} mg/dL`,
+                type: 'alert'
             };
 
             await api.addNotification(newNotification);
@@ -276,8 +310,8 @@ export default function LogBloodSugarScreen({ navigation }) {
             notifications.unshift({ ...newNotification, id: Date.now().toString() });
             await AsyncStorage.setItem('notifications', JSON.stringify(notifications));
 
-        } catch (error) { 
-            console.error("Failed to create and save persistent alert:", error); 
+        } catch (error) {
+            console.error("Failed to create and save persistent alert:", error);
         }
     };
     
@@ -287,10 +321,10 @@ export default function LogBloodSugarScreen({ navigation }) {
             
             if (logId) {
                 await api.updateLog(logId, { amount, tag });
-                showMessage({ 
-                    message: "Log Updated", 
-                    description: `Reading changed to ${amount} mg/dL.`, 
-                    type: "info" 
+                showMessage({
+                    message: "Log Updated",
+                    description: `Reading changed to ${amount} mg/dL.`,
+                    type: "info"
                 });
             } else {
                 await api.addLog({ amount, type: 3, date: date.toISOString(), tag });
@@ -302,8 +336,8 @@ export default function LogBloodSugarScreen({ navigation }) {
                 });
             }
             await createPersistentAlert(status, amount);
-        } catch (e) { 
-            Alert.alert('Error', 'An unexpected error occurred while saving.'); 
+        } catch (e) {
+            Alert.alert('Error', 'An unexpected error occurred while saving.');
         }
         loadDependencies();
     };
@@ -327,7 +361,7 @@ export default function LogBloodSugarScreen({ navigation }) {
         return null;
     };
     
-    const handleHistoryPress = (item) => { 
+    const handleHistoryPress = (item) => {
         setSelectedLog(item);
     };
 
@@ -353,14 +387,14 @@ export default function LogBloodSugarScreen({ navigation }) {
             const status = getBloodSugarStatus(data.glucose, data.tag, thresholds);
             await createPersistentAlert(status, data.glucose);
 
-            showMessage({ 
-                message: `Glucose Log Added: ${status.level}`, 
-                type: status.type, 
-                icon: status.type 
+            showMessage({
+                message: `Glucose Log Added: ${status.level}`,
+                type: status.type,
+                icon: status.type
             });
 
             loadDependencies();
-            return data; 
+            return data;
 
         } catch (error) {
             Alert.alert("Sync Failed", error.message);
@@ -445,7 +479,7 @@ export default function LogBloodSugarScreen({ navigation }) {
                 refreshing={isLoading}
             />
             
-            <LogBloodSugarModal 
+            <LogBloodSugarModal
                 log={selectedLog}
                 onSave={handleSave}
                 onDelete={handleDelete}

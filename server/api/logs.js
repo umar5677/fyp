@@ -6,7 +6,8 @@ function createLogsRouter(dbPool) {
     // GET /api/logs/history - Fetches the user's logging history
     router.get('/history', async (req, res) => {
         const userId = req.user.userId;
-        const { types, period = 'day', targetDate, limit } = req.query;
+        const { types, period = 'day', startDate, endDate, limit } = req.query;
+        
         if (!types) { return res.status(400).json({ message: "Log type(s) are required as a query parameter." }); }
         const typeArray = types.split(',').map(t => parseInt(t.trim()));
         if (typeArray.some(isNaN)) { return res.status(400).json({ message: "Invalid 'types' parameter." }); }
@@ -14,48 +15,22 @@ function createLogsRouter(dbPool) {
         let query = `SELECT logID, type, amount, date, tag, foodName FROM dataLogs WHERE userID = ? AND type IN (?)`;
         const queryParams = [userId, typeArray];
 
-        if (period !== 'all') {
-            // The targetDate from the client IS the start of their local day, but in UTC.
-            const clientLocalDate = targetDate ? new Date(targetDate) : new Date();
-
-            if (period === 'day') {
-                const startOfDay = new Date(clientLocalDate);
-                const endOfDay = new Date(startOfDay);
-                endOfDay.setDate(endOfDay.getDate() + 1); // The next day at 00:00
-
-                query += ` AND date >= ? AND date < ?`;
-                queryParams.push(startOfDay, endOfDay);
-
-            } else if (period === 'week') {
-                const startOfWeek = new Date(clientLocalDate);
-                // Set to the beginning of the week (Sunday) based on the client's provided date.
-                startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-                startOfWeek.setHours(0, 0, 0, 0);
-
-                const endOfWeek = new Date(startOfWeek);
-                endOfWeek.setDate(endOfWeek.getDate() + 7);
-
-                query += ` AND date >= ? AND date < ?`;
-                queryParams.push(startOfWeek, endOfWeek);
-
-            } else if (period === 'month') {
-                const year = clientLocalDate.getFullYear();
-                const month = clientLocalDate.getMonth();
-                const startOfMonth = new Date(year, month, 1);
-                const endOfMonth = new Date(year, month + 1, 1);
-                
-                query += ` AND date >= ? AND date < ?`;
-                queryParams.push(startOfMonth, endOfMonth);
-            }
+        if (period === 'day' && startDate && endDate) {
+            query += ` AND date >= ? AND date < ?`;
+            queryParams.push(startDate, endDate);
+        } else if (period === 'all' && limit) {
+        } else if (period !== 'all') {
+            console.warn(`Date filtering for period '${period}' is not fully implemented with timezone correction.`);
         }
 
         query += ` ORDER BY date DESC`;
-        if (limit && /^\d+$/.test(limit)) { query += ` LIMIT ?`; queryParams.push(parseInt(limit)); }
+        if (limit && /^\d+$/.test(limit)) { 
+            query += ` LIMIT ?`; 
+            queryParams.push(parseInt(limit)); 
+        }
         
         try {
             const [logs] = await dbPool.query(query, queryParams);
-            // The mysql2 driver returns Date objects that JSON.stringify converts to proper ISO UTC strings,
-            // which is what the client app expects.
             res.status(200).json(logs);
         } catch (error) {
             console.error('Error fetching history:', error);
@@ -63,13 +38,11 @@ function createLogsRouter(dbPool) {
         }
     });
 
-    // POST /api/logs/ - Creates a new log entry
+    // POST /api/logs/ 
     router.post('/', async (req, res) => {
         const userId = req.user.userId;
         const { amount, type, date, tag, foodName } = req.body;
         
-        // The `date` from the client is an ISO 8601 string in UTC. This is the correct value to insert.
-        // If no date is provided, it's a new log for 'now'.
         const dateToInsert = date ? new Date(date) : new Date();
 
         if (amount == null || type == null) { return res.status(400).json({ message: 'Amount and type are required.' }); }

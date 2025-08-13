@@ -86,11 +86,47 @@ export default function FullGlucoseChart() {
         const loadDataAndThresholds = async () => {
             setIsLoading(true);
             try {
+                let startDate;
+                let endDate;
+                const targetDate = new Date(displayDate);
+
+                switch (period) {
+                    case 'week':
+                        const firstDayOfWeek = new Date(targetDate.setDate(targetDate.getDate() - targetDate.getDay()));
+                        firstDayOfWeek.setHours(0, 0, 0, 0);
+                        startDate = firstDayOfWeek.toISOString();
+                        
+                        const lastDayOfWeek = new Date(firstDayOfWeek);
+                        lastDayOfWeek.setDate(lastDayOfWeek.getDate() + 7);
+                        endDate = lastDayOfWeek.toISOString();
+                        break;
+                    
+                    case 'month':
+                        const firstDayOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+                        firstDayOfMonth.setHours(0, 0, 0, 0);
+                        startDate = firstDayOfMonth.toISOString();
+                        
+                        const firstDayOfNextMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 1);
+                        endDate = firstDayOfNextMonth.toISOString();
+                        break;
+
+                    case 'day':
+                    default:
+                        targetDate.setHours(0, 0, 0, 0);
+                        startDate = targetDate.toISOString();
+                        
+                        const endOfDay = new Date(targetDate);
+                        endOfDay.setDate(endOfDay.getDate() + 1);
+                        endDate = endOfDay.toISOString();
+                        break;
+                }
+
                 const thresholdKeys = ['lowThreshold', 'highFastingThreshold', 'highPostMealThreshold', 'veryHighThreshold'];
                 const [storedThresholds, logs] = await Promise.all([
                     AsyncStorage.multiGet(thresholdKeys),
-                    api.getHistory([3], period, displayDate.toISOString())
+                    api.getHistory([3], period, startDate, endDate)
                 ]);
+
                 const loadedThresholds = { ...thresholds };
                 storedThresholds.forEach(([key, value]) => { if (value !== null) loadedThresholds[key] = parseFloat(value); });
                 setThresholds(loadedThresholds);
@@ -107,7 +143,10 @@ export default function FullGlucoseChart() {
   );
 
   const processData = useCallback((logs, currentPeriod) => {
-    const allReadings = logs ? [...logs].reverse() : [];
+    if (!logs) {
+        logs = [];
+    }
+    const allReadings = [...logs].reverse();
     setReadings(allReadings);
     if (allReadings.length > 0) {
         const amounts = allReadings.map(log => Number(log.amount) || 0);
@@ -118,7 +157,7 @@ export default function FullGlucoseChart() {
     } else {
         setAverage(0); setHigh(0); setLow(0);
     }
-    if (!logs || logs.length === 0) {
+    if (logs.length === 0) {
       setChartData(null); return;
     }
     let labels = []; let dataPoints = [];
@@ -166,7 +205,7 @@ export default function FullGlucoseChart() {
     if (period === 'week') {
         const start = new Date(displayDate); start.setDate(displayDate.getDate() - displayDate.getDay());
         const end = new Date(start); end.setDate(start.getDate() + 6);
-        return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+        return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
     }
     if (period === 'month') return displayDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
@@ -184,10 +223,10 @@ export default function FullGlucoseChart() {
     }
     return (
       <LineChart
-        data={{ labels: [], datasets: chartData.datasets }}
+        data={{ labels: chartData.labels, datasets: chartData.datasets }}
         width={screenWidth} 
         height={220}
-        withVerticalLabels={false} withShadow={false} fromZero bezier
+        withVerticalLabels={true} withShadow={false} fromZero bezier
         chartConfig={{
             backgroundColor: colors.card,
             backgroundGradientFrom: colors.card,
@@ -204,20 +243,6 @@ export default function FullGlucoseChart() {
             fillShadowGradientToOpacity: 0,
         }}
         style={styles.chart} 
-        renderDotContent={({x, y, index}) => {
-            const labelCount = chartData.labels.length;
-            const showLabelModulo = labelCount > 6 ? Math.ceil(labelCount / 6) : 1;
-            if (index % showLabelModulo !== 0) return null;
-            const isFirstLabel = index === 0;
-            return (
-                <Text key={index} style={{
-                    position: 'absolute', top: y + 15, left: isFirstLabel ? x : x - 20,
-                    textAlign: isFirstLabel ? 'left' : 'center', color: colors.textSecondary, fontSize: 10, width: 40,
-                }}>
-                    {chartData.labels[index]}
-                </Text>
-            );
-        }}
       />
     );
   };
@@ -290,7 +315,7 @@ export default function FullGlucoseChart() {
             </View>
         </View>
         <FlatList
-          data={readings.reverse()}
+          data={readings}
           keyExtractor={(item) => item.logID.toString()}
           renderItem={renderReadingItem}
           ListHeaderComponent={renderHeader()}

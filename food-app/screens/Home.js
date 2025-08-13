@@ -8,12 +8,12 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
-import useCalorieBLE from '../hooks/useCalorieBLE'; 
+import useCalorieBLE from '../hooks/useCalorieBLE';
 
 // Import Components
 import SummaryCard from '../components/SummaryCard';
 import PredictedGlucoseCard from '../components/PredictedGlucoseCard';
-import MiniGlucoseChart from '../components/MiniGlucoseChart'; 
+import MiniGlucoseChart from '../components/MiniGlucoseChart';
 import CalorieBurnt from '../components/CalorieBurnt';
 import ProviderAnswerCard from '../components/ProviderAnswerCard';
 import AskProviderCard from '../components/AskProviderCard';
@@ -51,9 +51,17 @@ export default function Home({ route }) {
     const loadData = useCallback(async () => {
         setIsLoadingSummary(true); 
         try {
+            // --- FIX IS HERE: Define precise start and end of the current day ---
+            const startOfDay = new Date();
+            startOfDay.setHours(0, 0, 0, 0);
+
+            const endOfDay = new Date();
+            endOfDay.setHours(23, 59, 59, 999);
+
             const [profileRes, calorieRes, notificationsData, qnaRes, exerciseRes] = await Promise.all([
                 api.getProfile(),
-                api.getHistory([1], 'day', new Date().toISOString()),
+                // Use the new start/end dates for the calorie history fetch
+                api.getHistory([1], 'day', startOfDay.toISOString(), endOfDay.toISOString()),
                 api.getNotifications(), 
                 isProvider ? api.getProviderQuestions() : api.getQnaStatus(),
                 api.getExerciseSummary() 
@@ -70,7 +78,7 @@ export default function Home({ route }) {
             }
             
             setExerciseSummary(exerciseRes);
-            const food = calorieRes.reduce((acc, log) => acc + (Number(log.amount) || 0), 0);
+            const food = (calorieRes || []).reduce((acc, log) => acc + (Number(log.amount) || 0), 0);
             const goal = profileRes.user?.calorieGoal || 2100;
             
             setSummary({

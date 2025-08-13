@@ -166,32 +166,30 @@ const EditModal = ({ modalVisible, setModalVisible, logs, onSave, onDelete, onSc
         <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
                 <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
-                    <Pressable>
-                        <View style={styles.modalContent}>
-                            <Text style={styles.modalTitle}>{isEditing ? "Edit Log" : "Log Calories & Sugar"}</Text>
-                            <TouchableOpacity onPress={() => setDatePickerVisibility(true)} style={styles.datePickerButton} disabled={isEditing}>
-                                <Ionicons name="calendar-outline" size={22} color={colors.primary} />
-                                <Text style={styles.datePickerText}>{logDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</Text>
-                            </TouchableOpacity>
-                            <DateTimePickerModal isVisible={isDatePickerVisible} mode="datetime" date={logDate} onConfirm={(d) => { setDatePickerVisibility(false); setLogDate(d); }} onCancel={() => setDatePickerVisibility(false)} display={Platform.OS === 'ios' ? 'inline' : 'default'} isDarkModeEnabled={theme === 'dark'} maximumDate={today} />
-                            <TextInput style={styles.foodNameInput} placeholder="Food Name (e.g., Apple)" placeholderTextColor={colors.textSecondary} value={foodName} onChangeText={setFoodName} />
-                            <View style={styles.inputRow}>
-                                <TextInput style={[styles.modalInput, {flex: 1}]} keyboardType="decimal-pad" value={calories} onChangeText={setCalories} placeholder="Calories" placeholderTextColor={colors.textSecondary} />
-                                <TextInput style={[styles.modalInput, {flex: 1, marginLeft: 10}]} keyboardType="decimal-pad" value={sugar} onChangeText={setSugar} placeholder="Sugar (g)" placeholderTextColor={colors.textSecondary} />
+                    <Pressable style={styles.modalContent} onPress={e => e.stopPropagation()}>
+                        <Text style={styles.modalTitle}>{isEditing ? "Edit Log" : "Log Calories & Sugar"}</Text>
+                        <TouchableOpacity onPress={() => setDatePickerVisibility(true)} style={styles.datePickerButton} disabled={isEditing}>
+                            <Ionicons name="calendar-outline" size={22} color={colors.primary} />
+                            <Text style={styles.datePickerText}>{logDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</Text>
+                        </TouchableOpacity>
+                        <DateTimePickerModal isVisible={isDatePickerVisible} mode="datetime" date={logDate} onConfirm={(d) => { setDatePickerVisibility(false); setLogDate(d); }} onCancel={() => setDatePickerVisibility(false)} display={Platform.OS === 'ios' ? 'inline' : 'default'} isDarkModeEnabled={theme === 'dark'} maximumDate={today} />
+                        <TextInput style={styles.foodNameInput} placeholder="Food Name (e.g., Apple)" placeholderTextColor={colors.textSecondary} value={foodName} onChangeText={setFoodName} autoFocus={!isEditing} />
+                        <View style={styles.inputRow}>
+                            <TextInput style={[styles.modalInput, {flex: 1}]} keyboardType="decimal-pad" value={calories} onChangeText={setCalories} placeholder="Calories" placeholderTextColor={colors.textSecondary} />
+                            <TextInput style={[styles.modalInput, {flex: 1, marginLeft: 10}]} keyboardType="decimal-pad" value={sugar} onChangeText={setSugar} placeholder="Sugar (g)" placeholderTextColor={colors.textSecondary} />
+                        </View>
+                        {isScanning ? <ActivityIndicator color={colors.primary} /> : (
+                            <View style={styles.scanButtonsContainer}>
+                                <TouchableOpacity style={styles.scanButton} onPress={() => handlePickImage('camera')}><Ionicons name="camera-outline" size={20} color="#fff" /><Text style={styles.scanButtonText}>Scan Label</Text></TouchableOpacity>
+                                <TouchableOpacity style={styles.scanButton} onPress={() => handlePickImage('gallery')}><Ionicons name="image-outline" size={20} color="#fff" /><Text style={styles.scanButtonText}>Upload</Text></TouchableOpacity>
                             </View>
-                            {isScanning ? <ActivityIndicator color={colors.primary} /> : (
-                                <View style={styles.scanButtonsContainer}>
-                                    <TouchableOpacity style={styles.scanButton} onPress={() => handlePickImage('camera')}><Ionicons name="camera-outline" size={20} color="#fff" /><Text style={styles.scanButtonText}>Scan Label</Text></TouchableOpacity>
-                                    <TouchableOpacity style={styles.scanButton} onPress={() => handlePickImage('gallery')}><Ionicons name="image-outline" size={20} color="#fff" /><Text style={styles.scanButtonText}>Upload</Text></TouchableOpacity>
-                                </View>
-                            )}
-                            <View style={styles.modalActions}>
-                                <TouchableOpacity onPress={() => setModalVisible(false)}><Text style={styles.modalButtonText}>Cancel</Text></TouchableOpacity>
-                                {isEditing ? (
-                                    <TouchableOpacity onPress={handleDeletePress}><Text style={[styles.modalButtonText, { color: colors.logoutText }]}>Delete</Text></TouchableOpacity>
-                                ) : null}
-                                <TouchableOpacity onPress={handleSave} disabled={isSaving}><Text style={[styles.modalButtonText, { fontWeight: 'bold' }]}>Save</Text></TouchableOpacity>
-                            </View>
+                        )}
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity onPress={() => setModalVisible(false)}><Text style={styles.modalButtonText}>Cancel</Text></TouchableOpacity>
+                            {isEditing ? (
+                                <TouchableOpacity onPress={handleDeletePress}><Text style={[styles.modalButtonText, { color: colors.logoutText }]}>Delete</Text></TouchableOpacity>
+                            ) : null}
+                            <TouchableOpacity onPress={handleSave} disabled={isSaving}><Text style={[styles.modalButtonText, { fontWeight: 'bold' }]}>Save</Text></TouchableOpacity>
                         </View>
                     </Pressable>
                 </Pressable>
@@ -238,16 +236,51 @@ export default function LogCalorieSugarScreen({ navigation }) {
     const loadData = async (period, date) => {
         setIsLoading(true);
         try {
+            let startDate;
+            let endDate;
+            const targetDate = new Date(date);
+
+            switch (period) {
+                case 'week':
+                    const firstDayOfWeek = new Date(targetDate.setDate(targetDate.getDate() - targetDate.getDay()));
+                    firstDayOfWeek.setHours(0, 0, 0, 0);
+                    startDate = firstDayOfWeek.toISOString();
+                    
+                    const lastDayOfWeek = new Date(firstDayOfWeek);
+                    lastDayOfWeek.setDate(lastDayOfWeek.getDate() + 7);
+                    endDate = lastDayOfWeek.toISOString();
+                    break;
+                
+                case 'month':
+                    const firstDayOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+                    firstDayOfMonth.setHours(0, 0, 0, 0);
+                    startDate = firstDayOfMonth.toISOString();
+                    
+                    const firstDayOfNextMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 1);
+                    endDate = firstDayOfNextMonth.toISOString();
+                    break;
+
+                case 'day':
+                default:
+                    targetDate.setHours(0, 0, 0, 0);
+                    startDate = targetDate.toISOString();
+                    
+                    const endOfDay = new Date(targetDate);
+                    endOfDay.setDate(endOfDay.getDate() + 1);
+                    endDate = endOfDay.toISOString();
+                    break;
+            }
+
             const [data, qnaStatus] = await Promise.all([
-                api.getHistory([1, 2], period, date.toISOString()),
+                api.getHistory([1, 2], period, startDate, endDate),
                 api.getQnaStatus()
             ]);
 
             setIsPremiumUser(qnaStatus.is_premium || false);
             
-            setHistory(data);
+            setHistory(data || []);
             const tempGroups = {};
-            data.forEach(log => {
+            (data || []).forEach(log => {
                 const groupKey = log.date + (log.foodName || '');
                 if (tempGroups[groupKey]) {
                     tempGroups[groupKey].push(log);
@@ -261,6 +294,7 @@ export default function LogCalorieSugarScreen({ navigation }) {
             setGroupedHistory(finalGrouped);
         } catch (err) { 
             Alert.alert('Error', 'Failed to load screen data.'); 
+            console.error("Error loading calorie/sugar data:", err);
             setIsPremiumUser(false);
         } 
         finally { setIsLoading(false); }

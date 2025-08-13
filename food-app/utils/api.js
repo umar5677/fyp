@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
 
-const BASE_URL = 'https://api.glucobites.org/api';
+const BASE_URL = 'http://172.20.10.5:3000/api';
 
 const handlePublicFetch = async (response) => {
     const data = await response.json();
@@ -113,12 +113,26 @@ export const api = {
     uploadProfilePhoto: (formData) => authenticatedFetch('/upload/profile-picture', { method: 'POST', body: formData }),
 
     // Data Logging
-    getHistory: (types, period = 'day', targetDate = null, limit = null) => {
-        const params = new URLSearchParams({ types: types.join(','), period });
-        if (targetDate) params.append('targetDate', targetDate);
-        if (limit) params.append('limit', limit.toString());
+    getHistory: (types, period = 'day', startDate = null, endDate = null, limit = null) => {
+        const params = new URLSearchParams();
+        params.append('types', types.join(','));
+        params.append('period', period);
+
+        // Correctly append the new date parameters if they exist
+        if (startDate) {
+            params.append('startDate', startDate);
+        }
+        if (endDate) {
+            params.append('endDate', endDate);
+        }
+
+        if (limit) {
+            params.append('limit', limit.toString());
+        }
+        
         return authenticatedFetch(`/logs/history?${params.toString()}`);
     },
+
     addLog: (logData) => authenticatedFetch('/logs', { method: 'POST', body: JSON.stringify(logData) }),
     updateLog: (logId, updateData) => authenticatedFetch(`/logs/${logId}`, { method: 'PUT', body: JSON.stringify(updateData) }),
     deleteLog: (logId) => authenticatedFetch(`/logs/${logId}`, { method: 'DELETE' }),

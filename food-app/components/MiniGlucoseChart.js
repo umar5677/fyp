@@ -90,8 +90,20 @@ export default function MiniGlucoseChart() {
                 if (!isLoading) setIsLoading(true);
 
                 try {
-                    const todayISO = new Date().toISOString();
-                    const glucoseRes = await api.getHistory([3], 'day', todayISO, 7);
+                    const startOfDay = new Date();
+                    startOfDay.setHours(0, 0, 0, 0);
+
+                    const endOfDay = new Date();
+                    endOfDay.setHours(23, 59, 59, 999);
+                    
+                    // Call the API with the correct signature
+                    const glucoseRes = await api.getHistory(
+                        [3], 
+                        'day', 
+                        startOfDay.toISOString(), 
+                        endOfDay.toISOString(), 
+                        7 
+                    );
 
                     if (glucoseRes && glucoseRes.length > 1) {
                         const reversedGlucose = [...glucoseRes].reverse();
@@ -116,7 +128,7 @@ export default function MiniGlucoseChart() {
             };
             
             fetchChartData();
-        }, [])
+        }, []) 
     );
 
     const renderContent = () => {
