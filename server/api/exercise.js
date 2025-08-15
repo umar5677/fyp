@@ -1,4 +1,3 @@
-// fyp/server/api/exercise.js
 const express = require('express');
 const authenticateToken = require('../lib/authMiddleware.js');
 
@@ -61,31 +60,48 @@ function createExerciseRouter(dbPool) {
     // GET /api/exercise/summary
     router.get('/summary', authenticateToken, async (req, res) => {
         const userId = req.user.userId;
+        const userTimezoneOffset = req.query.offset || '+00:00';
+
         try {
             const today = new Date();
             const year = today.getFullYear();
 
             const [dayLogs] = await dbPool.query(
-                `SELECT DATE_FORMAT(timestamp, '%Y-%m-%d') as date, SUM(caloriesBurnt) as calories 
-                 FROM exerciseLogs WHERE userID = ? AND DATE(timestamp) >= CURDATE() - INTERVAL 6 DAY
-                 GROUP BY DATE(timestamp) ORDER BY date DESC`, [userId]
+                `SELECT 
+                    DATE_FORMAT(CONVERT_TZ(timestamp, '+00:00', ?), '%Y-%m-%d') as date, 
+                    SUM(caloriesBurnt) as calories 
+                 FROM exerciseLogs 
+                 WHERE userID = ?
+                 GROUP BY date 
+                 ORDER BY date DESC`, 
+                [userTimezoneOffset, userId]
             );
 
             const [weekLogs] = await dbPool.query(
-                `SELECT YEARWEEK(timestamp, 1) as date, SUM(caloriesBurnt) as calories 
-                 FROM exerciseLogs WHERE userID = ? AND YEAR(timestamp) = ?
-                 GROUP BY YEARWEEK(timestamp, 1) ORDER BY date DESC LIMIT 4`, [userId, year]
+                `SELECT 
+                    YEARWEEK(CONVERT_TZ(timestamp, '+00:00', ?), 1) as date, 
+                    SUM(caloriesBurnt) as calories 
+                 FROM exerciseLogs 
+                 WHERE userID = ? AND YEAR(CONVERT_TZ(timestamp, '+00:00', ?)) = ?
+                 GROUP BY date 
+                 ORDER BY date DESC`, 
+                [userTimezoneOffset, userId, userTimezoneOffset, year]
             );
 
             const [monthLogs] = await dbPool.query(
-                `SELECT DATE_FORMAT(timestamp, '%Y-%m') as date, SUM(caloriesBurnt) as calories 
-                 FROM exerciseLogs WHERE userID = ? AND YEAR(timestamp) = ?
-                 GROUP BY DATE_FORMAT(timestamp, '%Y-%m') ORDER BY date DESC LIMIT 6`, [userId, year]
+                `SELECT 
+                    DATE_FORMAT(CONVERT_TZ(timestamp, '+00:00', ?), '%Y-%m') as date, 
+                    SUM(caloriesBurnt) as calories 
+                 FROM exerciseLogs 
+                 WHERE userID = ? AND YEAR(CONVERT_TZ(timestamp, '+00:00', ?)) = ?
+                 GROUP BY date 
+                 ORDER BY date DESC`, 
+                [userTimezoneOffset, userId, userTimezoneOffset, year]
             );
             
             const formattedData = {
                 Day: dayLogs.map(log => ({
-                    date: new Date(log.date).toLocaleDateString('en-GB'),
+                    date: log.date,
                     calories: Math.round(log.calories)
                 })),
                 Week: weekLogs.map(log => {
@@ -94,7 +110,7 @@ function createExerciseRouter(dbPool) {
                     return { date: `Week ${week}, ${year}`, calories: Math.round(log.calories) }
                 }),
                 Month: monthLogs.map(log => ({
-                    date: new Date(log.date).toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+                    date: new Date(log.date + '-02').toLocaleString('en-US', { month: 'long', year: 'numeric' }),
                     calories: Math.round(log.calories)
                 }))
             };
@@ -107,24 +123,29 @@ function createExerciseRouter(dbPool) {
     
     // GET /api/exercise/leaderboard
     router.get('/leaderboard', authenticateToken, async (req, res) => {
-        const { period = 'Day', date } = req.query; // Added date query param
+        const { period = 'Day', date, offset } = req.query;
+        const userTimezoneOffset = offset || '+00:00';
         const targetDate = date ? new Date(date) : new Date();
 
         let dateFilterSql = '';
         switch (period) {
             case 'Week':
-                dateFilterSql = `AND YEARWEEK(el.timestamp, 1) = YEARWEEK(?, 1)`;
+                dateFilterSql = `AND YEARWEEK(CONVERT_TZ(el.timestamp, '+00:00', ?), 1) = YEARWEEK(CONVERT_TZ(?, '+00:00', ?), 1)`;
                 break;
             case 'Month':
-                dateFilterSql = `AND YEAR(el.timestamp) = YEAR(?) AND MONTH(el.timestamp) = MONTH(?)`;
+                dateFilterSql = `AND YEAR(CONVERT_TZ(el.timestamp, '+00:00', ?)) = YEAR(?) AND MONTH(CONVERT_TZ(el.timestamp, '+00:00', ?)) = MONTH(?)`;
                 break;
             case 'Day':
             default:
-                dateFilterSql = `AND DATE(el.timestamp) = DATE(?)`;
+                dateFilterSql = `AND DATE(CONVERT_TZ(el.timestamp, '+00:00', ?)) = DATE(?)`;
                 break;
         }
 
-        const queryParams = period === 'Month' ? [targetDate, targetDate] : [targetDate];
+        const queryParams = period === 'Month' 
+            ? [userTimezoneOffset, targetDate, userTimezoneOffset, targetDate] 
+            : period === 'Week' 
+            ? [userTimezoneOffset, targetDate, userTimezoneOffset]
+            : [userTimezoneOffset, targetDate];
 
         try {
             const query = `
@@ -147,7 +168,7 @@ function createExerciseRouter(dbPool) {
             const formattedLeaderboard = leaderboardData.map(user => ({
                 userID: user.userID,
                 name: `${user.first_name} ${user.last_name}`,
-                avatar: user.pfpUrl, // No fallback to Pravatar, just send the pfpUrl or null
+                avatar: user.pfpUrl,
                 calories: Math.round(user.totalCalories),
             }));
 

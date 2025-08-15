@@ -7,11 +7,9 @@ import { useTheme } from '../context/ThemeContext';
 const HeaderBackground = () => {
   const { theme } = useTheme(); 
 
-  // Define colors for light theme
   const primaryLight = '249, 115, 22';
   const highlightLight = '254, 243, 199';
 
-  // Define colors for dark theme
   const primaryDark = '150, 60, 0';
   const highlightDark = '200, 90, 20';
   

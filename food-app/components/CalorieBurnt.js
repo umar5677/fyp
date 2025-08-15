@@ -1,4 +1,3 @@
-// fyp/food-app/components/CalorieBurnt.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Modal } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
@@ -27,8 +26,8 @@ const DateNavigator = ({ date, onDateChange, period, onOpenCalendar, colors, isF
     const formatDate = () => {
         if (period === 'Day') return moment(date).format('ddd, MMM D, YYYY');
         if (period === 'Week') {
-            const startOfWeek = moment(date).startOf('week').format('MMM D');
-            const endOfWeek = moment(date).endOf('week').format('MMM D');
+            const startOfWeek = moment(date).startOf('isoWeek').format('MMM D');
+            const endOfWeek = moment(date).endOf('isoWeek').format('MMM D');
             return `${startOfWeek} - ${endOfWeek}, ${moment(date).format('YYYY')}`;
         }
         if (period === 'Month') return moment(date).format('MMMM YYYY');
@@ -78,7 +77,6 @@ export default function CalorieBurnt({ calorieData, isLoading }) {
     const { colors, theme } = useTheme();
     const styles = getStyles(colors);
 
-    // State for UI interactivity
     const [isExpanded, setIsExpanded] = useState(false);
     const [period, setPeriod] = useState('Day');
     const [displayDate, setDisplayDate] = useState(new Date());
@@ -86,15 +84,14 @@ export default function CalorieBurnt({ calorieData, isLoading }) {
     const [totalBurnt, setTotalBurnt] = useState(0);
     const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
-    // Todays's total is always based on the 'Day' data from the API response
     const todaysTotal = (calorieData.Day && calorieData.Day.length > 0)
-        ? calorieData.Day.find(d => d.date === moment().format('DD/MM/YYYY'))?.calories || 0
+        ? calorieData.Day.find(d => d.date === moment().format('YYYY-MM-DD'))?.calories || 0
         : 0;
         
     const findTotalForPeriod = (currentPeriod, date, data) => {
         let foundCalories = 0;
         if (currentPeriod === 'Day') {
-            const formattedDate = moment(date).format('DD/MM/YYYY');
+            const formattedDate = moment(date).format('YYYY-MM-DD');
             const dayData = data.Day.find(d => d.date === formattedDate);
             if (dayData) foundCalories = dayData.calories;
         } 
@@ -111,7 +108,6 @@ export default function CalorieBurnt({ calorieData, isLoading }) {
         return foundCalories;
     }
 
-    // Effect to update the detailed total when dependencies change
     useEffect(() => {
         if (!isExpanded) return;
         setIsLoadingDetail(true);
@@ -127,7 +123,6 @@ export default function CalorieBurnt({ calorieData, isLoading }) {
     const isFutureNavigationDisabled = moment(displayDate).endOf(period.toLowerCase()).isSameOrAfter(moment(), 'day');
 
     const changeDate = (amount) => {
-        // Prevent moving forward if the next period is in the future
         if (amount > 0 && isFutureNavigationDisabled) {
             return; 
         }
@@ -195,7 +190,7 @@ export default function CalorieBurnt({ calorieData, isLoading }) {
                     ) : (
                         <Animatable.View animation="fadeIn" duration={600} style={styles.centeredContent}>
                             <Text style={styles.calorieValue}>{Math.round(todaysTotal)}</Text>
-                            <Text style={styles.calorieLabel}>calories (Today)</Text>
+                            <Text style={styles.calorieLabel}>kcal (Today)</Text>
                         </Animatable.View>
                     )}
                 </View>
@@ -215,10 +210,9 @@ const getStyles = (colors) => StyleSheet.create({
     headerLeft: { flexDirection: 'row', alignItems: 'center', },
     title: { fontSize: 18, fontWeight: 'bold', color: colors.text, marginLeft: 12, },
     content: { alignItems: 'center', justifyContent: 'center', marginTop: 20, minHeight: 80, },
-    centeredContent: { alignItems: 'center', justifyContent: 'center', width: '100%' }, // Centering helper
+    centeredContent: { alignItems: 'center', justifyContent: 'center', width: '100%' },
     calorieValue: { fontSize: 48, fontWeight: 'bold', color: colors.primary, textAlign: 'center' },
     calorieLabel: { fontSize: 16, color: colors.textSecondary, textAlign: 'center', marginTop: 2, fontWeight: '500' },
-    // Detailed View
     detailsContainer: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10, marginTop: 15, marginHorizontal: -20, paddingHorizontal: 20 },
     controlsContainer: { paddingBottom: 20 },
     segmentedControlContainer: { flexDirection: 'row', backgroundColor: colors.background, borderRadius: 12, overflow: 'hidden', padding: 4 },
@@ -229,11 +223,9 @@ const getStyles = (colors) => StyleSheet.create({
     dateNavigatorContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 15 },
     arrowButton: { padding: 8, backgroundColor: colors.background, borderRadius: 16 },
     dateNavigatorText: { fontSize: 16, fontWeight: 'bold', color: colors.text },
-    // Total Display
     totalDisplayContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 25, marginHorizontal: -4, borderRadius: 16, marginBottom: 10 },
     totalDisplayText: { fontSize: 44, fontWeight: 'bold', color: colors.primary, textAlign: 'center' },
     totalDisplayLabel: { color: colors.textSecondary, fontSize: 14, marginTop: 4, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center' },
-    // Calendar
     calendarBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
     calendarModalContainer: { width: 350, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5, overflow: 'hidden' },
 });
