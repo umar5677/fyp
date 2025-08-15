@@ -462,11 +462,9 @@ function createPostsRouter(dbPool) {
         }
     });
 
-    // --- MODIFIED ROUTE ---
     // DELETE a comment, accessible by the owner or an admin
     router.delete('/comments/:commentId', async (req, res) => {
         const { commentId } = req.params;
-        // Assuming your auth middleware provides isAdmin flag
         const { userId, isAdmin } = req.user; 
         const connection = await dbPool.getConnection();
         
@@ -483,8 +481,6 @@ function createPostsRouter(dbPool) {
             const comment = comments[0];
             const postId = comment.postID;
 
-            // --- FIX IS HERE: Allow admin to delete ---
-            // Authorize the deletion: user must be the comment owner OR an admin
             if (comment.userID !== userId && !isAdmin) {
                 await connection.rollback();
                 connection.release();
@@ -494,7 +490,6 @@ function createPostsRouter(dbPool) {
             // Delete the comment.
             await connection.query('DELETE FROM post_comments WHERE id = ?', [commentId]);
             
-            // Reliably decrement the count in the `posts` table by 1.
             await connection.query(
                 'UPDATE posts SET commentCount = GREATEST(0, commentCount - 1) WHERE id = ?', 
                 [postId]

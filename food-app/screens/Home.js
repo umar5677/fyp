@@ -51,7 +51,6 @@ export default function Home({ route }) {
     const loadData = useCallback(async () => {
         setIsLoadingSummary(true); 
         try {
-            // --- FIX IS HERE: Define precise start and end of the current day ---
             const startOfDay = new Date();
             startOfDay.setHours(0, 0, 0, 0);
 

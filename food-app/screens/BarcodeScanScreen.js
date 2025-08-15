@@ -52,7 +52,7 @@ const ScannerOverlay = ({ colors }) => {
             {
                 translateY: scanAnimation.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0, 200], // Adjust this based on viewfinder height
+                    outputRange: [0, 200],
                 }),
             },
         ],
@@ -277,7 +277,7 @@ const getStyles = (colors) => StyleSheet.create({
         borderColor: '#FFFFFF',
         borderWidth: 2,
         borderRadius: 16,
-        overflow: 'hidden', // Important for the animated line
+        overflow: 'hidden', 
     },
     scanLine: {
         width: '100%',
@@ -326,7 +326,7 @@ const getStyles = (colors) => StyleSheet.create({
     },
     resultItem: { 
         alignItems: 'center',
-        marginHorizontal: 30, // Space items out
+        marginHorizontal: 30, 
     },
     resultValue: { fontSize: 24, fontWeight: 'bold', marginTop: 4, color: colors.text },
     resultLabel: { fontSize: 14, color: colors.textSecondary, marginTop: 2, fontWeight: '500' },

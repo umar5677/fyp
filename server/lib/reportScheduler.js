@@ -59,7 +59,6 @@ const startScheduledReports = () => {
     cron.schedule('0 7 * * 0', async () => {
         console.log('Running weekly report job...');
         try {
-            // Find all users who want a weekly report and have a provider email set.
             const [users] = await dbPool.query(
                 `SELECT u.userID, ut.preferredProviderName, ut.preferredProviderEmail 
                  FROM users u

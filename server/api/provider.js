@@ -9,7 +9,6 @@ const { createNotification } = require('../lib/notificationManager.js');
 function createProviderRouter(dbPool) {
     const router = express.Router();
 
-    // These middlewares protect all routes in this file, ensuring only authenticated providers can access them.
     router.use(authenticateToken);
     router.use(isProvider);
 
@@ -87,7 +86,6 @@ function createProviderRouter(dbPool) {
                 return res.status(404).json({ message: 'Question not found or not assigned to you.' });
             }
             
-            // Check if the user has ALSO deleted this question.
             const [[question]] = await dbPool.query( 
                 'SELECT deletedByUser FROM questions WHERE questionID = ?',
                 [questionId]
@@ -143,7 +141,6 @@ function createProviderRouter(dbPool) {
                 return res.status(404).json({ message: 'Question not found or you are not authorized to answer it.' });
             }
 
-            // Create a notification for the user who asked the question.
             const notificationMessage = `Your provider has answered your question.`;
             await createNotification(dbPool, originalAskerId, notificationMessage, 'info');
             

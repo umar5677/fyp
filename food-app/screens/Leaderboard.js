@@ -150,7 +150,7 @@ export default function LeaderboardScreen() {
     const onDaySelectFromCalendar = (date) => { setDisplayDate(date); setIsCalendarVisible(false); };
     
     const topThree = users.slice(0, 3);
-    // Find the current user's data *within* the leaderboard list.
+    // Find the current user's data within the leaderboard list.
     const currentUserInList = users.find(u => u.userID === currentUser?.userID);
     const currentUserRank = currentUserInList ? users.findIndex(u => u.userID === currentUser?.userID) + 1 : 0;
     

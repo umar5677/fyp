@@ -252,7 +252,6 @@ function createAdminRouter(db) {
         }
     });
 
-    // --- MODIFIED ADMIN COMMENT DELETION ROUTE ---
     router.delete('/comments/:id', async (req, res) => {
         const { id: commentId } = req.params;
         let connection;
@@ -261,7 +260,6 @@ function createAdminRouter(db) {
             connection = await db.getConnection();
             await connection.beginTransaction();
 
-            // Step 1: Find the comment to get its parent postID
             const [comments] = await connection.execute(
                 'SELECT postID FROM post_comments WHERE id = ?',
                 [commentId]
@@ -275,24 +273,22 @@ function createAdminRouter(db) {
             
             const postId = comments[0].postID;
 
-            // Step 2: Delete the comment from the 'post_comments' table
+            // Delete the comment from the 'post_comments' table
             const [deleteResult] = await connection.execute(
                 'DELETE FROM post_comments WHERE id = ?',
                 [commentId]
             );
 
             if (deleteResult.affectedRows === 0) {
-                // This should not happen if the previous check passed, but it's good practice
                 throw new Error('Comment deletion failed after finding the comment.');
             }
 
-            // Step 3: Decrement the commentCount in the 'posts' table
             await connection.execute(
                 'UPDATE posts SET commentCount = GREATEST(0, commentCount - 1) WHERE id = ?',
                 [postId]
             );
 
-            // Step 4: Commit the transaction if all steps were successful
+            // Commit the transaction if all steps were successful
             await connection.commit();
             res.status(200).json({ message: 'Comment deleted successfully by admin.' });
 

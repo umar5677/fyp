@@ -80,7 +80,7 @@ const upload = multer({
     })
 });
 
-// --- ADMIN & PUBLIC ROUTES ---
+// ADMIN & PUBLIC ROUTES
 app.use('/admin', createAdminRouter(dbPool));
 app.use('/api/profile/verify-email-change', createVerifyEmailChangeRouter(dbPool));
 app.use('/api/verify-email', createVerifyEmailRouter(dbPool));
@@ -108,7 +108,7 @@ app.post('/api/token', (req, res) => {
 });
 
 
-// --- PROTECTED MOBILE APP ROUTES ---
+// PROTECTED MOBILE APP ROUTES
 app.use('/api', authenticateToken);
 
 // MOUNT FULLY-PROTECTED ROUTERS

@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
 
-const BASE_URL = 'http://172.20.10.5:3000/api';
+const BASE_URL = 'https://api.glucobites.org/api';
 
 const handlePublicFetch = async (response) => {
     const data = await response.json();
@@ -145,7 +145,6 @@ export const api = {
     
     // For fetching the aggregated summary to display in the CalorieBurnt component
     getExerciseSummary: () => {
-        // Calculate the client's timezone offset in ±HH:MM format
         const offsetMinutes = new Date().getTimezoneOffset();
         const sign = offsetMinutes > 0 ? '-' : '+';
         const offsetHours = Math.floor(Math.abs(offsetMinutes) / 60);
