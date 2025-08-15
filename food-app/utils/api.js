@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
 
-const BASE_URL = 'http://192.168.10.120:3000/api';
+const BASE_URL = 'https://api.glucobites.org/api';
 
 const handlePublicFetch = async (response) => {
     const data = await response.json();
@@ -145,9 +145,9 @@ export const api = {
     
     // For fetching the aggregated summary to display in the CalorieBurnt component
     getExerciseSummary: () => authenticatedFetch('/exercise/summary'),
-    getLeaderboard: (period) => {
-        // Fetches the top users from the new server endpoint
-        return authenticatedFetch(`/exercise/leaderboard?period=${period}`);
+    getLeaderboard: (period, date) => {
+        const dateQuery = date ? `&date=${date.toISOString()}` : '';
+        return authenticatedFetch(`/exercise/leaderboard?period=${period}${dateQuery}`);
     },
 
     // AI, OCR, & Predictions

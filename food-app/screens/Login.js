@@ -110,7 +110,6 @@ const Login = ({ navigation }) => {
                     )}
                 </View>
 
-                {/* The "Sign Up" text is replaced with a single "Forgot Password?" touchable */}
                 <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
                     <Text style={styles.signupLink}>
                         Forgot Password?
@@ -171,7 +170,6 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         alignItems: 'center',
         marginTop: 5,
-        // Adjusted marginBottom to create space for the forgot password link
         marginBottom: 25,
     },
     loginText: {
